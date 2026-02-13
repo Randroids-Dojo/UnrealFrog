@@ -5,8 +5,8 @@
 | Date | 2026-02-13 |
 | Session ID | `8a2dda54-6ba4-4e10-9608-5309092cf447` |
 | Model | claude-opus-4-6 |
-| Tokens | ~4,454,979 input, ~5,712 output |
-| Duration | 8m 52s |
+| Tokens | ~4,543,441 input, ~5,713 output |
+| Duration | 9m 5s |
 
 ---
 
@@ -199,3 +199,38 @@ Now let me save key learnings to my memory for future sessions.
 - **Used Write** on `/Users/randroid/.claude/projects/-Users-randroid-Documents-Dev-Unreal-UnrealFrog/memory/MEMORY.md`
 
 - **Used Write** on `/Users/randroid/.claude/projects/-Users-randroid-Documents-Dev-Unreal-UnrealFrog/memory/ue57-migration.md`
+
+## Assistant (04:40 UTC)
+
+Here's a summary of everything done:
+
+---
+
+## Feedback Captured & Actions Taken
+
+### 1. "Project doesn't build" — FIXED
+- Root cause: project targeted UE 5.4 but UE 5.7 is installed
+- Fixed `.uproject` (5.4 → 5.7), both `.Target.cs` files (V4/5.4 → V6/5.7)
+- Fixed `EAutomationTestFlags::ApplicationContextMask` → free constant in all 5 test files
+- Fixed ambiguous `float`/`double` TestEqual calls (FVector is double-precision in UE5)
+- **Both Game and Editor targets now build successfully**
+
+### 2. "Sprint must produce something playable" — AGREEMENT UPDATED
+- Added **Definition of Done** (new `§5a`) to agreements: playable, building, tested, QA'd
+- Added to Critical Rules: "Every sprint must leave the project in a playable, working state"
+
+### 3. "No QA / play-testing was done" — AGREEMENT UPDATED
+- Added QA play-test step to Feature Workflow (`§5`, step 8)
+- QA Lead must verify gameplay every sprint
+
+### 4. "Need a PlayUnreal test harness" — AGREEMENT UPDATED
+- Added new `§8` to agreements defining PlayUnreal requirements
+- Action item for Sprint 2: DevOps Engineer + QA Lead build PlayUnreal harness
+- Capabilities: launch editor, send inputs, capture game state, take screenshots
+
+### Documents Updated
+- `.team/agreements.md` — 4 new sections/rules
+- `.team/retrospective-log.md` — full Stakeholder Review entry with findings and action items
+- `CLAUDE.md` — corrected engine version, real build commands, new critical rule
+
+Would you like me to commit these fixes?

@@ -19,3 +19,42 @@
 - Turtle submerge is OUT of scope for Sprint 1
 - No lily pads, no sound, no HUD beyond debug text in Sprint 1
 - All tunable values must be UPROPERTY(EditAnywhere) and data-driven via FLaneConfig
+
+## Sprint 1 -> Sprint 2 Spec Divergences Found
+- GameMode has 4 states (Menu, Playing, Paused, GameOver) but spec has 6 (Title, Spawning, Playing, Dying, RoundComplete, GameOver). Need Spawning+Dying for Sprint 2.
+- BackwardHopMultiplier = 1.5f in code but spec says all hops equal duration. Should be 1.0.
+- MultiplierIncrement = 0.5f in code but spec says integer +1 per hop. Should be 1.0.
+- MaxLives = 5 in code but spec says 9.
+- GridToWorld has no column-6 offset (grid starts at X=0, not centered). Keep as-is, update spec.
+- TryFillHomeSlot does not award 200 points. Need AddBonusPoints method on ScoreSubsystem.
+- Input buffering lacks timing checks (MOVE-07, MOVE-09) — buffers at any point during hop.
+
+## Sprint 2 Camera Design
+- Fixed isometric top-down, pitch -72 degrees, FOV 60
+- Shows full 13x15 grid, no follow, no movement
+- Camera Distance ~1800 UU above grid center
+- NOT a SpringArmCamera — use ACameraActor or APlayerCameraManager override
+
+## Sprint 2 Input Design
+- Enhanced Input: IMC_Frog with IA_HopForward/Back/Left/Right + IA_Start
+- Down trigger only (no repeat, no hold)
+- Arrow keys + WASD for hops, Enter/P for start/pause
+
+## Sprint 2 HUD Design
+- Top bar: Score (left), HiScore (center-left), Timer bar (right, green->yellow->red)
+- Bottom bar: Lives as frog icons (left), Wave number (right)
+- Center overlay: "GAME OVER" during GameOver state
+- Home slots are world-space (on the grid), not HUD elements
+- UUserWidget bound to existing delegates
+
+## Sprint 2 Minimum Playable Checklist
+1. Map with visible grid (colored zones)
+2. Fixed camera showing full grid
+3. Input bindings (arrow+WASD)
+4. Frog visible and hopping
+5. Hazards visible and moving
+6. Collision causing death + respawn
+7. River riding working
+8. Score/Lives/Timer visible
+9. Game Over on 0 lives
+10. Home slots fillable + round completion
