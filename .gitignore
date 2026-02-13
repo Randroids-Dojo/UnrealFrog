@@ -22,5 +22,7 @@ Thumbs.db
 *.xcworkspace
 *.xcuserdata
 
-# Claude Code conversations (large JSONL files)
+# Claude Code conversations (raw JSONL — transcripts are committed instead)
 .claude/conversations/
+.claude/transcripts/.manifest.json
+
