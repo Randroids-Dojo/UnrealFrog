@@ -1,14 +1,49 @@
 // Copyright UnrealFrog Team. All Rights Reserved.
 
 #include "Core/UnrealFrogGameMode.h"
+#include "Core/FrogCharacter.h"
+#include "Core/FrogPlayerController.h"
+#include "Core/FroggerCameraActor.h"
+#include "Core/FroggerHUD.h"
+#include "Core/GroundBuilder.h"
+#include "Core/LaneManager.h"
 #include "TimerManager.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogFrogGameAudio, Log, All);
 
 AUnrealFrogGameMode::AUnrealFrogGameMode()
 {
+	PrimaryActorTick.bCanEverTick = true;
+
+	DefaultPawnClass = AFrogCharacter::StaticClass();
+	PlayerControllerClass = AFrogPlayerController::StaticClass();
+	HUDClass = AFroggerHUD::StaticClass();
+
 	HomeSlotColumns = {1, 4, 6, 8, 11};
 	ResetHomeSlots();
+}
+
+void AUnrealFrogGameMode::BeginPlay()
+{
+	Super::BeginPlay();
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	// Spawn support actors — the map is just an empty container
+	World->SpawnActor<ALaneManager>(ALaneManager::StaticClass());
+	World->SpawnActor<AGroundBuilder>(AGroundBuilder::StaticClass());
+	World->SpawnActor<AFroggerCameraActor>(AFroggerCameraActor::StaticClass());
+}
+
+void AUnrealFrogGameMode::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+
+	TickTimer(DeltaTime);
 }
 
 // -- State transitions --------------------------------------------------------

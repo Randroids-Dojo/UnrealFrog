@@ -36,6 +36,9 @@ class UNREALFROG_API AUnrealFrogGameMode : public AGameModeBase
 public:
 	AUnrealFrogGameMode();
 
+	virtual void BeginPlay() override;
+	virtual void Tick(float DeltaTime) override;
+
 	// -- Tunable parameters -----------------------------------------------
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Timer")
