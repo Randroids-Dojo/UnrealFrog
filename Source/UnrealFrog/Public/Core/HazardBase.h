@@ -8,6 +8,7 @@
 #include "HazardBase.generated.h"
 
 class UBoxComponent;
+class UStaticMesh;
 class UStaticMeshComponent;
 
 UCLASS()
@@ -91,6 +92,18 @@ private:
 
 	/** Right boundary for wrapping (includes buffer for hazard width) */
 	float GetWrapMaxX() const;
+
+	// -- Mesh setup -------------------------------------------------------
+
+	/** Configure mesh shape, scale, and color based on HazardType. Called in BeginPlay. */
+	void SetupMeshForHazardType();
+
+	/** Cached mesh assets loaded in constructor via ConstructorHelpers */
+	UPROPERTY()
+	TObjectPtr<UStaticMesh> CubeMeshAsset;
+
+	UPROPERTY()
+	TObjectPtr<UStaticMesh> CylinderMeshAsset;
 
 	// -- Turtle submerge state --------------------------------------------
 

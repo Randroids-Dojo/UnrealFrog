@@ -4,7 +4,9 @@
 #include "Core/HazardBase.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "TimerManager.h"
+#include "UObject/ConstructorHelpers.h"
 
 AFrogCharacter::AFrogCharacter()
 {
@@ -16,11 +18,31 @@ AFrogCharacter::AFrogCharacter()
 
 	MeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("MeshComponent"));
 	MeshComponent->SetupAttachment(CollisionComponent);
+
+	// Assign sphere mesh for frog placeholder visual
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> SphereMesh(TEXT("/Engine/BasicShapes/Sphere"));
+	if (SphereMesh.Succeeded())
+	{
+		MeshComponent->SetStaticMesh(SphereMesh.Object);
+	}
+
+	// Scale to ~40 UU radius (default sphere is 50 UU radius, so 0.8 scale)
+	MeshComponent->SetWorldScale3D(FVector(0.8f, 0.8f, 0.8f));
 }
 
 void AFrogCharacter::BeginPlay()
 {
 	Super::BeginPlay();
+
+	// Create a bright green dynamic material for the frog placeholder
+	if (MeshComponent && MeshComponent->GetStaticMesh())
+	{
+		UMaterialInstanceDynamic* DynMat = MeshComponent->CreateAndSetMaterialInstanceDynamic(0);
+		if (DynMat)
+		{
+			DynMat->SetVectorParameterValue(TEXT("BaseColor"), FLinearColor(0.1f, 0.9f, 0.1f));
+		}
+	}
 
 	// Snap to the initial grid position
 	SetActorLocation(GridToWorld(GridPosition));

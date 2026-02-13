@@ -3,6 +3,8 @@
 #include "Core/HazardBase.h"
 #include "Components/BoxComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "UObject/ConstructorHelpers.h"
 
 AHazardBase::AHazardBase()
 {
@@ -14,11 +16,27 @@ AHazardBase::AHazardBase()
 
 	MeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("MeshComponent"));
 	MeshComponent->SetupAttachment(CollisionBox);
+
+	// Pre-load both placeholder meshes -- actual assignment happens in BeginPlay
+	// based on HazardType, but the mesh objects need to be found at construction time.
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeMesh(TEXT("/Engine/BasicShapes/Cube"));
+	if (CubeMesh.Succeeded())
+	{
+		CubeMeshAsset = CubeMesh.Object;
+	}
+
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> CylinderMesh(TEXT("/Engine/BasicShapes/Cylinder"));
+	if (CylinderMesh.Succeeded())
+	{
+		CylinderMeshAsset = CylinderMesh.Object;
+	}
 }
 
 void AHazardBase::BeginPlay()
 {
 	Super::BeginPlay();
+
+	SetupMeshForHazardType();
 }
 
 void AHazardBase::Tick(float DeltaTime)
@@ -124,4 +142,70 @@ float AHazardBase::GetWrapMinX() const
 float AHazardBase::GetWrapMaxX() const
 {
 	return static_cast<float>(GridColumns) * GridCellSize + GetWorldWidth();
+}
+
+void AHazardBase::SetupMeshForHazardType()
+{
+	if (!MeshComponent)
+	{
+		return;
+	}
+
+	// Determine if this is a river object (cylinder) or road object (cube)
+	bool bIsRiverObject = (HazardType == EHazardType::SmallLog
+		|| HazardType == EHazardType::LargeLog
+		|| HazardType == EHazardType::TurtleGroup);
+
+	// Assign the appropriate mesh
+	if (bIsRiverObject && CylinderMeshAsset)
+	{
+		MeshComponent->SetStaticMesh(CylinderMeshAsset);
+
+		// Rotate cylinder 90 degrees to lie flat along X axis
+		MeshComponent->SetRelativeRotation(FRotator(0.0f, 90.0f, 0.0f));
+	}
+	else if (!bIsRiverObject && CubeMeshAsset)
+	{
+		MeshComponent->SetStaticMesh(CubeMeshAsset);
+	}
+
+	// Scale based on HazardWidthCells
+	// Default cube/cylinder is 100 UU (1 cell) in each axis
+	// X: scale by width in cells
+	// Y: 1.0 (one cell deep)
+	// Z: 0.5 (half cell height so hazards don't look too tall)
+	float ScaleX = static_cast<float>(HazardWidthCells);
+	MeshComponent->SetWorldScale3D(FVector(ScaleX, 1.0f, 0.5f));
+
+	// Select color based on hazard type
+	FLinearColor HazardColor = FLinearColor::White;
+	switch (HazardType)
+	{
+	case EHazardType::Car:
+		HazardColor = FLinearColor(0.9f, 0.1f, 0.1f);  // Red
+		break;
+	case EHazardType::Truck:
+		HazardColor = FLinearColor(0.6f, 0.1f, 0.1f);  // Dark red
+		break;
+	case EHazardType::Bus:
+		HazardColor = FLinearColor(0.9f, 0.5f, 0.1f);  // Orange
+		break;
+	case EHazardType::Motorcycle:
+		HazardColor = FLinearColor(0.9f, 0.9f, 0.1f);  // Yellow
+		break;
+	case EHazardType::SmallLog:
+	case EHazardType::LargeLog:
+		HazardColor = FLinearColor(0.5f, 0.3f, 0.1f);  // Brown
+		break;
+	case EHazardType::TurtleGroup:
+		HazardColor = FLinearColor(0.1f, 0.5f, 0.2f);  // Dark green
+		break;
+	}
+
+	// Create dynamic material and set color
+	UMaterialInstanceDynamic* DynMat = MeshComponent->CreateAndSetMaterialInstanceDynamic(0);
+	if (DynMat)
+	{
+		DynMat->SetVectorParameterValue(TEXT("BaseColor"), HazardColor);
+	}
 }
