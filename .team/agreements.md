@@ -1,7 +1,7 @@
 # Team Working Agreements
 
 *This is a living document. Updated during retrospectives by the XP Coach.*
-*Last updated: Initial formation*
+*Last updated: Sprint 1 Retrospective*
 
 ## Day 0 Agreements
 
@@ -9,7 +9,7 @@ These are our starting agreements. They WILL evolve through retrospectives.
 
 ### 1. Mob Programming Rules
 
-- **One driver at a time.** Only one agent has write permissions to any given file. Others navigate via messages.
+- **One driver per file at a time.** Multiple drivers are OK if they touch zero overlapping files. (Updated Sprint 1: strict single-driver was unnecessarily slow for independent systems.)
 - **Driver rotation**: The XP Coach assigns the driver for each task based on domain expertise.
 - **Navigators review in real-time.** Don't wait until the end — flag issues as you see them.
 - **Any agent can call "Stop"** if they see a problem. The driver must pause and discuss.
@@ -37,9 +37,9 @@ These are our starting agreements. They WILL evolve through retrospectives.
 
 ### 5. Feature Workflow
 
-1. XP Coach breaks down the feature into tasks
+1. XP Coach breaks down the feature into tasks with dependency graph
 2. Team discusses approach (all agents)
-3. QA Lead / DevOps Engineer writes failing tests
+3. **Same agent writes test AND implementation** (prevents API mismatch — learned Sprint 1)
 4. Domain expert drives implementation
 5. All agents review
 6. Tests pass → merge
@@ -61,7 +61,14 @@ These are our starting agreements. They WILL evolve through retrospectives.
 
 ## Things We Will Figure Out Together
 
-- Optimal driver rotation timing
+- ~~Optimal driver rotation timing~~ → Resolved: per-task, not time-based
 - How to handle disagreements between agents
-- When to bring in a specialist agent
+- When to bring in a specialist agent (Art Director, Sound Engineer, Level Designer not needed for Sprint 1)
 - How to balance speed vs. quality
+
+## Resolved Questions (Sprint 1)
+
+- **8 agents right?** Only 3 were needed for Sprint 1 (XP Coach, Engine Architect, DevOps Engineer). Art/Sound/Level agents are for later sprints with content.
+- **Opus for all?** Engine Architect benefits from opus. DevOps scaffolding could use sonnet for speed. Evaluate per-task.
+- **Driver rotation timing?** Per-task rotation works well. Engine Architect drove most implementation since it's all C++ systems.
+- **WIP limits?** One feature at a time is sufficient. Allow parallel non-overlapping systems within a feature.
