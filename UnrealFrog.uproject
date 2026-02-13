@@ -1,0 +1,13 @@
+{
+	"FileVersion": 3,
+	"EngineAssociation": "5.4",
+	"Category": "",
+	"Description": "3D Frogger arcade game with procedurally generated assets",
+	"Modules": [
+		{
+			"Name": "UnrealFrog",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		}
+	]
+}
