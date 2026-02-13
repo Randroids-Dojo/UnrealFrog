@@ -7,6 +7,8 @@
 #include "Core/FroggerHUD.h"
 #include "Core/GroundBuilder.h"
 #include "Core/LaneManager.h"
+#include "Components/LightComponent.h"
+#include "Engine/DirectionalLight.h"
 #include "TimerManager.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogFrogGameAudio, Log, All);
@@ -37,6 +39,16 @@ void AUnrealFrogGameMode::BeginPlay()
 	World->SpawnActor<ALaneManager>(ALaneManager::StaticClass());
 	World->SpawnActor<AGroundBuilder>(AGroundBuilder::StaticClass());
 	World->SpawnActor<AFroggerCameraActor>(AFroggerCameraActor::StaticClass());
+
+	// Spawn directional light — empty map has no lights
+	FTransform SunTransform;
+	SunTransform.SetRotation(FRotator(-50.0f, -30.0f, 0.0f).Quaternion());
+	ADirectionalLight* Sun = World->SpawnActor<ADirectionalLight>(
+		ADirectionalLight::StaticClass(), SunTransform);
+	if (Sun && Sun->GetLightComponent())
+	{
+		Sun->GetLightComponent()->SetIntensity(3.0f);
+	}
 }
 
 void AUnrealFrogGameMode::Tick(float DeltaTime)

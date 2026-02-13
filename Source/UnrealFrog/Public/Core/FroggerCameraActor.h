@@ -34,13 +34,13 @@ public:
 
 	/** World position of the camera (centered above the 13x15 grid). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera")
-	FVector CameraPosition = FVector(650.0, 750.0, 1800.0);
+	FVector CameraPosition = FVector(600.0, 700.0, 2200.0);
 
-	/** Camera pitch angle in degrees. Negative tilts downward. */
+	/** Camera rotation: pitch=-90 for top-down, yaw=0. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera")
-	float CameraPitch = -72.0f;
+	FRotator CameraRotation = FRotator(-90.0f, 0.0f, 0.0f);
 
 	/** Horizontal field of view in degrees. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera")
-	float CameraFOV = 60.0f;
+	float CameraFOV = 50.0f;
 };

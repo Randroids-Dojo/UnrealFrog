@@ -77,6 +77,20 @@ void AFroggerHUD::DrawHUD()
 		return;
 	}
 
+	// Sync display state from GameMode each frame
+	if (UWorld* World = GetWorld())
+	{
+		if (AUnrealFrogGameMode* GM = Cast<AUnrealFrogGameMode>(World->GetAuthGameMode()))
+		{
+			DisplayState = GM->CurrentState;
+			DisplayWave = GM->CurrentWave;
+			if (GM->TimePerLevel > 0.0f)
+			{
+				TimerPercent = FMath::Clamp(GM->RemainingTime / GM->TimePerLevel, 0.0f, 1.0f);
+			}
+		}
+	}
+
 	DrawScorePanel();
 	DrawTimerBar();
 	DrawOverlay();

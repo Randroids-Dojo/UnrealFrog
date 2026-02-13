@@ -12,7 +12,7 @@ AFroggerCameraActor::AFroggerCameraActor()
 	RootComponent = CameraComponent;
 
 	CameraComponent->SetRelativeLocation(CameraPosition);
-	CameraComponent->SetRelativeRotation(FRotator(CameraPitch, 0.0f, 0.0f));
+	CameraComponent->SetRelativeRotation(CameraRotation);
 	CameraComponent->FieldOfView = CameraFOV;
 }
 
@@ -22,7 +22,7 @@ void AFroggerCameraActor::BeginPlay()
 
 	// Apply tunable values in case they were changed in the editor
 	CameraComponent->SetRelativeLocation(CameraPosition);
-	CameraComponent->SetRelativeRotation(FRotator(CameraPitch, 0.0f, 0.0f));
+	CameraComponent->SetRelativeRotation(CameraRotation);
 	CameraComponent->FieldOfView = CameraFOV;
 
 	// Auto-activate: set this actor as the view target for the first local player

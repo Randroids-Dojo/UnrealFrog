@@ -36,8 +36,8 @@ bool FCameraTest_Pitch::RunTest(const FString& Parameters)
 {
 	AFroggerCameraActor* CamActor = NewObject<AFroggerCameraActor>();
 
-	FRotator CameraRotation = CamActor->CameraComponent->GetRelativeRotation();
-	TestNearlyEqual(TEXT("Camera pitch should be -72 degrees"), CameraRotation.Pitch, -72.0);
+	FRotator Rotation = CamActor->CameraComponent->GetRelativeRotation();
+	TestNearlyEqual(TEXT("Camera pitch should be -90 degrees (top-down)"), Rotation.Pitch, -90.0);
 
 	return true;
 }
@@ -54,7 +54,7 @@ bool FCameraTest_FOV::RunTest(const FString& Parameters)
 {
 	AFroggerCameraActor* CamActor = NewObject<AFroggerCameraActor>();
 
-	TestNearlyEqual(TEXT("Camera FOV should be 60 degrees"), CamActor->CameraComponent->FieldOfView, 60.0f);
+	TestNearlyEqual(TEXT("Camera FOV should be 50 degrees"), CamActor->CameraComponent->FieldOfView, 50.0f);
 
 	return true;
 }
@@ -72,9 +72,9 @@ bool FCameraTest_Position::RunTest(const FString& Parameters)
 	AFroggerCameraActor* CamActor = NewObject<AFroggerCameraActor>();
 
 	FVector CameraPos = CamActor->CameraComponent->GetRelativeLocation();
-	TestNearlyEqual(TEXT("Camera X centered over grid"), CameraPos.X, 650.0, 1.0);
-	TestNearlyEqual(TEXT("Camera Y centered over grid"), CameraPos.Y, 750.0, 1.0);
-	TestNearlyEqual(TEXT("Camera Z high above grid"), CameraPos.Z, 1800.0, 1.0);
+	TestNearlyEqual(TEXT("Camera X centered over grid"), CameraPos.X, 600.0, 1.0);
+	TestNearlyEqual(TEXT("Camera Y centered over grid"), CameraPos.Y, 700.0, 1.0);
+	TestNearlyEqual(TEXT("Camera Z high above grid"), CameraPos.Z, 2200.0, 1.0);
 
 	return true;
 }
