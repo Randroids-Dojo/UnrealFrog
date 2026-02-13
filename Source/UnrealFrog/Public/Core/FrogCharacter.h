@@ -140,6 +140,14 @@ public:
 	/** Apply the current platform's velocity to the frog. Call each frame while riding. */
 	void UpdateRiding(float DeltaTime);
 
+	// -- Collision handlers (public for direct test invocation) ------------
+
+	/** Process overlap with a hazard: road hazards kill, river platforms mount. */
+	void HandleHazardOverlap(AHazardBase* Hazard);
+
+	/** Process end of overlap with a platform: clear CurrentPlatform if it matches. */
+	void HandlePlatformEndOverlap(AHazardBase* Hazard);
+
 protected:
 	// -- Components -------------------------------------------------------
 
@@ -168,6 +176,17 @@ private:
 	void StartHop(FVector Direction);
 	void FinishHop();
 	FIntPoint DirectionToGridDelta(FVector Direction) const;
+
+	// -- Overlap event callbacks ------------------------------------------
+
+	UFUNCTION()
+	void OnBeginOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
+		UPrimitiveComponent* OtherComp, int32 OtherBodyIndex,
+		bool bFromSweep, const FHitResult& SweepResult);
+
+	UFUNCTION()
+	void OnEndOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
+		UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
 
 	// -- Respawn timer ----------------------------------------------------
 

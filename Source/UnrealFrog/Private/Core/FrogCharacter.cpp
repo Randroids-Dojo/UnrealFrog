@@ -14,6 +14,10 @@ AFrogCharacter::AFrogCharacter()
 
 	CollisionComponent = CreateDefaultSubobject<UCapsuleComponent>(TEXT("CollisionComponent"));
 	CollisionComponent->InitCapsuleSize(34.0f, 44.0f);
+	CollisionComponent->SetGenerateOverlapEvents(true);
+	CollisionComponent->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+	CollisionComponent->SetCollisionObjectType(ECC_Pawn);
+	CollisionComponent->SetCollisionResponseToAllChannels(ECR_Overlap);
 	SetRootComponent(CollisionComponent);
 
 	MeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("MeshComponent"));
@@ -43,6 +47,10 @@ void AFrogCharacter::BeginPlay()
 			DynMat->SetVectorParameterValue(TEXT("BaseColor"), FLinearColor(0.1f, 0.9f, 0.1f));
 		}
 	}
+
+	// Bind overlap events for collision detection
+	CollisionComponent->OnComponentBeginOverlap.AddDynamic(this, &AFrogCharacter::OnBeginOverlap);
+	CollisionComponent->OnComponentEndOverlap.AddDynamic(this, &AFrogCharacter::OnEndOverlap);
 
 	// Snap to the initial grid position
 	SetActorLocation(GridToWorld(GridPosition));
@@ -182,6 +190,13 @@ void AFrogCharacter::FinishHop()
 
 	OnHopCompleted.Broadcast(GridPosition);
 
+	// Check river death: landed on river row without a platform
+	if (CheckRiverDeath())
+	{
+		Die(EDeathType::Splash);
+		return;
+	}
+
 	// Process buffered input
 	if (bHasBufferedInput)
 	{
@@ -309,4 +324,54 @@ void AFrogCharacter::UpdateRiding(float DeltaTime)
 	FVector Location = GetActorLocation();
 	Location.X += DeltaX;
 	SetActorLocation(Location);
+}
+
+// -- Collision handlers ---------------------------------------------------
+
+void AFrogCharacter::HandleHazardOverlap(AHazardBase* Hazard)
+{
+	if (bIsDead || !Hazard)
+	{
+		return;
+	}
+
+	if (Hazard->bIsRideable)
+	{
+		// River platform: mount it
+		CurrentPlatform = Hazard;
+	}
+	else
+	{
+		// Road hazard: death by squish
+		Die(EDeathType::Squish);
+	}
+}
+
+void AFrogCharacter::HandlePlatformEndOverlap(AHazardBase* Hazard)
+{
+	if (CurrentPlatform.Get() == Hazard)
+	{
+		CurrentPlatform = nullptr;
+	}
+}
+
+// -- Overlap event callbacks ----------------------------------------------
+
+void AFrogCharacter::OnBeginOverlap(UPrimitiveComponent* OverlappedComp,
+	AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex,
+	bool bFromSweep, const FHitResult& SweepResult)
+{
+	if (AHazardBase* Hazard = Cast<AHazardBase>(OtherActor))
+	{
+		HandleHazardOverlap(Hazard);
+	}
+}
+
+void AFrogCharacter::OnEndOverlap(UPrimitiveComponent* OverlappedComp,
+	AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
+{
+	if (AHazardBase* Hazard = Cast<AHazardBase>(OtherActor))
+	{
+		HandlePlatformEndOverlap(Hazard);
+	}
 }
