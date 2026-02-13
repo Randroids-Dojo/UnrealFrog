@@ -49,10 +49,13 @@ bool FGameState_StartGame::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Starts in Title"), GM->CurrentState, EGameState::Title);
 
 	GM->StartGame();
-	TestEqual(TEXT("Transitions to Playing"), GM->CurrentState, EGameState::Playing);
+	TestEqual(TEXT("Transitions to Spawning"), GM->CurrentState, EGameState::Spawning);
 	TestEqual(TEXT("Timer reset to TimePerLevel"), GM->RemainingTime, GM->TimePerLevel);
 	TestEqual(TEXT("Wave is 1"), GM->CurrentWave, 1);
 	TestEqual(TEXT("Homes filled reset to 0"), GM->HomeSlotsFilledCount, 0);
+
+	GM->OnSpawningComplete();
+	TestEqual(TEXT("After spawning, now Playing"), GM->CurrentState, EGameState::Playing);
 
 	return true;
 }
@@ -70,6 +73,7 @@ bool FGameState_PauseResume::RunTest(const FString& Parameters)
 	AUnrealFrogGameMode* GM = NewObject<AUnrealFrogGameMode>();
 
 	GM->StartGame();
+	GM->OnSpawningComplete();
 	TestEqual(TEXT("Playing state"), GM->CurrentState, EGameState::Playing);
 
 	// Simulate some time passing
@@ -107,6 +111,7 @@ bool FGameState_GameOver::RunTest(const FString& Parameters)
 	AUnrealFrogGameMode* GM = NewObject<AUnrealFrogGameMode>();
 
 	GM->StartGame();
+	GM->OnSpawningComplete();
 	TestEqual(TEXT("Playing state"), GM->CurrentState, EGameState::Playing);
 
 	// Trigger game over
@@ -129,6 +134,7 @@ bool FGameState_CannotStartFromGameOver::RunTest(const FString& Parameters)
 	AUnrealFrogGameMode* GM = NewObject<AUnrealFrogGameMode>();
 
 	GM->StartGame();
+	GM->OnSpawningComplete();
 	GM->HandleGameOver();
 	TestEqual(TEXT("In GameOver"), GM->CurrentState, EGameState::GameOver);
 
@@ -141,6 +147,8 @@ bool FGameState_CannotStartFromGameOver::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Back to Title"), GM->CurrentState, EGameState::Title);
 
 	GM->StartGame();
+	TestEqual(TEXT("Now Spawning"), GM->CurrentState, EGameState::Spawning);
+	GM->OnSpawningComplete();
 	TestEqual(TEXT("Now Playing"), GM->CurrentState, EGameState::Playing);
 
 	return true;
@@ -159,6 +167,7 @@ bool FGameState_LevelTimer::RunTest(const FString& Parameters)
 	AUnrealFrogGameMode* GM = NewObject<AUnrealFrogGameMode>();
 
 	GM->StartGame();
+	GM->OnSpawningComplete();
 	TestEqual(TEXT("Timer starts at 30"), GM->RemainingTime, 30.0f);
 
 	GM->TickTimer(10.0f);
@@ -191,6 +200,7 @@ bool FGameState_HomeSlotFill::RunTest(const FString& Parameters)
 	AUnrealFrogGameMode* GM = NewObject<AUnrealFrogGameMode>();
 
 	GM->StartGame();
+	GM->OnSpawningComplete();
 
 	// Column 1 is a valid home slot
 	TestTrue(TEXT("Column 1 is home slot"), GM->IsHomeSlotColumn(1));
@@ -232,6 +242,7 @@ bool FGameState_WaveComplete::RunTest(const FString& Parameters)
 	AUnrealFrogGameMode* GM = NewObject<AUnrealFrogGameMode>();
 
 	GM->StartGame();
+	GM->OnSpawningComplete();
 	TestEqual(TEXT("Wave starts at 1"), GM->CurrentWave, 1);
 
 	// Fill 4 home slots -- wave should NOT be complete yet
@@ -242,10 +253,18 @@ bool FGameState_WaveComplete::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Still wave 1 at 4 slots"), GM->CurrentWave, 1);
 	TestEqual(TEXT("4 slots filled"), GM->HomeSlotsFilledCount, 4);
 
-	// Fill the 5th slot -- triggers wave complete
+	// Fill the 5th slot -- triggers wave complete → RoundComplete state
 	GM->TryFillHomeSlot(11);
+	TestEqual(TEXT("State is RoundComplete"), GM->CurrentState, EGameState::RoundComplete);
+
+	// Manually complete the round (timer would fire in real game)
+	GM->OnRoundCompleteFinished();
 	TestEqual(TEXT("CurrentWave is now 2"), GM->CurrentWave, 2);
 	TestEqual(TEXT("Homes reset to 0"), GM->HomeSlotsFilledCount, 0);
+	TestEqual(TEXT("State is Spawning"), GM->CurrentState, EGameState::Spawning);
+
+	// Advance to Playing
+	GM->OnSpawningComplete();
 
 	// Verify we can fill slots again in wave 2
 	bool bFilled = GM->TryFillHomeSlot(1);

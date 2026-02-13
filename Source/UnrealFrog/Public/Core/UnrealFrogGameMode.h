@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/GameModeBase.h"
+#include "Core/LaneTypes.h"
 #include "UnrealFrogGameMode.generated.h"
 
 UENUM(BlueprintType)
@@ -55,6 +56,22 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "HomeSlots")
 	int32 TotalHomeSlots = 5;
 
+	// -- Timed state transition durations ---------------------------------
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Timing")
+	float SpawningDuration = 1.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Timing")
+	float DyingDuration = 0.5f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Timing")
+	float RoundCompleteDuration = 2.0f;
+
+	// -- Grid references --------------------------------------------------
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid")
+	int32 HomeSlotRow = 14;
+
 	// -- Runtime state ----------------------------------------------------
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "State")
@@ -71,6 +88,15 @@ public:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Timer")
 	float RemainingTime = 30.0f;
+
+	/** Highest row the frog has reached this life (for scoring forward hops). */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "State")
+	int32 HighestRowReached = 0;
+
+	/** Set by external systems (ScoreSubsystem) when lives reach 0.
+	  * Checked by OnDyingComplete to decide GameOver vs Spawning. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "State")
+	bool bPendingGameOver = false;
 
 	// -- Delegates --------------------------------------------------------
 
@@ -135,6 +161,28 @@ public:
 	/** Tick the level timer. Only counts down while in Playing state. */
 	void TickTimer(float DeltaTime);
 
+	// -- Orchestration (public for direct test invocation) ----------------
+
+	/** Handle frog death: transition to Dying state. Only valid from Playing. */
+	UFUNCTION(BlueprintCallable, Category = "Orchestration")
+	void HandleFrogDied(EDeathType DeathType);
+
+	/** Handle hop completion: track highest row, score forward hops, check home slots. */
+	UFUNCTION(BlueprintCallable, Category = "Orchestration")
+	void HandleHopCompleted(FIntPoint NewGridPosition);
+
+	/** Called when Spawning timer expires → transition to Playing. */
+	UFUNCTION(BlueprintCallable, Category = "Orchestration")
+	void OnSpawningComplete();
+
+	/** Called when Dying timer expires → GameOver or Spawning. */
+	UFUNCTION(BlueprintCallable, Category = "Orchestration")
+	void OnDyingComplete();
+
+	/** Called when RoundComplete timer expires → next wave, Spawning. */
+	UFUNCTION(BlueprintCallable, Category = "Orchestration")
+	void OnRoundCompleteFinished();
+
 private:
 	/** Reset all home slots to unfilled. */
 	void ResetHomeSlots();
@@ -147,4 +195,10 @@ private:
 
 	/** Set state and broadcast delegate. */
 	void SetState(EGameState NewState);
+
+	// -- Timer handles for timed state transitions ------------------------
+
+	FTimerHandle SpawningTimerHandle;
+	FTimerHandle DyingTimerHandle;
+	FTimerHandle RoundCompleteTimerHandle;
 };
