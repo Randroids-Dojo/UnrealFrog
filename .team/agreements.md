@@ -1,7 +1,7 @@
 # Team Working Agreements
 
 *This is a living document. Updated during retrospectives by the XP Coach.*
-*Last updated: Sprint 1 Stakeholder Review*
+*Last updated: Sprint 2 Retrospective*
 
 ## Day 0 Agreements
 
@@ -34,7 +34,7 @@ These are our starting agreements. They WILL evolve through retrospectives.
 - Each commit is one logical change
 - Commit message explains WHY, not WHAT (the diff shows what)
 - Never commit broken builds
-- **Build verification is mandatory before every commit.** Run the UBT build and confirm `Result: Succeeded` before `git commit`. (Added: Stakeholder Review — Sprint 1 shipped a broken build.)
+- **Build verification is mandatory before every commit.** Run the UBT build for BOTH Game AND Editor targets and confirm `Result: Succeeded` before `git commit`. Never build just one target — the `-game` flag uses Editor binaries. (Updated Sprint 2: building only the Game target caused debugging confusion.)
 
 ### 5. Feature Workflow
 
@@ -53,6 +53,7 @@ These are our starting agreements. They WILL evolve through retrospectives.
 A sprint is NOT done until:
 - The project builds successfully (Game + Editor targets)
 - All automated tests pass
+- **Visual smoke test passes** after foundation phase: game launches, ground visible, player visible, camera correct, HUD renders (Added Sprint 2: three visual bugs were invisible to unit tests)
 - The game is playable — you can press Play and interact with the game
 - QA Lead has verified gameplay via PlayUnreal or manual play-testing
 - The project is left in a working state for the next sprint
@@ -81,6 +82,30 @@ A sprint is NOT done until:
   - Take screenshots for visual verification
 - QA Lead and Game Designer use PlayUnreal to validate gameplay feel
 - DevOps Engineer owns the PlayUnreal infrastructure
+
+### 9. Visual Smoke Test After Foundation (Added: Sprint 2 Retrospective)
+
+After foundation systems are in place (actors, meshes, camera, ground), **launch the game before writing integration code** and verify:
+- [ ] Can you see the ground plane?
+- [ ] Can you see the player actor?
+- [ ] Does the camera show the full play area?
+- [ ] Does the HUD render text?
+- [ ] Is there lighting in the scene?
+
+If any fail, fix them immediately. Do NOT proceed to integration tasks with an invisible game.
+
+**Why:** Sprint 2 built 12 tasks before launching. Three critical visual bugs (no lighting, unwired HUD, wrong camera angle) were invisible to unit tests and required a full extra debugging session.
+
+### 10. Scene Requirements for New Maps (Added: Sprint 2 Retrospective)
+
+When creating a new map or empty scene via code, always ensure:
+- A directional light exists (sun)
+- Ambient lighting exists (sky light or fill light)
+- Camera view target is explicitly set
+- HUD is wired to game state (polling or delegates)
+- Ground/floor geometry is present and lit
+
+**Why:** An empty .umap has NO lights, NO sky, NO atmosphere. C++ auto-spawned meshes are invisible without lighting.
 
 ## Things We Will Figure Out Together
 

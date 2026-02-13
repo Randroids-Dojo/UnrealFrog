@@ -94,7 +94,95 @@ Stakeholder review of Sprint 1 deliverables. Four critical issues identified.
 4. `.team/agreements.md` §8: New section — PlayUnreal Test Harness requirement
 
 ### Action Items for Sprint 2
-- [ ] Build a PlayUnreal automation harness (DevOps Engineer + QA Lead)
-- [ ] Create a minimal playable level with placeholder geometry
-- [ ] QA Lead must play-test every sprint deliverable
-- [ ] Verify build before every commit (no exceptions)
+- [x] Build a PlayUnreal automation harness (DevOps Engineer + QA Lead)
+- [x] Create a minimal playable level with placeholder geometry
+- [ ] QA Lead must play-test every sprint deliverable → Partially done. Play-test happened but only at the very end.
+- [x] Verify build before every commit (no exceptions)
+
+---
+
+## Retrospective 2 — Sprint 2: Make It Playable
+
+### Context
+Sprint 2 goal: "Make UnrealFrog playable from the editor." Press Play and experience a Frogger game loop. 13 tasks across 4 phases (spec alignment, foundation, integration, polish). 16 commits total.
+
+### What Was Built
+| System | Files | Tests |
+|--------|-------|-------|
+| Phase 0: Spec alignment | 10 modified | 41 updated |
+| Camera system | 2 new + test | 4 |
+| Enhanced Input (pure C++) | 2 new + test | 3 |
+| Placeholder meshes | 2 modified + test | 2 |
+| Ground plane (15 rows) | 2 new + test | 5 |
+| Build.cs updates | 1 modified | 0 |
+| Collision wiring | 3 modified + test | 6 |
+| Game orchestration | 2 modified + test | 11 |
+| HUD (Canvas-based) | 2 new + test | 4 |
+| Audio stubs | 2 modified | 0 |
+| Map bootstrap | 3 modified + 1 new | 0 |
+| Integration tests | 1 new | 7 |
+| PlayUnreal scripts | 2 new | 0 |
+| Editor automation spike | 1 new (research) | 0 |
+| **Total** | **~30 files** | **~42 new tests** |
+
+### What Went Well
+1. **TDD discipline held** — 42 new tests, all passing before commits
+2. **Build verification worked** — both Game+Editor targets verified before every commit, caught real issues
+3. **Enhanced Input pure-C++ approach** — no .uasset files needed, clean runtime creation
+4. **State machine logic was solid** — orchestration, timers, home slots all worked correctly in unit tests
+5. **Phased execution plan** — dependency graph was accurate, no circular dependencies
+
+### What Went Wrong
+
+1. **No smoke test until the final task.** We built 12 tasks worth of code before anyone tried to launch the game. Three critical issues were invisible to unit tests:
+   - **No scene lighting** — empty map had no lights. All 3D meshes rendered black/invisible. Only the HUD canvas layer showed up.
+   - **HUD not wired** — `UpdateGameState()` method existed but nothing called it. The "PRESS START" overlay never cleared.
+   - **Camera pointed wrong way** — pitch -72 with yaw 0 looked sideways, not down at the grid.
+
+   **Root cause:** Unit tests verify logic in isolation. They cannot catch visual/integration issues like missing lighting, unwired UI, or wrong camera orientation. The plan deferred play-testing to the very last task.
+
+2. **Editor vs Game target confusion.** The `play-game.sh` script launches via `UnrealEditor -game`, which uses the Editor target's binaries. Rebuilding only the Game target didn't update what the player saw. Debugging time wasted because diagnostic logs weren't appearing.
+
+3. **Log files hard to find.** UE writes logs to `~/Library/Logs/UnrealFrog/` on macOS, not to the project's `Saved/Logs/`. Had to search for them manually.
+
+4. **Empty map = empty scene.** The C++ auto-setup pattern (spawn everything in BeginPlay) is great for gameplay actors, but forgot about environment prerequisites: lighting, sky, atmosphere. A blank map is not the same as a "default" map.
+
+5. **Camera tuning requires visual feedback.** The camera position/angle/FOV values were calculated theoretically and committed without visual verification. Pure top-down (-90 pitch) was the obvious correct answer but the spec said -72.
+
+### Agreements to Change
+
+1. **NEW §9: Smoke Test After Phase 1.** After foundation systems are in place, launch the game and verify basic visibility BEFORE writing integration code. Specifically:
+   - Can you see the ground?
+   - Can you see the player?
+   - Does the camera show the play area?
+   - Does the HUD render?
+   If any of these fail, fix them before proceeding.
+
+2. **UPDATE §4: Always build BOTH targets.** Never build just Game or just Editor. The `-game` flag uses Editor binaries. Build both every time.
+
+3. **NEW §10: Scene Requirements Checklist.** When creating a new map or empty scene, always include:
+   - Directional light (sun)
+   - Ambient light (sky light or ambient cubemap)
+   - Verify camera view target is set
+   - Verify HUD is wired to game state
+
+4. **UPDATE §5a: Definition of Done.** Add: "A visual smoke test (launch + screenshot) must pass before integration testing begins."
+
+### Resolved Questions from Sprint 1
+- [x] Is the DefaultEngine.ini reference to UnrealFrogGameMode correct? → Yes, works correctly with GlobalDefaultGameMode.
+- [x] Should we add a FrogPlayerController? → Yes, implemented with Enhanced Input.
+- [ ] When should we generate first art/audio assets? → Sprint 3 (audio stubs are ready, content directories created).
+
+### Open Questions for Next Retrospective
+- [ ] Should the PlayUnreal scripts use Remote Control API for gameplay validation?
+- [ ] Do we need AFunctionalTest actors for in-engine gameplay tests?
+- [ ] How to handle the frog-on-river mounting/carrying in the real game (needs physics or tick-based position sync)?
+- [ ] Is the top-down camera the right feel, or do we want a slight angle?
+
+### Sprint 2 Burndown
+- Phase 0: 1 session (spec alignment)
+- Phase 1: 1 session (5 foundation tasks in parallel)
+- Phase 2: 1 session (collision → orchestration → HUD)
+- Phase 3: 1 session (map, integration tests, audio, PlayUnreal, spike)
+- Play-test fixes: 1 session (lighting, HUD wiring, camera angle)
+- **Total: ~5 sessions. Play-test fixes added an unplanned session.**
