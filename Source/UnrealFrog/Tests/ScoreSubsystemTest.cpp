@@ -12,7 +12,7 @@
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FScoreSubsystem_InitialState,
 	"UnrealFrog.Score.InitialState",
-	EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
 
 bool FScoreSubsystem_InitialState::RunTest(const FString& Parameters)
 {
@@ -37,7 +37,7 @@ bool FScoreSubsystem_InitialState::RunTest(const FString& Parameters)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FScoreSubsystem_ForwardHopScoring,
 	"UnrealFrog.Score.ForwardHopScoring",
-	EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
 
 bool FScoreSubsystem_ForwardHopScoring::RunTest(const FString& Parameters)
 {
@@ -64,7 +64,7 @@ bool FScoreSubsystem_ForwardHopScoring::RunTest(const FString& Parameters)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FScoreSubsystem_MultiplierIncrease,
 	"UnrealFrog.Score.MultiplierIncrease",
-	EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
 
 bool FScoreSubsystem_MultiplierIncrease::RunTest(const FString& Parameters)
 {
@@ -93,7 +93,7 @@ bool FScoreSubsystem_MultiplierIncrease::RunTest(const FString& Parameters)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FScoreSubsystem_MultiplierReset,
 	"UnrealFrog.Score.MultiplierReset",
-	EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
 
 bool FScoreSubsystem_MultiplierReset::RunTest(const FString& Parameters)
 {
@@ -126,7 +126,7 @@ bool FScoreSubsystem_MultiplierReset::RunTest(const FString& Parameters)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FScoreSubsystem_TimeBonus,
 	"UnrealFrog.Score.TimeBonus",
-	EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
 
 bool FScoreSubsystem_TimeBonus::RunTest(const FString& Parameters)
 {
@@ -160,7 +160,7 @@ bool FScoreSubsystem_TimeBonus::RunTest(const FString& Parameters)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FScoreSubsystem_ExtraLife,
 	"UnrealFrog.Score.ExtraLife",
-	EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
 
 bool FScoreSubsystem_ExtraLife::RunTest(const FString& Parameters)
 {
@@ -202,7 +202,7 @@ bool FScoreSubsystem_ExtraLife::RunTest(const FString& Parameters)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FScoreSubsystem_LoseLife,
 	"UnrealFrog.Score.LoseLife",
-	EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
 
 bool FScoreSubsystem_LoseLife::RunTest(const FString& Parameters)
 {
@@ -232,7 +232,7 @@ bool FScoreSubsystem_LoseLife::RunTest(const FString& Parameters)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FScoreSubsystem_NewGame,
 	"UnrealFrog.Score.NewGame",
-	EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
 
 bool FScoreSubsystem_NewGame::RunTest(const FString& Parameters)
 {
@@ -261,7 +261,7 @@ bool FScoreSubsystem_NewGame::RunTest(const FString& Parameters)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FScoreSubsystem_HighScore,
 	"UnrealFrog.Score.HighScore",
-	EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
 
 bool FScoreSubsystem_HighScore::RunTest(const FString& Parameters)
 {

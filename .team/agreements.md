@@ -1,7 +1,7 @@
 # Team Working Agreements
 
 *This is a living document. Updated during retrospectives by the XP Coach.*
-*Last updated: Sprint 1 Retrospective*
+*Last updated: Sprint 1 Stakeholder Review*
 
 ## Day 0 Agreements
 
@@ -34,6 +34,7 @@ These are our starting agreements. They WILL evolve through retrospectives.
 - Each commit is one logical change
 - Commit message explains WHY, not WHAT (the diff shows what)
 - Never commit broken builds
+- **Build verification is mandatory before every commit.** Run the UBT build and confirm `Result: Succeeded` before `git commit`. (Added: Stakeholder Review — Sprint 1 shipped a broken build.)
 
 ### 5. Feature Workflow
 
@@ -42,8 +43,19 @@ These are our starting agreements. They WILL evolve through retrospectives.
 3. **Same agent writes test AND implementation** (prevents API mismatch — learned Sprint 1)
 4. Domain expert drives implementation
 5. All agents review
-6. Tests pass → merge
-7. XP Coach runs retrospective
+6. **Build verification** — UBT build must succeed (Game + Editor targets)
+7. Tests pass → merge
+8. **QA Lead play-tests** using PlayUnreal automation harness (Added: Stakeholder Review)
+9. XP Coach runs retrospective
+
+### 5a. Definition of Done (Added: Stakeholder Review)
+
+A sprint is NOT done until:
+- The project builds successfully (Game + Editor targets)
+- All automated tests pass
+- The game is playable — you can press Play and interact with the game
+- QA Lead has verified gameplay via PlayUnreal or manual play-testing
+- The project is left in a working state for the next sprint
 
 ### 6. Asset Pipeline
 
@@ -59,12 +71,23 @@ These are our starting agreements. They WILL evolve through retrospectives.
 - Produces concrete changes to THIS document and/or agent profiles
 - Changes are committed as part of the retrospective
 
+### 8. PlayUnreal Test Harness (Added: Stakeholder Review)
+
+- Agents must be able to launch the game and interact with it programmatically
+- Build a PlayUnreal automation tool (similar to PlayGodot) that can:
+  - Launch the editor with a test map
+  - Send input commands (hop, pause, etc.) via Remote Control API or Automation Driver
+  - Capture game state (frog position, score, lives, game state)
+  - Take screenshots for visual verification
+- QA Lead and Game Designer use PlayUnreal to validate gameplay feel
+- DevOps Engineer owns the PlayUnreal infrastructure
+
 ## Things We Will Figure Out Together
 
 - ~~Optimal driver rotation timing~~ → Resolved: per-task, not time-based
 - How to handle disagreements between agents
 - When to bring in a specialist agent (Art Director, Sound Engineer, Level Designer not needed for Sprint 1)
-- How to balance speed vs. quality
+- ~~How to balance speed vs. quality~~ → Resolved: quality gate is "playable and building" (Stakeholder Review)
 
 ## Resolved Questions (Sprint 1)
 

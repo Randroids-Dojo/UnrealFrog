@@ -61,4 +61,40 @@ First development sprint. Built the core Frogger game loop from zero: project sc
 - [ ] Is the DefaultEngine.ini reference to UnrealFrogGameMode correct before it exists in-editor?
 - [ ] Should we add an FrogPlayerController for input handling?
 - [ ] When should we generate first art/audio assets?
-- [ ] Do we need a CI pipeline before adding more systems?
+- [x] Do we need a CI pipeline before adding more systems? → Yes. Build verification is mandatory before commits. (Stakeholder Review)
+
+---
+
+## Stakeholder Review — Post Sprint 1
+
+### Context
+Stakeholder review of Sprint 1 deliverables. Four critical issues identified.
+
+### Feedback
+
+1. **Sprint 1 did not produce anything playable.** The walking skeleton has C++ systems and 38 unit tests, but there is no map, no content, and no way to press Play and see a game. Every sprint must leave the project in a playable, working state.
+
+2. **No QA or play-testing was performed.** The QA Lead was idle all sprint. Unit tests alone are not sufficient — someone needs to actually play the game and verify it works end-to-end.
+
+3. **No test harness for automated play-testing.** Agents need a PlayUnreal tool (analogous to PlayGodot) that can launch the game, send inputs, capture game state, and verify gameplay programmatically. Without this, agents cannot independently verify their work.
+
+4. **The project does not build.** The project was targeting UE 5.4 but the installed engine is UE 5.7. `EAutomationTestFlags::ApplicationContextMask` was removed in UE 5.7 (now `EAutomationTestFlags_ApplicationContextMask`). FVector is double-precision in UE5, causing ambiguous TestEqual overloads with float literals. Build verification must happen before every commit.
+
+### Immediate Fixes Applied
+- Updated `.uproject` EngineAssociation from 5.4 to 5.7
+- Updated `UnrealFrog.Target.cs` and `UnrealFrogEditor.Target.cs` to use `BuildSettingsVersion.V6` and `IncludeOrderVersion.Unreal5_7`
+- Fixed `EAutomationTestFlags::ApplicationContextMask` → `EAutomationTestFlags_ApplicationContextMask` in all 5 test files
+- Fixed ambiguous `TestEqual`/`TestNearlyEqual` calls: FVector member comparisons now use `double` literals
+- Verified build succeeds for both Game and Editor targets
+
+### Agreements Changed
+1. `.team/agreements.md` §4: Added mandatory build verification before every commit
+2. `.team/agreements.md` §5: Added build verification, QA play-test, and Definition of Done
+3. `.team/agreements.md` §5a: New section — Definition of Done (playable, building, tested, QA'd)
+4. `.team/agreements.md` §8: New section — PlayUnreal Test Harness requirement
+
+### Action Items for Sprint 2
+- [ ] Build a PlayUnreal automation harness (DevOps Engineer + QA Lead)
+- [ ] Create a minimal playable level with placeholder geometry
+- [ ] QA Lead must play-test every sprint deliverable
+- [ ] Verify build before every commit (no exceptions)

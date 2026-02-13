@@ -12,7 +12,7 @@
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FGameState_InitialState,
 	"UnrealFrog.GameState.InitialState",
-	EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
 
 bool FGameState_InitialState::RunTest(const FString& Parameters)
 {
@@ -40,7 +40,7 @@ bool FGameState_InitialState::RunTest(const FString& Parameters)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FGameState_StartGame,
 	"UnrealFrog.GameState.StartGame",
-	EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
 
 bool FGameState_StartGame::RunTest(const FString& Parameters)
 {
@@ -63,7 +63,7 @@ bool FGameState_StartGame::RunTest(const FString& Parameters)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FGameState_PauseResume,
 	"UnrealFrog.GameState.PauseResume",
-	EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
 
 bool FGameState_PauseResume::RunTest(const FString& Parameters)
 {
@@ -100,7 +100,7 @@ bool FGameState_PauseResume::RunTest(const FString& Parameters)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FGameState_GameOver,
 	"UnrealFrog.GameState.GameOver",
-	EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
 
 bool FGameState_GameOver::RunTest(const FString& Parameters)
 {
@@ -122,7 +122,7 @@ bool FGameState_GameOver::RunTest(const FString& Parameters)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FGameState_CannotStartFromGameOver,
 	"UnrealFrog.GameState.CannotStartFromGameOver",
-	EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
 
 bool FGameState_CannotStartFromGameOver::RunTest(const FString& Parameters)
 {
@@ -152,7 +152,7 @@ bool FGameState_CannotStartFromGameOver::RunTest(const FString& Parameters)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FGameState_LevelTimer,
 	"UnrealFrog.GameState.LevelTimer",
-	EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
 
 bool FGameState_LevelTimer::RunTest(const FString& Parameters)
 {
@@ -184,7 +184,7 @@ bool FGameState_LevelTimer::RunTest(const FString& Parameters)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FGameState_HomeSlotFill,
 	"UnrealFrog.GameState.HomeSlotFill",
-	EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
 
 bool FGameState_HomeSlotFill::RunTest(const FString& Parameters)
 {
@@ -225,7 +225,7 @@ bool FGameState_HomeSlotFill::RunTest(const FString& Parameters)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FGameState_WaveComplete,
 	"UnrealFrog.GameState.WaveComplete",
-	EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
 
 bool FGameState_WaveComplete::RunTest(const FString& Parameters)
 {
@@ -261,7 +261,7 @@ bool FGameState_WaveComplete::RunTest(const FString& Parameters)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FGameState_DifficultyScaling,
 	"UnrealFrog.GameState.DifficultyScaling",
-	EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
 
 bool FGameState_DifficultyScaling::RunTest(const FString& Parameters)
 {

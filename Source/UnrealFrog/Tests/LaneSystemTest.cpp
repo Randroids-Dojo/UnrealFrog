@@ -15,7 +15,7 @@
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FLaneConfig_DefaultValues,
 	"UnrealFrog.LaneSystem.LaneConfig_DefaultValues",
-	EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
 
 bool FLaneConfig_DefaultValues::RunTest(const FString& Parameters)
 {
@@ -38,7 +38,7 @@ bool FLaneConfig_DefaultValues::RunTest(const FString& Parameters)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FHazardBase_Movement,
 	"UnrealFrog.LaneSystem.HazardBase_Movement",
-	EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
 
 bool FHazardBase_Movement::RunTest(const FString& Parameters)
 {
@@ -55,8 +55,8 @@ bool FHazardBase_Movement::RunTest(const FString& Parameters)
 	Hazard->TickMovement(1.0f);
 
 	FVector Pos = Hazard->GetActorLocation();
-	TestNearlyEqual(TEXT("X position after 1s at 200 UU/s right"), Pos.X, 200.0f);
-	TestNearlyEqual(TEXT("Y position unchanged"), Pos.Y, 100.0f);
+	TestNearlyEqual(TEXT("X position after 1s at 200 UU/s right"), Pos.X, 200.0);
+	TestNearlyEqual(TEXT("Y position unchanged"), Pos.Y, 100.0);
 
 	// Configure: move left at 150 UU/s
 	AHazardBase* HazardLeft = NewObject<AHazardBase>();
@@ -69,7 +69,7 @@ bool FHazardBase_Movement::RunTest(const FString& Parameters)
 	HazardLeft->TickMovement(1.0f);
 
 	FVector PosLeft = HazardLeft->GetActorLocation();
-	TestNearlyEqual(TEXT("X position after 1s at 150 UU/s left"), PosLeft.X, 450.0f);
+	TestNearlyEqual(TEXT("X position after 1s at 150 UU/s left"), PosLeft.X, 450.0);
 
 	return true;
 }
@@ -80,7 +80,7 @@ bool FHazardBase_Movement::RunTest(const FString& Parameters)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FHazardBase_Recycling,
 	"UnrealFrog.LaneSystem.HazardBase_Recycling",
-	EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
 
 bool FHazardBase_Recycling::RunTest(const FString& Parameters)
 {
@@ -129,7 +129,7 @@ bool FHazardBase_Recycling::RunTest(const FString& Parameters)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FLaneManager_SpawnHazards,
 	"UnrealFrog.LaneSystem.LaneManager_SpawnHazards",
-	EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
 
 bool FLaneManager_SpawnHazards::RunTest(const FString& Parameters)
 {
@@ -161,7 +161,7 @@ bool FLaneManager_SpawnHazards::RunTest(const FString& Parameters)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FLaneManager_GapValidation,
 	"UnrealFrog.LaneSystem.LaneManager_GapValidation",
-	EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
 
 bool FLaneManager_GapValidation::RunTest(const FString& Parameters)
 {
@@ -205,7 +205,7 @@ bool FLaneManager_GapValidation::RunTest(const FString& Parameters)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FHazard_DirectionAlternation,
 	"UnrealFrog.LaneSystem.Hazard_DirectionAlternation",
-	EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
 
 bool FHazard_DirectionAlternation::RunTest(const FString& Parameters)
 {
@@ -243,7 +243,7 @@ bool FHazard_DirectionAlternation::RunTest(const FString& Parameters)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FHazardBase_TurtleSubmerge,
 	"UnrealFrog.LaneSystem.HazardBase_TurtleSubmerge",
-	EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
 
 bool FHazardBase_TurtleSubmerge::RunTest(const FString& Parameters)
 {

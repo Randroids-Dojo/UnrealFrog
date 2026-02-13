@@ -15,7 +15,7 @@
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FFrogCharacter_DefaultValues,
 	"UnrealFrog.Character.DefaultValues",
-	EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
 
 bool FFrogCharacter_DefaultValues::RunTest(const FString& Parameters)
 {
@@ -39,7 +39,7 @@ bool FFrogCharacter_DefaultValues::RunTest(const FString& Parameters)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FFrogCharacter_GridPosition,
 	"UnrealFrog.Character.GridPosition",
-	EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
 
 bool FFrogCharacter_GridPosition::RunTest(const FString& Parameters)
 {
@@ -51,12 +51,12 @@ bool FFrogCharacter_GridPosition::RunTest(const FString& Parameters)
 
 	// Test GridToWorld conversion
 	FVector WorldPos = Frog->GridToWorld(FIntPoint(0, 0));
-	TestEqual(TEXT("Grid(0,0) world X"), WorldPos.X, 0.0f);
-	TestEqual(TEXT("Grid(0,0) world Y"), WorldPos.Y, 0.0f);
+	TestEqual(TEXT("Grid(0,0) world X"), WorldPos.X, 0.0);
+	TestEqual(TEXT("Grid(0,0) world Y"), WorldPos.Y, 0.0);
 
 	FVector WorldPos2 = Frog->GridToWorld(FIntPoint(3, 5));
-	TestEqual(TEXT("Grid(3,5) world X"), WorldPos2.X, 3.0f * 100.0f);
-	TestEqual(TEXT("Grid(3,5) world Y"), WorldPos2.Y, 5.0f * 100.0f);
+	TestEqual(TEXT("Grid(3,5) world X"), WorldPos2.X, 300.0);
+	TestEqual(TEXT("Grid(3,5) world Y"), WorldPos2.Y, 500.0);
 
 	// Test WorldToGrid conversion (round-trip)
 	FIntPoint GridPos = Frog->WorldToGrid(FVector(300.0f, 500.0f, 0.0f));
@@ -72,7 +72,7 @@ bool FFrogCharacter_GridPosition::RunTest(const FString& Parameters)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FFrogCharacter_HopRequest,
 	"UnrealFrog.Character.HopRequest",
-	EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
 
 bool FFrogCharacter_HopRequest::RunTest(const FString& Parameters)
 {
@@ -95,7 +95,7 @@ bool FFrogCharacter_HopRequest::RunTest(const FString& Parameters)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FFrogCharacter_InputBuffer,
 	"UnrealFrog.Character.InputBuffer",
-	EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
 
 bool FFrogCharacter_InputBuffer::RunTest(const FString& Parameters)
 {
@@ -123,7 +123,7 @@ bool FFrogCharacter_InputBuffer::RunTest(const FString& Parameters)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FFrogCharacter_ForwardBias,
 	"UnrealFrog.Character.ForwardBias",
-	EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
 
 bool FFrogCharacter_ForwardBias::RunTest(const FString& Parameters)
 {
@@ -146,7 +146,7 @@ bool FFrogCharacter_ForwardBias::RunTest(const FString& Parameters)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FFrogCharacter_GridBounds,
 	"UnrealFrog.Character.GridBounds",
-	EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
 
 bool FFrogCharacter_GridBounds::RunTest(const FString& Parameters)
 {

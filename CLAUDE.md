@@ -1,7 +1,7 @@
 # UnrealFrog - 3D Frogger Arcade Game
 
 ## Project
-Unreal Engine 5.4 C++ project. 3D arcade Frogger with procedurally generated assets.
+Unreal Engine 5.7 C++ project. 3D arcade Frogger with procedurally generated assets.
 Low-poly stylized aesthetic. Mob programming workflow with agent team coordination.
 
 ## Architecture
@@ -13,9 +13,10 @@ Low-poly stylized aesthetic. Mob programming workflow with agent team coordinati
 - /.claude/skills/ — Shared knowledge skills
 - /.team/ — Team agreements, roster, retrospective log
 
-## Build
-- `UnrealBuildTool UnrealFrog Development Win64` — build
-- `UnrealEditor-Cmd UnrealFrog.uproject -ExecCmds="Automation RunTests UnrealFrog"` — test
+## Build (macOS, UE 5.7)
+- Game target: `"/Users/Shared/Epic Games/UE_5.7/Engine/Build/BatchFiles/Mac/Build.sh" UnrealFrog Mac Development "/Users/randroid/Documents/Dev/Unreal/UnrealFrog/UnrealFrog.uproject"`
+- Editor target: `"/Users/Shared/Epic Games/UE_5.7/Engine/Build/BatchFiles/Mac/Build.sh" UnrealFrogEditor Mac Development "/Users/randroid/Documents/Dev/Unreal/UnrealFrog/UnrealFrog.uproject"`
+- **Both targets must succeed before any commit.**
 
 ## Standards
 - C++ follows UE coding standards (UPROPERTY, UFUNCTION macros mandatory)
@@ -30,11 +31,12 @@ Read `.team/agreements.md` before ANY work. Update it during retrospectives.
 
 ## Critical Rules
 - NEVER modify engine source files
-- NEVER commit broken builds
+- NEVER commit broken builds — verify build (Game + Editor) before every commit
 - NEVER bypass the asset validation pipeline
 - Always run tests before marking tasks complete
 - One driver at a time — mob programming is mandatory
 - Retrospect after each feature completion
+- Every sprint must leave the project in a playable, working state
 
 @.team/agreements.md
 @.claude/skills/unreal-conventions/SKILL.md

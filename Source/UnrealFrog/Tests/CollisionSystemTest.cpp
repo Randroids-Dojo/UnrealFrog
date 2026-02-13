@@ -14,7 +14,7 @@
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FCollisionSystem_RoadHazardKillsFrog,
 	"UnrealFrog.Collision.RoadHazardKillsFrog",
-	EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
 
 bool FCollisionSystem_RoadHazardKillsFrog::RunTest(const FString& Parameters)
 {
@@ -38,7 +38,7 @@ bool FCollisionSystem_RoadHazardKillsFrog::RunTest(const FString& Parameters)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FCollisionSystem_RiverWithoutPlatform,
 	"UnrealFrog.Collision.RiverWithoutPlatform",
-	EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
 
 bool FCollisionSystem_RiverWithoutPlatform::RunTest(const FString& Parameters)
 {
@@ -63,7 +63,7 @@ bool FCollisionSystem_RiverWithoutPlatform::RunTest(const FString& Parameters)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FCollisionSystem_RidingPlatform,
 	"UnrealFrog.Collision.RidingPlatform",
-	EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
 
 bool FCollisionSystem_RidingPlatform::RunTest(const FString& Parameters)
 {
@@ -87,8 +87,8 @@ bool FCollisionSystem_RidingPlatform::RunTest(const FString& Parameters)
 	Frog->UpdateRiding(1.0f);
 
 	FVector Pos = Frog->GetActorLocation();
-	TestNearlyEqual(TEXT("Frog X moved with platform"), Pos.X, 700.0f);
-	TestNearlyEqual(TEXT("Frog Y unchanged"), Pos.Y, 700.0f);
+	TestNearlyEqual(TEXT("Frog X moved with platform"), Pos.X, 700.0);
+	TestNearlyEqual(TEXT("Frog Y unchanged"), Pos.Y, 700.0);
 
 	return true;
 }
@@ -99,7 +99,7 @@ bool FCollisionSystem_RidingPlatform::RunTest(const FString& Parameters)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FCollisionSystem_SubmergedTurtleNotRideable,
 	"UnrealFrog.Collision.SubmergedTurtleNotRideable",
-	EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
 
 bool FCollisionSystem_SubmergedTurtleNotRideable::RunTest(const FString& Parameters)
 {
@@ -131,7 +131,7 @@ bool FCollisionSystem_SubmergedTurtleNotRideable::RunTest(const FString& Paramet
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FCollisionSystem_OffScreenDeath,
 	"UnrealFrog.Collision.OffScreenDeath",
-	EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
 
 bool FCollisionSystem_OffScreenDeath::RunTest(const FString& Parameters)
 {
@@ -162,7 +162,7 @@ bool FCollisionSystem_OffScreenDeath::RunTest(const FString& Parameters)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FCollisionSystem_RespawnAfterDeath,
 	"UnrealFrog.Collision.RespawnAfterDeath",
-	EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
 
 bool FCollisionSystem_RespawnAfterDeath::RunTest(const FString& Parameters)
 {
@@ -190,7 +190,7 @@ bool FCollisionSystem_RespawnAfterDeath::RunTest(const FString& Parameters)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FCollisionSystem_NoRespawnOnGameOver,
 	"UnrealFrog.Collision.NoRespawnOnGameOver",
-	EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
 
 bool FCollisionSystem_NoRespawnOnGameOver::RunTest(const FString& Parameters)
 {
