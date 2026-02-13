@@ -3,6 +3,8 @@
 #include "Core/UnrealFrogGameMode.h"
 #include "TimerManager.h"
 
+DEFINE_LOG_CATEGORY_STATIC(LogFrogGameAudio, Log, All);
+
 AUnrealFrogGameMode::AUnrealFrogGameMode()
 {
 	HomeSlotColumns = {1, 4, 6, 8, 11};
@@ -294,4 +296,16 @@ void AUnrealFrogGameMode::OnRoundCompleteFinished()
 			&AUnrealFrogGameMode::OnSpawningComplete,
 			SpawningDuration, false);
 	}
+}
+
+// -- Audio stubs ----------------------------------------------------------
+
+void AUnrealFrogGameMode::PlayRoundCompleteSound()
+{
+	UE_LOG(LogFrogGameAudio, Verbose, TEXT("PlayRoundCompleteSound: stub"));
+}
+
+void AUnrealFrogGameMode::PlayGameOverSound()
+{
+	UE_LOG(LogFrogGameAudio, Verbose, TEXT("PlayGameOverSound: stub"));
 }

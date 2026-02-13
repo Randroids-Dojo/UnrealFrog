@@ -2,11 +2,14 @@
 
 #include "Core/FrogCharacter.h"
 #include "Core/HazardBase.h"
+#include "Components/AudioComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "TimerManager.h"
 #include "UObject/ConstructorHelpers.h"
+
+DEFINE_LOG_CATEGORY_STATIC(LogFrogAudio, Log, All);
 
 AFrogCharacter::AFrogCharacter()
 {
@@ -22,6 +25,10 @@ AFrogCharacter::AFrogCharacter()
 
 	MeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("MeshComponent"));
 	MeshComponent->SetupAttachment(CollisionComponent);
+
+	AudioComponent = CreateDefaultSubobject<UAudioComponent>(TEXT("AudioComponent"));
+	AudioComponent->SetupAttachment(CollisionComponent);
+	AudioComponent->bAutoActivate = false;
 
 	// Assign sphere mesh for frog placeholder visual
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> SphereMesh(TEXT("/Engine/BasicShapes/Sphere"));
@@ -374,4 +381,21 @@ void AFrogCharacter::OnEndOverlap(UPrimitiveComponent* OverlappedComp,
 	{
 		HandlePlatformEndOverlap(Hazard);
 	}
+}
+
+// -- Audio stubs (log-only placeholders) ----------------------------------
+
+void AFrogCharacter::PlayHopSound()
+{
+	UE_LOG(LogFrogAudio, Verbose, TEXT("PlayHopSound: stub"));
+}
+
+void AFrogCharacter::PlayDeathSound(EDeathType DeathType)
+{
+	UE_LOG(LogFrogAudio, Verbose, TEXT("PlayDeathSound: type=%d (stub)"), static_cast<uint8>(DeathType));
+}
+
+void AFrogCharacter::PlayHomeSlotSound()
+{
+	UE_LOG(LogFrogAudio, Verbose, TEXT("PlayHomeSlotSound: stub"));
 }
