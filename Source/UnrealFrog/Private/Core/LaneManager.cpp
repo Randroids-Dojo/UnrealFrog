@@ -84,7 +84,33 @@ void ALaneManager::SetupDefaultLaneConfigs()
 
 	// -- Road lanes (rows 1-5) --------------------------------------------
 
-	// Row 1: Car, 200 UU/s, width 1
+	// Row 1: Car, 150 UU/s, width 1, gap 3, LEFT
+	{
+		FLaneConfig C;
+		C.LaneType = ELaneType::Road;
+		C.HazardType = EHazardType::Car;
+		C.Speed = 150.0f;
+		C.HazardWidth = 1;
+		C.MinGapCells = 3;
+		C.bMovesRight = false;
+		C.RowIndex = 1;
+		LaneConfigs.Add(C);
+	}
+
+	// Row 2: Truck, 100 UU/s, width 2, gap 4, RIGHT
+	{
+		FLaneConfig C;
+		C.LaneType = ELaneType::Road;
+		C.HazardType = EHazardType::Truck;
+		C.Speed = 100.0f;
+		C.HazardWidth = 2;
+		C.MinGapCells = 4;
+		C.bMovesRight = true;
+		C.RowIndex = 2;
+		LaneConfigs.Add(C);
+	}
+
+	// Row 3: Car, 200 UU/s, width 1, gap 2, LEFT
 	{
 		FLaneConfig C;
 		C.LaneType = ELaneType::Road;
@@ -92,66 +118,79 @@ void ALaneManager::SetupDefaultLaneConfigs()
 		C.Speed = 200.0f;
 		C.HazardWidth = 1;
 		C.MinGapCells = 2;
-		C.bMovesRight = true;  // odd row
-		C.RowIndex = 1;
-		LaneConfigs.Add(C);
-	}
-
-	// Row 2: Truck, 120 UU/s, width 2
-	{
-		FLaneConfig C;
-		C.LaneType = ELaneType::Road;
-		C.HazardType = EHazardType::Truck;
-		C.Speed = 120.0f;
-		C.HazardWidth = 2;
-		C.MinGapCells = 2;
-		C.bMovesRight = false; // even row
-		C.RowIndex = 2;
-		LaneConfigs.Add(C);
-	}
-
-	// Row 3: Bus, 300 UU/s, width 2
-	{
-		FLaneConfig C;
-		C.LaneType = ELaneType::Road;
-		C.HazardType = EHazardType::Bus;
-		C.Speed = 300.0f;
-		C.HazardWidth = 2;
-		C.MinGapCells = 2;
-		C.bMovesRight = true;  // odd row
+		C.bMovesRight = false;
 		C.RowIndex = 3;
 		LaneConfigs.Add(C);
 	}
 
-	// Row 4: Car, 180 UU/s, width 1
+	// Row 4: Bus, 175 UU/s, width 2, gap 3, RIGHT
 	{
 		FLaneConfig C;
 		C.LaneType = ELaneType::Road;
-		C.HazardType = EHazardType::Car;
-		C.Speed = 180.0f;
-		C.HazardWidth = 1;
-		C.MinGapCells = 2;
-		C.bMovesRight = false; // even row
+		C.HazardType = EHazardType::Bus;
+		C.Speed = 175.0f;
+		C.HazardWidth = 2;
+		C.MinGapCells = 3;
+		C.bMovesRight = true;
 		C.RowIndex = 4;
 		LaneConfigs.Add(C);
 	}
 
-	// Row 5: Motorcycle, 350 UU/s, width 1
+	// Row 5: Motorcycle, 250 UU/s, width 1, gap 2, LEFT
 	{
 		FLaneConfig C;
 		C.LaneType = ELaneType::Road;
 		C.HazardType = EHazardType::Motorcycle;
-		C.Speed = 350.0f;
+		C.Speed = 250.0f;
 		C.HazardWidth = 1;
 		C.MinGapCells = 2;
-		C.bMovesRight = true;  // odd row
+		C.bMovesRight = false;
 		C.RowIndex = 5;
 		LaneConfigs.Add(C);
 	}
 
 	// -- River lanes (rows 7-12) ------------------------------------------
 
-	// Row 7: Small Log, 100 UU/s, width 2
+	// Row 7: SmallLog, 100 UU/s, width 2, gap 3, RIGHT
+	{
+		FLaneConfig C;
+		C.LaneType = ELaneType::River;
+		C.HazardType = EHazardType::SmallLog;
+		C.Speed = 100.0f;
+		C.HazardWidth = 2;
+		C.MinGapCells = 3;
+		C.bMovesRight = true;
+		C.RowIndex = 7;
+		LaneConfigs.Add(C);
+	}
+
+	// Row 8: TurtleGroup, 80 UU/s, width 3, gap 3, LEFT
+	{
+		FLaneConfig C;
+		C.LaneType = ELaneType::River;
+		C.HazardType = EHazardType::TurtleGroup;
+		C.Speed = 80.0f;
+		C.HazardWidth = 3;
+		C.MinGapCells = 3;
+		C.bMovesRight = false;
+		C.RowIndex = 8;
+		LaneConfigs.Add(C);
+	}
+
+	// Row 9: LargeLog, 120 UU/s, width 4, gap 3, RIGHT
+	{
+		FLaneConfig C;
+		C.LaneType = ELaneType::River;
+		C.HazardType = EHazardType::LargeLog;
+		C.Speed = 120.0f;
+		C.HazardWidth = 4;
+		C.MinGapCells = 3;
+		C.bMovesRight = true;
+		C.RowIndex = 9;
+		LaneConfigs.Add(C);
+	}
+
+	// Row 10: SmallLog, 100 UU/s, width 2, gap 2, LEFT
 	{
 		FLaneConfig C;
 		C.LaneType = ELaneType::River;
@@ -159,12 +198,25 @@ void ALaneManager::SetupDefaultLaneConfigs()
 		C.Speed = 100.0f;
 		C.HazardWidth = 2;
 		C.MinGapCells = 2;
-		C.bMovesRight = true;  // odd row
-		C.RowIndex = 7;
+		C.bMovesRight = false;
+		C.RowIndex = 10;
 		LaneConfigs.Add(C);
 	}
 
-	// Row 8: Large Log, 150 UU/s, width 4
+	// Row 11: TurtleGroup, 80 UU/s, width 3, gap 4, RIGHT
+	{
+		FLaneConfig C;
+		C.LaneType = ELaneType::River;
+		C.HazardType = EHazardType::TurtleGroup;
+		C.Speed = 80.0f;
+		C.HazardWidth = 3;
+		C.MinGapCells = 4;
+		C.bMovesRight = true;
+		C.RowIndex = 11;
+		LaneConfigs.Add(C);
+	}
+
+	// Row 12: LargeLog, 150 UU/s, width 4, gap 2, LEFT
 	{
 		FLaneConfig C;
 		C.LaneType = ELaneType::River;
@@ -172,59 +224,7 @@ void ALaneManager::SetupDefaultLaneConfigs()
 		C.Speed = 150.0f;
 		C.HazardWidth = 4;
 		C.MinGapCells = 2;
-		C.bMovesRight = false; // even row
-		C.RowIndex = 8;
-		LaneConfigs.Add(C);
-	}
-
-	// Row 9: Turtle Group, 80 UU/s, width 3
-	{
-		FLaneConfig C;
-		C.LaneType = ELaneType::River;
-		C.HazardType = EHazardType::TurtleGroup;
-		C.Speed = 80.0f;
-		C.HazardWidth = 3;
-		C.MinGapCells = 2;
-		C.bMovesRight = true;  // odd row
-		C.RowIndex = 9;
-		LaneConfigs.Add(C);
-	}
-
-	// Row 10: Small Log, 120 UU/s, width 2
-	{
-		FLaneConfig C;
-		C.LaneType = ELaneType::River;
-		C.HazardType = EHazardType::SmallLog;
-		C.Speed = 120.0f;
-		C.HazardWidth = 2;
-		C.MinGapCells = 2;
-		C.bMovesRight = false; // even row
-		C.RowIndex = 10;
-		LaneConfigs.Add(C);
-	}
-
-	// Row 11: Large Log, 130 UU/s, width 4
-	{
-		FLaneConfig C;
-		C.LaneType = ELaneType::River;
-		C.HazardType = EHazardType::LargeLog;
-		C.Speed = 130.0f;
-		C.HazardWidth = 4;
-		C.MinGapCells = 2;
-		C.bMovesRight = true;  // odd row
-		C.RowIndex = 11;
-		LaneConfigs.Add(C);
-	}
-
-	// Row 12: Turtle Group, 90 UU/s, width 3
-	{
-		FLaneConfig C;
-		C.LaneType = ELaneType::River;
-		C.HazardType = EHazardType::TurtleGroup;
-		C.Speed = 90.0f;
-		C.HazardWidth = 3;
-		C.MinGapCells = 2;
-		C.bMovesRight = false; // even row
+		C.bMovesRight = false;
 		C.RowIndex = 12;
 		LaneConfigs.Add(C);
 	}

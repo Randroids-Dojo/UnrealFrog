@@ -200,7 +200,7 @@ bool FLaneManager_GapValidation::RunTest(const FString& Parameters)
 }
 
 // ---------------------------------------------------------------------------
-// Test: Odd lanes move right, even lanes move left
+// Test: Lane directions match the design spec
 // ---------------------------------------------------------------------------
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FHazard_DirectionAlternation,
@@ -209,30 +209,36 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FHazard_DirectionAlternation::RunTest(const FString& Parameters)
 {
-	// Verify the design spec: odd-indexed lanes move right, even move left
-	// Lane 1 (odd) -> right
-	FLaneConfig Lane1;
-	Lane1.RowIndex = 1;
-	Lane1.bMovesRight = (Lane1.RowIndex % 2 != 0);
-	TestTrue(TEXT("Lane 1 (odd) moves right"), Lane1.bMovesRight);
+	// Verify directions from the spec's Wave 1 table.
+	// Road: odd rows LEFT (bMovesRight=false), even rows RIGHT (bMovesRight=true)
+	// River: odd rows RIGHT (bMovesRight=true), even rows LEFT (bMovesRight=false)
 
-	// Lane 2 (even) -> left
-	FLaneConfig Lane2;
-	Lane2.RowIndex = 2;
-	Lane2.bMovesRight = (Lane2.RowIndex % 2 != 0);
-	TestFalse(TEXT("Lane 2 (even) moves left"), Lane2.bMovesRight);
+	ALaneManager* Manager = NewObject<ALaneManager>();
 
-	// Lane 7 (odd) -> right
-	FLaneConfig Lane7;
-	Lane7.RowIndex = 7;
-	Lane7.bMovesRight = (Lane7.RowIndex % 2 != 0);
-	TestTrue(TEXT("Lane 7 (odd) moves right"), Lane7.bMovesRight);
+	// Populate with the default spec configs
+	Manager->SetupDefaultLaneConfigs();
 
-	// Lane 12 (even) -> left
-	FLaneConfig Lane12;
-	Lane12.RowIndex = 12;
-	Lane12.bMovesRight = (Lane12.RowIndex % 2 != 0);
-	TestFalse(TEXT("Lane 12 (even) moves left"), Lane12.bMovesRight);
+	// Build a lookup from row index to bMovesRight
+	TMap<int32, bool> DirectionByRow;
+	for (const FLaneConfig& Config : Manager->LaneConfigs)
+	{
+		DirectionByRow.Add(Config.RowIndex, Config.bMovesRight);
+	}
+
+	// Road lanes: Row 1 LEFT, Row 2 RIGHT, Row 3 LEFT, Row 4 RIGHT, Row 5 LEFT
+	TestFalse(TEXT("Road row 1 moves LEFT"), DirectionByRow[1]);
+	TestTrue(TEXT("Road row 2 moves RIGHT"), DirectionByRow[2]);
+	TestFalse(TEXT("Road row 3 moves LEFT"), DirectionByRow[3]);
+	TestTrue(TEXT("Road row 4 moves RIGHT"), DirectionByRow[4]);
+	TestFalse(TEXT("Road row 5 moves LEFT"), DirectionByRow[5]);
+
+	// River lanes: Row 7 RIGHT, Row 8 LEFT, Row 9 RIGHT, Row 10 LEFT, Row 11 RIGHT, Row 12 LEFT
+	TestTrue(TEXT("River row 7 moves RIGHT"), DirectionByRow[7]);
+	TestFalse(TEXT("River row 8 moves LEFT"), DirectionByRow[8]);
+	TestTrue(TEXT("River row 9 moves RIGHT"), DirectionByRow[9]);
+	TestFalse(TEXT("River row 10 moves LEFT"), DirectionByRow[10]);
+	TestTrue(TEXT("River row 11 moves RIGHT"), DirectionByRow[11]);
+	TestFalse(TEXT("River row 12 moves LEFT"), DirectionByRow[12]);
 
 	return true;
 }

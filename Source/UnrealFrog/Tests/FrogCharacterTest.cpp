@@ -25,7 +25,7 @@ bool FFrogCharacter_DefaultValues::RunTest(const FString& Parameters)
 	TestEqual(TEXT("HopArcHeight default"), Frog->HopArcHeight, 30.0f);
 	TestEqual(TEXT("GridCellSize default"), Frog->GridCellSize, 100.0f);
 	TestEqual(TEXT("InputBufferWindow default"), Frog->InputBufferWindow, 0.1f);
-	TestEqual(TEXT("BackwardHopMultiplier default"), Frog->BackwardHopMultiplier, 1.5f);
+	TestEqual(TEXT("BackwardHopMultiplier default"), Frog->BackwardHopMultiplier, 1.0f);
 	TestEqual(TEXT("GridColumns default"), Frog->GridColumns, 13);
 	TestEqual(TEXT("GridRows default"), Frog->GridRows, 15);
 	TestEqual(TEXT("bIsHopping default"), Frog->bIsHopping, false);
@@ -118,14 +118,14 @@ bool FFrogCharacter_InputBuffer::RunTest(const FString& Parameters)
 }
 
 // ---------------------------------------------------------------------------
-// Test: Backward hops use the multiplier for longer duration
+// Test: All directions use uniform hop duration (multiplier is 1.0)
 // ---------------------------------------------------------------------------
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-	FFrogCharacter_ForwardBias,
-	"UnrealFrog.Character.ForwardBias",
+	FFrogCharacter_UniformHopDuration,
+	"UnrealFrog.Character.UniformHopDuration",
 	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
 
-bool FFrogCharacter_ForwardBias::RunTest(const FString& Parameters)
+bool FFrogCharacter_UniformHopDuration::RunTest(const FString& Parameters)
 {
 	AFrogCharacter* Frog = NewObject<AFrogCharacter>();
 
@@ -134,7 +134,7 @@ bool FFrogCharacter_ForwardBias::RunTest(const FString& Parameters)
 	float SideDuration = Frog->GetHopDurationForDirection(FVector(1.0f, 0.0f, 0.0f));
 
 	TestEqual(TEXT("Forward hop duration"), ForwardDuration, 0.15f);
-	TestNearlyEqual(TEXT("Backward hop duration"), BackwardDuration, 0.15f * 1.5f);
+	TestEqual(TEXT("Backward hop duration"), BackwardDuration, 0.15f);
 	TestEqual(TEXT("Side hop duration"), SideDuration, 0.15f);
 
 	return true;

@@ -18,7 +18,7 @@ bool FGameState_InitialState::RunTest(const FString& Parameters)
 {
 	AUnrealFrogGameMode* GM = NewObject<AUnrealFrogGameMode>();
 
-	TestEqual(TEXT("Starts in Menu state"), GM->CurrentState, EGameState::Menu);
+	TestEqual(TEXT("Starts in Title state"), GM->CurrentState, EGameState::Title);
 	TestEqual(TEXT("Wave starts at 1"), GM->CurrentWave, 1);
 	TestEqual(TEXT("No homes filled"), GM->HomeSlotsFilledCount, 0);
 	TestEqual(TEXT("TimePerLevel default 30"), GM->TimePerLevel, 30.0f);
@@ -35,7 +35,7 @@ bool FGameState_InitialState::RunTest(const FString& Parameters)
 }
 
 // ---------------------------------------------------------------------------
-// Test: Menu -> Playing transition via StartGame
+// Test: Title -> Playing transition via StartGame
 // ---------------------------------------------------------------------------
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FGameState_StartGame,
@@ -46,7 +46,7 @@ bool FGameState_StartGame::RunTest(const FString& Parameters)
 {
 	AUnrealFrogGameMode* GM = NewObject<AUnrealFrogGameMode>();
 
-	TestEqual(TEXT("Starts in Menu"), GM->CurrentState, EGameState::Menu);
+	TestEqual(TEXT("Starts in Title"), GM->CurrentState, EGameState::Title);
 
 	GM->StartGame();
 	TestEqual(TEXT("Transitions to Playing"), GM->CurrentState, EGameState::Playing);
@@ -89,7 +89,7 @@ bool FGameState_PauseResume::RunTest(const FString& Parameters)
 	// Pause from Menu should not work
 	AUnrealFrogGameMode* GM2 = NewObject<AUnrealFrogGameMode>();
 	GM2->PauseGame();
-	TestEqual(TEXT("Cannot pause from Menu"), GM2->CurrentState, EGameState::Menu);
+	TestEqual(TEXT("Cannot pause from Title"), GM2->CurrentState, EGameState::Title);
 
 	return true;
 }
@@ -117,7 +117,7 @@ bool FGameState_GameOver::RunTest(const FString& Parameters)
 }
 
 // ---------------------------------------------------------------------------
-// Test: Cannot start game from GameOver; must ReturnToMenu first
+// Test: Cannot start game from GameOver; must ReturnToTitle() first
 // ---------------------------------------------------------------------------
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FGameState_CannotStartFromGameOver,
@@ -136,9 +136,9 @@ bool FGameState_CannotStartFromGameOver::RunTest(const FString& Parameters)
 	GM->StartGame();
 	TestEqual(TEXT("Still GameOver"), GM->CurrentState, EGameState::GameOver);
 
-	// ReturnToMenu first, then StartGame should work
-	GM->ReturnToMenu();
-	TestEqual(TEXT("Back to Menu"), GM->CurrentState, EGameState::Menu);
+	// ReturnToTitle first, then StartGame should work
+	GM->ReturnToTitle();
+	TestEqual(TEXT("Back to Title"), GM->CurrentState, EGameState::Title);
 
 	GM->StartGame();
 	TestEqual(TEXT("Now Playing"), GM->CurrentState, EGameState::Playing);
@@ -282,15 +282,23 @@ bool FGameState_DifficultyScaling::RunTest(const FString& Parameters)
 	TestNearlyEqual(TEXT("Wave 4 speed multiplier"), GM->GetSpeedMultiplier(), 1.3f);
 	TestEqual(TEXT("Wave 4 gap reduction"), GM->GetGapReduction(), 1);
 
-	// Wave 7: speed 1.6, gap reduction 2
+	// Wave 7: speed 1.6, gap reduction 3 ((7-1)/2=3)
 	GM->CurrentWave = 7;
 	TestNearlyEqual(TEXT("Wave 7 speed multiplier"), GM->GetSpeedMultiplier(), 1.6f);
-	TestEqual(TEXT("Wave 7 gap reduction"), GM->GetGapReduction(), 2);
+	TestEqual(TEXT("Wave 7 gap reduction"), GM->GetGapReduction(), 3);
 
-	// Wave 10: speed 1.9, gap reduction 3
+	// Wave 10: speed 1.9, gap reduction 4 ((10-1)/2=4)
 	GM->CurrentWave = 10;
 	TestNearlyEqual(TEXT("Wave 10 speed multiplier"), GM->GetSpeedMultiplier(), 1.9f);
-	TestEqual(TEXT("Wave 10 gap reduction"), GM->GetGapReduction(), 3);
+	TestEqual(TEXT("Wave 10 gap reduction"), GM->GetGapReduction(), 4);
+
+	// Wave 11: speed is 2.0 (raw = 1.0 + 10*0.1 = 2.0, capped at MaxSpeedMultiplier)
+	GM->CurrentWave = 11;
+	TestNearlyEqual(TEXT("Wave 11 speed capped at 2.0"), GM->GetSpeedMultiplier(), 2.0f);
+
+	// Wave 15: speed still 2.0 (raw = 1.0 + 14*0.1 = 2.4, capped)
+	GM->CurrentWave = 15;
+	TestNearlyEqual(TEXT("Wave 15 speed still capped at 2.0"), GM->GetSpeedMultiplier(), 2.0f);
 
 	return true;
 }

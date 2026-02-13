@@ -9,10 +9,13 @@
 UENUM(BlueprintType)
 enum class EGameState : uint8
 {
-	Menu		UMETA(DisplayName = "Menu"),
-	Playing		UMETA(DisplayName = "Playing"),
-	Paused		UMETA(DisplayName = "Paused"),
-	GameOver	UMETA(DisplayName = "Game Over")
+	Title			UMETA(DisplayName = "Title"),
+	Spawning		UMETA(DisplayName = "Spawning"),
+	Playing			UMETA(DisplayName = "Playing"),
+	Paused			UMETA(DisplayName = "Paused"),
+	Dying			UMETA(DisplayName = "Dying"),
+	RoundComplete	UMETA(DisplayName = "Round Complete"),
+	GameOver		UMETA(DisplayName = "Game Over")
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnGameStateChanged, EGameState, NewState);
@@ -44,7 +47,10 @@ public:
 	float DifficultySpeedIncrement = 0.1f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Difficulty")
-	int32 WavesPerGapReduction = 3;
+	int32 WavesPerGapReduction = 2;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Difficulty")
+	float MaxSpeedMultiplier = 2.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "HomeSlots")
 	int32 TotalHomeSlots = 5;
@@ -52,7 +58,7 @@ public:
 	// -- Runtime state ----------------------------------------------------
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "State")
-	EGameState CurrentState = EGameState::Menu;
+	EGameState CurrentState = EGameState::Title;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "State")
 	int32 CurrentWave = 1;
@@ -98,7 +104,7 @@ public:
 	void ResumeGame();
 
 	UFUNCTION(BlueprintCallable, Category = "GameState")
-	void ReturnToMenu();
+	void ReturnToTitle();
 
 	/** Called externally when the score subsystem reports game over (0 lives). */
 	UFUNCTION(BlueprintCallable, Category = "GameState")

@@ -28,13 +28,22 @@ public:
 	int32 PointsPerHop = 10;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Scoring")
-	float MultiplierIncrement = 0.5f;
+	float MultiplierIncrement = 1.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Scoring")
 	int32 ExtraLifeThreshold = 10000;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Scoring")
-	int32 MaxLives = 5;
+	int32 MaxLives = 9;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Scoring")
+	float MaxMultiplier = 5.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Scoring")
+	int32 HomeSlotPoints = 200;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Scoring")
+	int32 RoundCompleteBonus = 1000;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Scoring")
 	int32 InitialLives = 3;
@@ -73,9 +82,17 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Scoring")
 	void AddForwardHopScore();
 
-	/** Award time bonus for reaching home: (RemainingTime / MaxTime) * 1000. */
+	/** Award time bonus: floor(RemainingSeconds) * 10 points. */
 	UFUNCTION(BlueprintCallable, Category = "Scoring")
-	void AddTimeBonus(float RemainingTime, float MaxTime);
+	void AddTimeBonus(float RemainingSeconds);
+
+	/** Award arbitrary bonus points (e.g. round complete bonus). */
+	UFUNCTION(BlueprintCallable, Category = "Scoring")
+	void AddBonusPoints(int32 Points);
+
+	/** Award points for filling a home slot. */
+	UFUNCTION(BlueprintCallable, Category = "Scoring")
+	void AddHomeSlotScore();
 
 	/** Reset the consecutive-hop multiplier to 1.0 (called on retreat, death, or reaching home). */
 	UFUNCTION(BlueprintCallable, Category = "Scoring")

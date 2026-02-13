@@ -7,26 +7,39 @@ void UScoreSubsystem::AddForwardHopScore()
 	int32 Points = FMath::RoundToInt(static_cast<float>(PointsPerHop) * Multiplier);
 	Score += Points;
 
-	// Increase multiplier for the next consecutive forward hop
+	// Increase multiplier for the next consecutive forward hop, capped at MaxMultiplier
 	Multiplier += MultiplierIncrement;
+	Multiplier = FMath::Min(Multiplier, MaxMultiplier);
 
 	NotifyScoreChanged();
 	CheckExtraLife();
 }
 
-void UScoreSubsystem::AddTimeBonus(float RemainingTime, float MaxTime)
+void UScoreSubsystem::AddTimeBonus(float RemainingSeconds)
 {
-	if (MaxTime <= 0.0f)
+	if (RemainingSeconds <= 0.0f)
 	{
 		return;
 	}
 
-	float Ratio = FMath::Clamp(RemainingTime / MaxTime, 0.0f, 1.0f);
-	int32 Bonus = FMath::RoundToInt(Ratio * 1000.0f);
+	int32 Bonus = FMath::FloorToInt(RemainingSeconds) * 10;
 	Score += Bonus;
 
 	NotifyScoreChanged();
 	CheckExtraLife();
+}
+
+void UScoreSubsystem::AddBonusPoints(int32 Points)
+{
+	Score += Points;
+
+	NotifyScoreChanged();
+	CheckExtraLife();
+}
+
+void UScoreSubsystem::AddHomeSlotScore()
+{
+	AddBonusPoints(HomeSlotPoints);
 }
 
 void UScoreSubsystem::ResetMultiplier()

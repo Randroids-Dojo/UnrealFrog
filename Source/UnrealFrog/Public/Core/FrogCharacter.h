@@ -41,7 +41,7 @@ public:
 	float InputBufferWindow = 0.1f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
-	float BackwardHopMultiplier = 1.5f;
+	float BackwardHopMultiplier = 1.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid")
 	int32 GridColumns = 13;

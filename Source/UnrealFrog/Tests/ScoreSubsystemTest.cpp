@@ -23,9 +23,9 @@ bool FScoreSubsystem_InitialState::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Lives starts at 3"), Scoring->Lives, 3);
 	TestNearlyEqual(TEXT("Multiplier starts at 1.0"), Scoring->Multiplier, 1.0f);
 	TestEqual(TEXT("PointsPerHop default"), Scoring->PointsPerHop, 10);
-	TestNearlyEqual(TEXT("MultiplierIncrement default"), Scoring->MultiplierIncrement, 0.5f);
+	TestNearlyEqual(TEXT("MultiplierIncrement default"), Scoring->MultiplierIncrement, 1.0f);
 	TestEqual(TEXT("ExtraLifeThreshold default"), Scoring->ExtraLifeThreshold, 10000);
-	TestEqual(TEXT("MaxLives default"), Scoring->MaxLives, 5);
+	TestEqual(TEXT("MaxLives default"), Scoring->MaxLives, 9);
 	TestEqual(TEXT("InitialLives default"), Scoring->InitialLives, 3);
 
 	return true;
@@ -47,19 +47,19 @@ bool FScoreSubsystem_ForwardHopScoring::RunTest(const FString& Parameters)
 	Scoring->AddForwardHopScore();
 	TestEqual(TEXT("Score after first hop"), Scoring->Score, 10);
 
-	// Second hop: multiplier should have increased to 1.5, so 10 * 1.5 = 15
+	// Second hop: multiplier increased to 2.0, so 10 * 2.0 = 20 (total 30)
 	Scoring->AddForwardHopScore();
-	TestEqual(TEXT("Score after second hop"), Scoring->Score, 25);
+	TestEqual(TEXT("Score after second hop"), Scoring->Score, 30);
 
-	// Third hop: multiplier 2.0, so 10 * 2.0 = 20
+	// Third hop: multiplier 3.0, so 10 * 3.0 = 30 (total 60)
 	Scoring->AddForwardHopScore();
-	TestEqual(TEXT("Score after third hop"), Scoring->Score, 45);
+	TestEqual(TEXT("Score after third hop"), Scoring->Score, 60);
 
 	return true;
 }
 
 // ---------------------------------------------------------------------------
-// Test: Consecutive forward hops increase multiplier by 0.5 each time
+// Test: Consecutive forward hops increase multiplier by 1.0 each time
 // ---------------------------------------------------------------------------
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FScoreSubsystem_MultiplierIncrease,
@@ -73,16 +73,16 @@ bool FScoreSubsystem_MultiplierIncrease::RunTest(const FString& Parameters)
 	TestNearlyEqual(TEXT("Multiplier starts at 1.0"), Scoring->Multiplier, 1.0f);
 
 	Scoring->AddForwardHopScore();
-	TestNearlyEqual(TEXT("Multiplier after 1st hop"), Scoring->Multiplier, 1.5f);
+	TestNearlyEqual(TEXT("Multiplier after 1st hop"), Scoring->Multiplier, 2.0f);
 
 	Scoring->AddForwardHopScore();
-	TestNearlyEqual(TEXT("Multiplier after 2nd hop"), Scoring->Multiplier, 2.0f);
+	TestNearlyEqual(TEXT("Multiplier after 2nd hop"), Scoring->Multiplier, 3.0f);
 
 	Scoring->AddForwardHopScore();
-	TestNearlyEqual(TEXT("Multiplier after 3rd hop"), Scoring->Multiplier, 2.5f);
+	TestNearlyEqual(TEXT("Multiplier after 3rd hop"), Scoring->Multiplier, 4.0f);
 
 	Scoring->AddForwardHopScore();
-	TestNearlyEqual(TEXT("Multiplier after 4th hop"), Scoring->Multiplier, 3.0f);
+	TestNearlyEqual(TEXT("Multiplier after 4th hop"), Scoring->Multiplier, 5.0f);
 
 	return true;
 }
@@ -102,7 +102,7 @@ bool FScoreSubsystem_MultiplierReset::RunTest(const FString& Parameters)
 	// Build up multiplier
 	Scoring->AddForwardHopScore();
 	Scoring->AddForwardHopScore();
-	TestNearlyEqual(TEXT("Multiplier is 2.0 before reset"), Scoring->Multiplier, 2.0f);
+	TestNearlyEqual(TEXT("Multiplier is 3.0 before reset"), Scoring->Multiplier, 3.0f);
 
 	// Retreat resets multiplier
 	Scoring->ResetMultiplier();
@@ -111,7 +111,7 @@ bool FScoreSubsystem_MultiplierReset::RunTest(const FString& Parameters)
 	// Build up again
 	Scoring->AddForwardHopScore();
 	Scoring->AddForwardHopScore();
-	TestNearlyEqual(TEXT("Multiplier rebuilt to 2.0"), Scoring->Multiplier, 2.0f);
+	TestNearlyEqual(TEXT("Multiplier rebuilt to 3.0"), Scoring->Multiplier, 3.0f);
 
 	// Death also resets multiplier (via LoseLife)
 	Scoring->LoseLife();
@@ -121,7 +121,7 @@ bool FScoreSubsystem_MultiplierReset::RunTest(const FString& Parameters)
 }
 
 // ---------------------------------------------------------------------------
-// Test: Time bonus calculation: (RemainingTime / MaxTime) * 1000
+// Test: Time bonus calculation: floor(RemainingSeconds) * 10
 // ---------------------------------------------------------------------------
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FScoreSubsystem_TimeBonus,
@@ -132,30 +132,30 @@ bool FScoreSubsystem_TimeBonus::RunTest(const FString& Parameters)
 {
 	UScoreSubsystem* Scoring = NewObject<UScoreSubsystem>();
 
-	// Full time remaining: (60 / 60) * 1000 = 1000
-	Scoring->AddTimeBonus(60.0f, 60.0f);
-	TestEqual(TEXT("Full time bonus"), Scoring->Score, 1000);
+	// 20 seconds remaining: floor(20) * 10 = 200
+	Scoring->AddTimeBonus(20.0f);
+	TestEqual(TEXT("20s time bonus"), Scoring->Score, 200);
 
-	// Half time remaining: (30 / 60) * 1000 = 500
-	Scoring->Score = 0; // Reset for clarity
-	Scoring->AddTimeBonus(30.0f, 60.0f);
-	TestEqual(TEXT("Half time bonus"), Scoring->Score, 500);
-
-	// No time remaining: 0
+	// 15.5 seconds remaining: floor(15.5) * 10 = 150
 	Scoring->Score = 0;
-	Scoring->AddTimeBonus(0.0f, 60.0f);
+	Scoring->AddTimeBonus(15.5f);
+	TestEqual(TEXT("15.5s time bonus (floored)"), Scoring->Score, 150);
+
+	// 0 seconds remaining: guard returns early, no points
+	Scoring->Score = 0;
+	Scoring->AddTimeBonus(0.0f);
 	TestEqual(TEXT("Zero time bonus"), Scoring->Score, 0);
 
-	// Edge case: MaxTime is 0 should not crash, awards 0
+	// Negative seconds: guard returns early, no points
 	Scoring->Score = 0;
-	Scoring->AddTimeBonus(10.0f, 0.0f);
-	TestEqual(TEXT("MaxTime zero edge case"), Scoring->Score, 0);
+	Scoring->AddTimeBonus(-5.0f);
+	TestEqual(TEXT("Negative time bonus"), Scoring->Score, 0);
 
 	return true;
 }
 
 // ---------------------------------------------------------------------------
-// Test: Extra life at 10,000 threshold, capped at MaxLives (5)
+// Test: Extra life at 10,000 threshold, capped at MaxLives (9)
 // ---------------------------------------------------------------------------
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FScoreSubsystem_ExtraLife,
@@ -169,29 +169,32 @@ bool FScoreSubsystem_ExtraLife::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Initial lives"), Scoring->Lives, 3);
 
 	// Push score just below threshold -- no extra life
+	// With MultiplierIncrement=1.0: hop1 = 10*1.0=10, multiplier->2.0
 	Scoring->Score = 9989;
-	Scoring->AddForwardHopScore(); // +10, score = 9999
+	Scoring->AddForwardHopScore(); // +10, score = 9999, multiplier = 2.0
 	TestEqual(TEXT("No extra life below threshold"), Scoring->Lives, 3);
 
 	// Cross threshold -- extra life awarded
-	Scoring->AddForwardHopScore(); // +15 (multiplier is 1.5), score = 10014
+	// hop2 = 10*2.0=20, score = 10019, multiplier->3.0
+	Scoring->AddForwardHopScore();
 	TestEqual(TEXT("Extra life at 10000"), Scoring->Lives, 4);
 
 	// Push to 20,000 threshold -- another extra life
 	Scoring->Score = 19989;
 	Scoring->Multiplier = 1.0f;
-	Scoring->AddForwardHopScore(); // +10, score = 19999
+	Scoring->AddForwardHopScore(); // +10, score = 19999, multiplier->2.0
 	TestEqual(TEXT("No extra life below 20000"), Scoring->Lives, 4);
 
-	Scoring->AddForwardHopScore(); // +15 (multiplier 1.5), score = 20014
+	Scoring->AddForwardHopScore(); // +20 (multiplier 2.0), score = 20019, multiplier->3.0
 	TestEqual(TEXT("Extra life at 20000"), Scoring->Lives, 5);
 
-	// At max lives -- no more extra lives
+	// MaxLives is 9; set lives to 9 and verify no more extra lives
+	Scoring->Lives = 9;
 	Scoring->Score = 29989;
 	Scoring->Multiplier = 1.0f;
 	Scoring->AddForwardHopScore();
 	Scoring->AddForwardHopScore();
-	TestEqual(TEXT("Capped at MaxLives"), Scoring->Lives, 5);
+	TestEqual(TEXT("Capped at MaxLives"), Scoring->Lives, 9);
 
 	return true;
 }
@@ -272,16 +275,90 @@ bool FScoreSubsystem_HighScore::RunTest(const FString& Parameters)
 	Scoring->AddForwardHopScore(); // +10
 	TestEqual(TEXT("High score updates to 10"), Scoring->HighScore, 10);
 
-	Scoring->AddForwardHopScore(); // +15
-	TestEqual(TEXT("High score updates to 25"), Scoring->HighScore, 25);
+	Scoring->AddForwardHopScore(); // +20 (multiplier 2.0)
+	TestEqual(TEXT("High score updates to 30"), Scoring->HighScore, 30);
 
 	// Start a new game -- high score should persist
 	Scoring->StartNewGame();
-	TestEqual(TEXT("High score persists after new game"), Scoring->HighScore, 25);
+	TestEqual(TEXT("High score persists after new game"), Scoring->HighScore, 30);
 
 	// Score below high score -- high score stays
 	Scoring->AddForwardHopScore(); // +10, score = 10
-	TestEqual(TEXT("High score unchanged when score is lower"), Scoring->HighScore, 25);
+	TestEqual(TEXT("High score unchanged when score is lower"), Scoring->HighScore, 30);
+
+	return true;
+}
+
+// ---------------------------------------------------------------------------
+// Test: Multiplier caps at MaxMultiplier (5.0)
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FScoreSubsystem_MultiplierCap,
+	"UnrealFrog.Score.MultiplierCap",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FScoreSubsystem_MultiplierCap::RunTest(const FString& Parameters)
+{
+	UScoreSubsystem* Scoring = NewObject<UScoreSubsystem>();
+
+	// Hop 1: mult 1.0 -> awards 10, mult becomes 2.0
+	Scoring->AddForwardHopScore();
+	// Hop 2: mult 2.0 -> awards 20, mult becomes 3.0
+	Scoring->AddForwardHopScore();
+	// Hop 3: mult 3.0 -> awards 30, mult becomes 4.0
+	Scoring->AddForwardHopScore();
+	// Hop 4: mult 4.0 -> awards 40, mult becomes 5.0 (capped)
+	Scoring->AddForwardHopScore();
+	TestNearlyEqual(TEXT("Multiplier at cap after 4 hops"), Scoring->Multiplier, 5.0f);
+
+	// Hop 5: mult 5.0 -> awards 50, mult stays at 5.0 (capped at MaxMultiplier)
+	Scoring->AddForwardHopScore();
+	TestNearlyEqual(TEXT("Multiplier still capped after 5 hops"), Scoring->Multiplier, 5.0f);
+
+	// Hop 6: mult 5.0 -> awards 50, still capped
+	int32 ScoreBefore = Scoring->Score;
+	Scoring->AddForwardHopScore();
+	TestEqual(TEXT("Hop 6 awards 50 at cap"), Scoring->Score - ScoreBefore, 50);
+	TestNearlyEqual(TEXT("Multiplier still 5.0 after 6 hops"), Scoring->Multiplier, 5.0f);
+
+	return true;
+}
+
+// ---------------------------------------------------------------------------
+// Test: AddBonusPoints adds arbitrary points
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FScoreSubsystem_BonusPoints,
+	"UnrealFrog.Score.BonusPoints",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FScoreSubsystem_BonusPoints::RunTest(const FString& Parameters)
+{
+	UScoreSubsystem* Scoring = NewObject<UScoreSubsystem>();
+
+	Scoring->AddBonusPoints(200);
+	TestEqual(TEXT("Score after bonus"), Scoring->Score, 200);
+
+	Scoring->AddBonusPoints(1000);
+	TestEqual(TEXT("Score after round bonus"), Scoring->Score, 1200);
+
+	return true;
+}
+
+// ---------------------------------------------------------------------------
+// Test: AddHomeSlotScore awards HomeSlotPoints (200)
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FScoreSubsystem_HomeSlotScore,
+	"UnrealFrog.Score.HomeSlotScore",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FScoreSubsystem_HomeSlotScore::RunTest(const FString& Parameters)
+{
+	UScoreSubsystem* Scoring = NewObject<UScoreSubsystem>();
+
+	Scoring->AddHomeSlotScore();
+	TestEqual(TEXT("Home slot awards 200"), Scoring->Score, 200);
 
 	return true;
 }

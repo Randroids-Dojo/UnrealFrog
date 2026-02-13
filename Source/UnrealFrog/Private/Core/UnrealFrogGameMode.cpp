@@ -12,7 +12,7 @@ AUnrealFrogGameMode::AUnrealFrogGameMode()
 
 void AUnrealFrogGameMode::StartGame()
 {
-	if (CurrentState != EGameState::Menu)
+	if (CurrentState != EGameState::Title)
 	{
 		return;
 	}
@@ -44,7 +44,7 @@ void AUnrealFrogGameMode::ResumeGame()
 	SetState(EGameState::Playing);
 }
 
-void AUnrealFrogGameMode::ReturnToMenu()
+void AUnrealFrogGameMode::ReturnToTitle()
 {
 	if (CurrentState != EGameState::GameOver)
 	{
@@ -55,7 +55,7 @@ void AUnrealFrogGameMode::ReturnToMenu()
 	HomeSlotsFilledCount = 0;
 	RemainingTime = TimePerLevel;
 	ResetHomeSlots();
-	SetState(EGameState::Menu);
+	SetState(EGameState::Title);
 }
 
 void AUnrealFrogGameMode::HandleGameOver()
@@ -109,7 +109,7 @@ bool AUnrealFrogGameMode::IsHomeSlotColumn(int32 Column) const
 
 float AUnrealFrogGameMode::GetSpeedMultiplier() const
 {
-	return 1.0f + static_cast<float>(CurrentWave - 1) * DifficultySpeedIncrement;
+	return FMath::Min(MaxSpeedMultiplier, 1.0f + static_cast<float>(CurrentWave - 1) * DifficultySpeedIncrement);
 }
 
 int32 AUnrealFrogGameMode::GetGapReduction() const
