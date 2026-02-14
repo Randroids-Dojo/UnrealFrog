@@ -26,5 +26,10 @@ public class UnrealFrog : ModuleRules
 			"Slate",
 			"SlateCore"
 		});
+
+		if (Target.bBuildDeveloperTools || Target.Configuration != UnrealTargetConfiguration.Shipping)
+		{
+			PrivateDependencyModuleNames.Add("FunctionalTesting");
+		}
 	}
 }
