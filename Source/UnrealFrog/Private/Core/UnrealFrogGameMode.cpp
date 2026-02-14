@@ -7,8 +7,10 @@
 #include "Core/FroggerHUD.h"
 #include "Core/GroundBuilder.h"
 #include "Core/LaneManager.h"
+#include "Core/ScoreSubsystem.h"
 #include "Components/LightComponent.h"
 #include "Engine/DirectionalLight.h"
+#include "Kismet/GameplayStatics.h"
 #include "TimerManager.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogFrogGameAudio, Log, All);
@@ -49,6 +51,15 @@ void AUnrealFrogGameMode::BeginPlay()
 	{
 		Sun->GetLightComponent()->SetIntensity(3.0f);
 	}
+
+	// Wire frog delegates — the default pawn is spawned by Super::BeginPlay
+	AFrogCharacter* Frog = Cast<AFrogCharacter>(
+		UGameplayStatics::GetPlayerPawn(this, 0));
+	if (Frog)
+	{
+		Frog->OnHopCompleted.AddDynamic(this, &AUnrealFrogGameMode::HandleHopCompleted);
+		Frog->OnFrogDied.AddDynamic(this, &AUnrealFrogGameMode::HandleFrogDied);
+	}
 }
 
 void AUnrealFrogGameMode::Tick(float DeltaTime)
@@ -73,6 +84,16 @@ void AUnrealFrogGameMode::StartGame()
 	bPendingGameOver = false;
 	RemainingTime = TimePerLevel;
 	ResetHomeSlots();
+
+	// Reset score and lives for the new game
+	if (UGameInstance* GI = GetGameInstance())
+	{
+		if (UScoreSubsystem* Scoring = GI->GetSubsystem<UScoreSubsystem>())
+		{
+			Scoring->StartNewGame();
+		}
+	}
+
 	SetState(EGameState::Spawning);
 
 	if (UWorld* World = GetWorld())
@@ -209,6 +230,17 @@ void AUnrealFrogGameMode::ResetHomeSlots()
 
 void AUnrealFrogGameMode::OnWaveComplete()
 {
+	// Award time bonus and round completion bonus
+	if (UGameInstance* GI = GetGameInstance())
+	{
+		if (UScoreSubsystem* Scoring = GI->GetSubsystem<UScoreSubsystem>())
+		{
+			Scoring->AddTimeBonus(RemainingTime);
+			Scoring->AddBonusPoints(Scoring->RoundCompleteBonus);
+			Scoring->ResetMultiplier();
+		}
+	}
+
 	SetState(EGameState::RoundComplete);
 
 	if (UWorld* World = GetWorld())
@@ -241,6 +273,19 @@ void AUnrealFrogGameMode::HandleFrogDied(EDeathType DeathType)
 		return;
 	}
 
+	// Update scoring: lose a life, check for game over
+	if (UGameInstance* GI = GetGameInstance())
+	{
+		if (UScoreSubsystem* Scoring = GI->GetSubsystem<UScoreSubsystem>())
+		{
+			Scoring->LoseLife();
+			if (Scoring->IsGameOver())
+			{
+				bPendingGameOver = true;
+			}
+		}
+	}
+
 	SetState(EGameState::Dying);
 
 	if (UWorld* World = GetWorld())
@@ -265,7 +310,14 @@ void AUnrealFrogGameMode::HandleHopCompleted(FIntPoint NewGridPosition)
 	if (NewRow > HighestRowReached)
 	{
 		HighestRowReached = NewRow;
-		// Scoring will be wired to ScoreSubsystem in BeginPlay (with world context)
+
+		if (UGameInstance* GI = GetGameInstance())
+		{
+			if (UScoreSubsystem* Scoring = GI->GetSubsystem<UScoreSubsystem>())
+			{
+				Scoring->AddForwardHopScore();
+			}
+		}
 	}
 
 	// Check if frog reached the home slot row
@@ -274,8 +326,16 @@ void AUnrealFrogGameMode::HandleHopCompleted(FIntPoint NewGridPosition)
 		int32 Column = NewGridPosition.X;
 		if (TryFillHomeSlot(Column))
 		{
-			// Home slot filled — frog resets, scoring handled by wiring
 			HighestRowReached = 0;
+
+			if (UGameInstance* GI = GetGameInstance())
+			{
+				if (UScoreSubsystem* Scoring = GI->GetSubsystem<UScoreSubsystem>())
+				{
+					Scoring->AddHomeSlotScore();
+					Scoring->ResetMultiplier();
+				}
+			}
 		}
 		// If not a valid home slot column, frog just sits on the goal row
 	}
@@ -286,6 +346,16 @@ void AUnrealFrogGameMode::OnSpawningComplete()
 	if (CurrentState != EGameState::Spawning)
 	{
 		return;
+	}
+
+	// Respawn the frog at start position so it's alive for the new round
+	if (AFrogCharacter* Frog = Cast<AFrogCharacter>(
+			UGameplayStatics::GetPlayerPawn(this, 0)))
+	{
+		if (Frog->bIsDead)
+		{
+			Frog->Respawn();
+		}
 	}
 
 	SetState(EGameState::Playing);

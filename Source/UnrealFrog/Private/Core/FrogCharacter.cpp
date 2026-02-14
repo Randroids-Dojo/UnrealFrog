@@ -1,10 +1,12 @@
 // Copyright UnrealFrog Team. All Rights Reserved.
 
 #include "Core/FrogCharacter.h"
+#include "Core/FlatColorMaterial.h"
 #include "Core/HazardBase.h"
 #include "Components/AudioComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "EngineUtils.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "TimerManager.h"
 #include "UObject/ConstructorHelpers.h"
@@ -48,10 +50,14 @@ void AFrogCharacter::BeginPlay()
 	// Create a bright green dynamic material for the frog placeholder
 	if (MeshComponent && MeshComponent->GetStaticMesh())
 	{
+		if (UMaterial* FlatColor = GetOrCreateFlatColorMaterial())
+		{
+			MeshComponent->SetMaterial(0, FlatColor);
+		}
 		UMaterialInstanceDynamic* DynMat = MeshComponent->CreateAndSetMaterialInstanceDynamic(0);
 		if (DynMat)
 		{
-			DynMat->SetVectorParameterValue(TEXT("BaseColor"), FLinearColor(0.1f, 0.9f, 0.1f));
+			DynMat->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.1f, 0.9f, 0.1f));
 		}
 	}
 
@@ -98,6 +104,13 @@ void AFrogCharacter::Tick(float DeltaTime)
 	if (IsOnRiverRow())
 	{
 		UpdateRiding(DeltaTime);
+
+		// River death: turtle submerged or platform drifted away
+		if (CheckRiverDeath())
+		{
+			Die(EDeathType::Splash);
+			return;
+		}
 
 		// Check off-screen death after riding moves the frog
 		if (IsOffScreen())
@@ -195,14 +208,17 @@ void AFrogCharacter::FinishHop()
 	// Snap precisely to grid to avoid floating-point drift
 	SetActorLocation(GridToWorld(GridPosition));
 
-	OnHopCompleted.Broadcast(GridPosition);
+	// Synchronous platform detection — bypasses deferred overlap event timing
+	FindPlatformAtCurrentPosition();
 
-	// Check river death: landed on river row without a platform
-	if (CheckRiverDeath())
+	// River death: on a river row with no valid platform = splash
+	if (IsOnRiverRow() && CheckRiverDeath())
 	{
 		Die(EDeathType::Splash);
 		return;
 	}
+
+	OnHopCompleted.Broadcast(GridPosition);
 
 	// Process buffered input
 	if (bHasBufferedInput)
@@ -247,6 +263,7 @@ void AFrogCharacter::Die(EDeathType DeathType)
 	bIsHopping = false;
 
 	OnFrogDied.Broadcast(DeathType);
+	OnFrogDiedNative.Broadcast(DeathType);
 
 	// Schedule respawn if the game is still running
 	if (ShouldRespawn())
@@ -333,6 +350,43 @@ void AFrogCharacter::UpdateRiding(float DeltaTime)
 	SetActorLocation(Location);
 }
 
+// -- Synchronous platform detection ---------------------------------------
+
+void AFrogCharacter::FindPlatformAtCurrentPosition()
+{
+	CurrentPlatform = nullptr;
+
+	if (!IsOnRiverRow() || !GetWorld())
+	{
+		return;
+	}
+
+	// Direct position check — bypasses physics body sync timing issues.
+	// Check if the frog's world position falls within any rideable hazard's footprint.
+	FVector FrogPos = GetActorLocation();
+	float HalfCell = GridCellSize * 0.5f;
+
+	for (TActorIterator<AHazardBase> It(GetWorld()); It; ++It)
+	{
+		AHazardBase* Hazard = *It;
+		if (!Hazard || !Hazard->bIsRideable || Hazard->bIsSubmerged)
+		{
+			continue;
+		}
+
+		FVector HazardPos = Hazard->GetActorLocation();
+		float HalfWidth = static_cast<float>(Hazard->HazardWidthCells) * GridCellSize * 0.5f;
+
+		// Frog center must be within hazard footprint (width x 1 cell)
+		if (FMath::Abs(FrogPos.X - HazardPos.X) <= HalfWidth &&
+			FMath::Abs(FrogPos.Y - HazardPos.Y) <= HalfCell)
+		{
+			CurrentPlatform = Hazard;
+			return;
+		}
+	}
+}
+
 // -- Collision handlers ---------------------------------------------------
 
 void AFrogCharacter::HandleHazardOverlap(AHazardBase* Hazard)
@@ -356,6 +410,12 @@ void AFrogCharacter::HandleHazardOverlap(AHazardBase* Hazard)
 
 void AFrogCharacter::HandlePlatformEndOverlap(AHazardBase* Hazard)
 {
+	// Ignore mid-hop end-overlaps — FinishHop will re-detect platforms via synchronous query
+	if (bIsHopping)
+	{
+		return;
+	}
+
 	if (CurrentPlatform.Get() == Hazard)
 	{
 		CurrentPlatform = nullptr;

@@ -52,6 +52,32 @@ You are the QA Lead, responsible for quality assurance, game feel validation, an
 - Game over flow: clear feedback, score display, restart option
 - Performance: locked framerate with no hitches during gameplay
 
+## Pre-Play-Test Verification (Added: Post-Sprint 2 Hotfix)
+
+Before declaring a sprint "ready for play-test," verify these programmatically. Every one of these was a real bug that passed 81 unit tests.
+
+### Material & Visual Checks
+- [ ] Every actor with a mesh uses `GetOrCreateFlatColorMaterial()` — NEVER raw `SetVectorParameterValue("BaseColor", ...)` on engine primitives
+- [ ] Every `SetVectorParameterValue` uses `TEXT("Color")` (our custom parameter), not `TEXT("BaseColor")`
+- [ ] Scene has directional light + sky light (empty maps have NO lighting)
+
+### Delegate Wiring Checks
+- [ ] For every `DECLARE_DYNAMIC_MULTICAST_DELEGATE`, grep the codebase for at least one `AddDynamic` binding
+- [ ] For every native multicast delegate, grep for `AddLambda`/`AddUObject`/`AddRaw` binding
+- [ ] HUD is wired to game state via polling or delegates (not just method existence)
+- [ ] ScoreSubsystem is wired to frog events in GameMode::BeginPlay
+
+### Collision & Physics Checks
+- [ ] Platform detection uses `TActorIterator` position check, NOT physics overlap queries (physics bodies may be stale)
+- [ ] `HandlePlatformEndOverlap` is guarded with `if (bIsHopping) return;` to prevent mid-hop artifacts
+- [ ] Frog can survive on river rows when landing directly on a log/turtle
+
+### Game Flow Checks
+- [ ] Game can restart after game over (`StartNewGame()` + `Respawn()` are called)
+- [ ] Score updates when hopping forward
+- [ ] Lives decrease on death
+- [ ] Timer counts down during play
+
 ## Before Writing Code
 
 1. Read `.team/agreements.md` — confirm you are the current driver

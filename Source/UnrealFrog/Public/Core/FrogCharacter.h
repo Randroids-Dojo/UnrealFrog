@@ -203,6 +203,9 @@ private:
 	void OnEndOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
 		UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
 
+	/** Synchronous overlap query to find a rideable platform at the frog's current position. */
+	void FindPlatformAtCurrentPosition();
+
 	// -- Respawn timer ----------------------------------------------------
 
 	FTimerHandle RespawnTimerHandle;

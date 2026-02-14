@@ -2,9 +2,19 @@
 
 #include "CoreMinimal.h"
 #include "Misc/AutomationTest.h"
+#include "Engine/GameInstance.h"
 #include "Core/ScoreSubsystem.h"
 
 #if WITH_AUTOMATION_TESTS
+
+namespace
+{
+	UScoreSubsystem* CreateTestScoreSubsystem()
+	{
+		UGameInstance* TestGI = NewObject<UGameInstance>();
+		return NewObject<UScoreSubsystem>(TestGI);
+	}
+}
 
 // ---------------------------------------------------------------------------
 // Test: Initial state matches design spec defaults
@@ -16,7 +26,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FScoreSubsystem_InitialState::RunTest(const FString& Parameters)
 {
-	UScoreSubsystem* Scoring = NewObject<UScoreSubsystem>();
+	UScoreSubsystem* Scoring = CreateTestScoreSubsystem();
 
 	TestEqual(TEXT("Score starts at 0"), Scoring->Score, 0);
 	TestEqual(TEXT("HighScore starts at 0"), Scoring->HighScore, 0);
@@ -41,7 +51,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FScoreSubsystem_ForwardHopScoring::RunTest(const FString& Parameters)
 {
-	UScoreSubsystem* Scoring = NewObject<UScoreSubsystem>();
+	UScoreSubsystem* Scoring = CreateTestScoreSubsystem();
 
 	// First hop: 10 * 1.0 = 10
 	Scoring->AddForwardHopScore();
@@ -68,7 +78,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FScoreSubsystem_MultiplierIncrease::RunTest(const FString& Parameters)
 {
-	UScoreSubsystem* Scoring = NewObject<UScoreSubsystem>();
+	UScoreSubsystem* Scoring = CreateTestScoreSubsystem();
 
 	TestNearlyEqual(TEXT("Multiplier starts at 1.0"), Scoring->Multiplier, 1.0f);
 
@@ -97,7 +107,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FScoreSubsystem_MultiplierReset::RunTest(const FString& Parameters)
 {
-	UScoreSubsystem* Scoring = NewObject<UScoreSubsystem>();
+	UScoreSubsystem* Scoring = CreateTestScoreSubsystem();
 
 	// Build up multiplier
 	Scoring->AddForwardHopScore();
@@ -130,7 +140,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FScoreSubsystem_TimeBonus::RunTest(const FString& Parameters)
 {
-	UScoreSubsystem* Scoring = NewObject<UScoreSubsystem>();
+	UScoreSubsystem* Scoring = CreateTestScoreSubsystem();
 
 	// 20 seconds remaining: floor(20) * 10 = 200
 	Scoring->AddTimeBonus(20.0f);
@@ -164,7 +174,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FScoreSubsystem_ExtraLife::RunTest(const FString& Parameters)
 {
-	UScoreSubsystem* Scoring = NewObject<UScoreSubsystem>();
+	UScoreSubsystem* Scoring = CreateTestScoreSubsystem();
 
 	TestEqual(TEXT("Initial lives"), Scoring->Lives, 3);
 
@@ -209,7 +219,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FScoreSubsystem_LoseLife::RunTest(const FString& Parameters)
 {
-	UScoreSubsystem* Scoring = NewObject<UScoreSubsystem>();
+	UScoreSubsystem* Scoring = CreateTestScoreSubsystem();
 
 	TestEqual(TEXT("Start with 3 lives"), Scoring->Lives, 3);
 	TestFalse(TEXT("Not game over"), Scoring->IsGameOver());
@@ -239,7 +249,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FScoreSubsystem_NewGame::RunTest(const FString& Parameters)
 {
-	UScoreSubsystem* Scoring = NewObject<UScoreSubsystem>();
+	UScoreSubsystem* Scoring = CreateTestScoreSubsystem();
 
 	// Accumulate some score
 	Scoring->Score = 5000;
@@ -268,7 +278,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FScoreSubsystem_HighScore::RunTest(const FString& Parameters)
 {
-	UScoreSubsystem* Scoring = NewObject<UScoreSubsystem>();
+	UScoreSubsystem* Scoring = CreateTestScoreSubsystem();
 
 	TestEqual(TEXT("High score starts at 0"), Scoring->HighScore, 0);
 
@@ -299,7 +309,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FScoreSubsystem_MultiplierCap::RunTest(const FString& Parameters)
 {
-	UScoreSubsystem* Scoring = NewObject<UScoreSubsystem>();
+	UScoreSubsystem* Scoring = CreateTestScoreSubsystem();
 
 	// Hop 1: mult 1.0 -> awards 10, mult becomes 2.0
 	Scoring->AddForwardHopScore();
@@ -334,7 +344,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FScoreSubsystem_BonusPoints::RunTest(const FString& Parameters)
 {
-	UScoreSubsystem* Scoring = NewObject<UScoreSubsystem>();
+	UScoreSubsystem* Scoring = CreateTestScoreSubsystem();
 
 	Scoring->AddBonusPoints(200);
 	TestEqual(TEXT("Score after bonus"), Scoring->Score, 200);
@@ -355,7 +365,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FScoreSubsystem_HomeSlotScore::RunTest(const FString& Parameters)
 {
-	UScoreSubsystem* Scoring = NewObject<UScoreSubsystem>();
+	UScoreSubsystem* Scoring = CreateTestScoreSubsystem();
 
 	Scoring->AddHomeSlotScore();
 	TestEqual(TEXT("Home slot awards 200"), Scoring->Score, 200);

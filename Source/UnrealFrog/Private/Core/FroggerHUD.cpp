@@ -1,6 +1,7 @@
 // Copyright UnrealFrog Team. All Rights Reserved.
 
 #include "Core/FroggerHUD.h"
+#include "Core/ScoreSubsystem.h"
 #include "Engine/Canvas.h"
 #include "Engine/Font.h"
 
@@ -77,7 +78,7 @@ void AFroggerHUD::DrawHUD()
 		return;
 	}
 
-	// Sync display state from GameMode each frame
+	// Sync display state from GameMode and ScoreSubsystem each frame
 	if (UWorld* World = GetWorld())
 	{
 		if (AUnrealFrogGameMode* GM = Cast<AUnrealFrogGameMode>(World->GetAuthGameMode()))
@@ -87,6 +88,16 @@ void AFroggerHUD::DrawHUD()
 			if (GM->TimePerLevel > 0.0f)
 			{
 				TimerPercent = FMath::Clamp(GM->RemainingTime / GM->TimePerLevel, 0.0f, 1.0f);
+			}
+		}
+
+		if (UGameInstance* GI = World->GetGameInstance())
+		{
+			if (UScoreSubsystem* Scoring = GI->GetSubsystem<UScoreSubsystem>())
+			{
+				DisplayScore = Scoring->Score;
+				DisplayHighScore = Scoring->HighScore;
+				DisplayLives = Scoring->Lives;
 			}
 		}
 	}

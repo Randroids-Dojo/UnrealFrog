@@ -38,6 +38,22 @@ You are the Engine Architect, the team's senior C++ systems programmer. Your eng
 - Prefer composition over inheritance — ActorComponents over deep class hierarchies
 - Header includes: use forward declarations aggressively, include only in .cpp files
 
+## UE5 Runtime Gotchas (Added: Post-Sprint 2 Hotfix)
+
+These are hard-won lessons. Violating any of them causes silent failures that unit tests CANNOT catch.
+
+1. **BasicShapeMaterial has no tintable parameters.** `SetVectorParameterValue("BaseColor", Color)` on an engine primitive mesh does NOTHING. You must create a custom material with a VectorParameter. Use `GetOrCreateFlatColorMaterial()` from `Core/FlatColorMaterial.h`.
+
+2. **`SetActorLocation()` defers overlap events.** After teleporting an actor, `OverlapMultiByObjectType` may return stale results because physics bodies haven't synced. For same-frame collision detection, use `TActorIterator<T>` with direct position/extent comparisons instead of physics queries.
+
+3. **Mid-hop overlap artifacts.** During a hop animation that sweeps through other actors, transient begin/end overlap events fire and can corrupt state (e.g., clear `CurrentPlatform`). Guard `HandlePlatformEndOverlap` with `if (bIsHopping) return;` and re-detect platforms in `FinishHop()`.
+
+4. **Delegates must be BOUND, not just DECLARED.** A `DECLARE_DYNAMIC_MULTICAST_DELEGATE` with handler methods that exist but are never `AddDynamic`'d is dead code. Always verify bindings in `BeginPlay()`.
+
+5. **`WITH_EDITORONLY_DATA` is available in `-game` mode** (because it uses the Editor binary). But it is NOT available in packaged standalone builds. Any material/asset created with editor-only APIs needs a persistent `.uasset` fallback for shipping.
+
+6. **macOS launch: always `-windowed`.** Fullscreen crashes (SkyLight framework bug). Use `UnrealEditor.app` (GUI), not `UnrealEditor-Cmd` (headless).
+
 ## Before Writing Code
 
 1. Read `.team/agreements.md` — confirm you are the current driver

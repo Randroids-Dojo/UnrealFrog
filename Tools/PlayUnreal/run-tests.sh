@@ -19,7 +19,10 @@ EDITOR_CMD="${ENGINE_DIR}/Engine/Binaries/Mac/UnrealEditor-Cmd"
 PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 PROJECT_FILE="${PROJECT_ROOT}/UnrealFrog.uproject"
 LOG_DIR="${PROJECT_ROOT}/Saved/Logs"
+# macOS UE 5.7 ignores -Log path and writes to ~/Library/Logs/Unreal Engine/
+# We'll search for the most recent log after the test run
 TEST_LOG="${LOG_DIR}/TestRunner.log"
+MACOS_LOG_DIR="${HOME}/Library/Logs/Unreal Engine/UnrealFrogEditor"
 
 # Default test filter: all UnrealFrog tests
 TEST_FILTER="${1:-UnrealFrog}"
@@ -73,6 +76,9 @@ mkdir -p "${LOG_DIR}"
 echo "Running tests..."
 echo ""
 
+# Timestamp marker so we can find the correct log on macOS
+touch /tmp/.unreafrog_test_start
+
 # Launch editor in headless mode, run automation tests, then quit
 "${EDITOR_CMD}" \
     "${PROJECT_FILE}" \
@@ -99,13 +105,31 @@ PASSED=0
 FAILED=0
 ERRORS=""
 
+# Find the actual log file — check project dir first, then macOS default location
+ACTUAL_LOG=""
 if [ -f "${TEST_LOG}" ]; then
+    ACTUAL_LOG="${TEST_LOG}"
+elif [ -d "${MACOS_LOG_DIR}" ]; then
+    # UE nests the -Log path under its own log directory on macOS
+    ACTUAL_LOG=$(find "${MACOS_LOG_DIR}" -name "*.log" -newer /tmp/.unreafrog_test_start 2>/dev/null | head -1)
+    if [ -z "${ACTUAL_LOG}" ]; then
+        # Fallback: most recently modified log
+        ACTUAL_LOG=$(ls -t "${MACOS_LOG_DIR}"/*.log 2>/dev/null | head -1)
+    fi
+fi
+
+if [ -n "${ACTUAL_LOG}" ] && [ -f "${ACTUAL_LOG}" ]; then
     # Count passed/failed from log
-    PASSED=$(grep -c "Test Completed\. Result={Success}" "${TEST_LOG}" 2>/dev/null || echo "0")
-    FAILED=$(grep -c "Test Completed\. Result={Fail}" "${TEST_LOG}" 2>/dev/null || echo "0")
+    # Note: grep -c outputs "0" AND exits 1 when no matches, so we must
+    # avoid the || echo "0" pattern which would produce "0\n0"
+    PASSED=$(grep -c "Test Completed\. Result={Success}" "${ACTUAL_LOG}" 2>/dev/null) || true
+    FAILED=$(grep -c "Test Completed\. Result={Fail}" "${ACTUAL_LOG}" 2>/dev/null) || true
+    PASSED=${PASSED:-0}
+    FAILED=${FAILED:-0}
 
     # Extract failure details
-    ERRORS=$(grep -A2 "Result={Fail}" "${TEST_LOG}" 2>/dev/null || true)
+    ERRORS=$(grep -A2 "Result={Fail}" "${ACTUAL_LOG}" 2>/dev/null || true)
+    TEST_LOG="${ACTUAL_LOG}"
 fi
 
 TOTAL=$((PASSED + FAILED))

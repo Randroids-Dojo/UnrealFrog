@@ -1,6 +1,7 @@
 // Copyright UnrealFrog Team. All Rights Reserved.
 
 #include "Core/HazardBase.h"
+#include "Core/FlatColorMaterial.h"
 #include "Components/BoxComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -34,6 +35,7 @@ AHazardBase::AHazardBase()
 	{
 		CylinderMeshAsset = CylinderMesh.Object;
 	}
+
 }
 
 void AHazardBase::BeginPlay()
@@ -206,10 +208,14 @@ void AHazardBase::SetupMeshForHazardType()
 		break;
 	}
 
-	// Create dynamic material and set color
+	// Apply flat color material and set color
+	if (UMaterial* FlatColor = GetOrCreateFlatColorMaterial())
+	{
+		MeshComponent->SetMaterial(0, FlatColor);
+	}
 	UMaterialInstanceDynamic* DynMat = MeshComponent->CreateAndSetMaterialInstanceDynamic(0);
 	if (DynMat)
 	{
-		DynMat->SetVectorParameterValue(TEXT("BaseColor"), HazardColor);
+		DynMat->SetVectorParameterValue(TEXT("Color"), HazardColor);
 	}
 }

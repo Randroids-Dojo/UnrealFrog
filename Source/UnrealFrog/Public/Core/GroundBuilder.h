@@ -6,9 +6,9 @@
 #include "GameFramework/Actor.h"
 #include "GroundBuilder.generated.h"
 
+class UMaterialInstanceDynamic;
 class UStaticMesh;
 class UStaticMeshComponent;
-class UMaterialInstanceDynamic;
 
 /**
  * Describes a single ground row: its index and color.

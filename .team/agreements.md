@@ -107,6 +107,54 @@ When creating a new map or empty scene via code, always ensure:
 
 **Why:** An empty .umap has NO lights, NO sky, NO atmosphere. C++ auto-spawned meshes are invisible without lighting.
 
+### 11. UE5 Material Coloring (Added: Post-Sprint 2 Hotfix)
+
+**Never call `SetVectorParameterValue("BaseColor", ...)` on engine primitive meshes.** UE5's `BasicShapeMaterial` has no exposed "BaseColor" parameter — the call silently does nothing and meshes render gray.
+
+To tint engine primitives (Cube, Sphere, Cylinder):
+1. Use `GetOrCreateFlatColorMaterial()` from `Core/FlatColorMaterial.h` — creates a runtime UMaterial with a "Color" VectorParameter wired to BaseColor
+2. Call `Component->SetMaterial(0, FlatColor)` FIRST
+3. Then `CreateAndSetMaterialInstanceDynamic(0)` to get a DynMat
+4. Then `DynMat->SetVectorParameterValue(TEXT("Color"), DesiredColor)`
+
+**Note:** `FlatColorMaterial.h` uses `WITH_EDITORONLY_DATA` — it returns nullptr in packaged builds. For shipping, create a persistent `.uasset` material.
+
+**Why:** Sprint 2 shipped with all meshes gray. All actors called SetVectorParameterValue but nothing was visible because the base material had no parameter to set.
+
+### 12. Overlap Detection Timing (Added: Post-Sprint 2 Hotfix)
+
+**Never rely on deferred overlap events for same-frame logic.** `SetActorLocation()` without sweep defers overlap events to the next physics tick. Frame-counting grace periods (e.g., `bJustLanded`) are unreliable across different tick rates and physics sync timings.
+
+For immediate platform/collision detection after teleporting an actor:
+- Use **direct position-based checks** via `TActorIterator<T>` and distance comparisons
+- Compare actor positions and known extents — no physics engine dependency
+- This is fast for small actor counts (<50 hazards) and avoids physics sync race conditions
+- Reserve `OverlapMultiByObjectType` for queries where physics bodies are guaranteed to be synced (e.g., during physics tick callbacks)
+
+**Why:** The frog always died on river logs because `FinishHop()` queried overlaps at the landing position, but physics bodies hadn't synced yet from the current frame's `SetActorLocation` calls.
+
+### 13. Delegate Wiring Verification (Added: Post-Sprint 2 Hotfix)
+
+**Defining a delegate method is not the same as binding it.** Every delegate (`OnHopCompleted`, `OnFrogDied`, etc.) must have an explicit `AddDynamic`/`AddLambda`/`AddUObject` call somewhere in the codebase. Having a handler method exist does nothing if nobody calls `AddDynamic`.
+
+Verification rule: For every `DECLARE_DYNAMIC_MULTICAST_DELEGATE`, grep for at least one `AddDynamic` binding. If zero bindings exist, the delegate is dead code.
+
+**Why:** Sprint 2 had `HandleHopCompleted` and `HandleFrogDied` methods that existed but were never bound. Score never updated, deaths weren't tracked.
+
+### 14. Game Launch Commands — macOS (Added: Post-Sprint 2 Hotfix)
+
+For visual play-testing on macOS:
+```
+"/Users/Shared/Epic Games/UE_5.7/Engine/Binaries/Mac/UnrealEditor.app/Contents/MacOS/UnrealEditor" "<project>.uproject" -game -windowed -resx=1280 -resy=720 -log
+```
+
+Key rules:
+- **Always use `-windowed`** — fullscreen crashes on macOS (SkyLight framework bug in UE 5.7)
+- **Use `UnrealEditor.app`** (GUI) not `UnrealEditor-Cmd` (headless, no window)
+- **`-game` uses the Editor binary** — always rebuild the Editor target before play-testing
+- **Kill existing editor instances** before launching — shared memory conflicts cause silent startup failures
+- Logs are at `~/Library/Logs/Unreal Engine/UnrealFrogEditor/`, NOT `Saved/Logs/`
+
 ## Things We Will Figure Out Together
 
 - ~~Optimal driver rotation timing~~ → Resolved: per-task, not time-based

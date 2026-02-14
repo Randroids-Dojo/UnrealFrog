@@ -1,6 +1,7 @@
 // Copyright UnrealFrog Team. All Rights Reserved.
 
 #include "Core/GroundBuilder.h"
+#include "Core/FlatColorMaterial.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -109,11 +110,15 @@ void AGroundBuilder::SpawnRowPlane(int32 Row, const FLinearColor& Color)
 	Plane->RegisterComponent();
 	Plane->AttachToComponent(GetRootComponent(), FAttachmentTransformRules::KeepWorldTransform);
 
-	// Apply dynamic material with the zone color
+	// Apply flat color material and set zone color
+	if (UMaterial* FlatColor = GetOrCreateFlatColorMaterial())
+	{
+		Plane->SetMaterial(0, FlatColor);
+	}
 	UMaterialInstanceDynamic* DynMat = Plane->CreateAndSetMaterialInstanceDynamic(0);
 	if (DynMat)
 	{
-		DynMat->SetVectorParameterValue(TEXT("BaseColor"), Color);
+		DynMat->SetVectorParameterValue(TEXT("Color"), Color);
 	}
 }
 
@@ -145,10 +150,14 @@ void AGroundBuilder::SpawnHomeSlotIndicator(int32 Column)
 	Indicator->RegisterComponent();
 	Indicator->AttachToComponent(GetRootComponent(), FAttachmentTransformRules::KeepWorldTransform);
 
-	// Apply bright green color
+	// Apply flat color material and set home slot color
+	if (UMaterial* FlatColor = GetOrCreateFlatColorMaterial())
+	{
+		Indicator->SetMaterial(0, FlatColor);
+	}
 	UMaterialInstanceDynamic* DynMat = Indicator->CreateAndSetMaterialInstanceDynamic(0);
 	if (DynMat)
 	{
-		DynMat->SetVectorParameterValue(TEXT("BaseColor"), HomeSlotColor);
+		DynMat->SetVectorParameterValue(TEXT("Color"), HomeSlotColor);
 	}
 }

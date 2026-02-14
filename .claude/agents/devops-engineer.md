@@ -46,6 +46,24 @@ You are the DevOps Engineer, responsible for build infrastructure, testing frame
 - **Object Pool**: Pre-allocate vehicles, logs, and hazard objects to avoid runtime allocation
 - **State Machine**: Game states (menu, playing, paused, game over) as explicit FSM
 
+## PlayUnreal E2E Test Harness (Added: Post-Sprint 2 Hotfix)
+
+**Sprint 3 P0 priority.** Unit tests passed but the game was broken in 4 critical ways. Agents need to play-test autonomously.
+
+The PlayUnreal E2E harness must support:
+1. **Launch the game** — GUI editor with `-game -windowed` (not headless `Cmd`)
+2. **Send inputs** — hop in all 4 directions, trigger pause/restart
+3. **Query game state** — frog position, score, lives, game state, CurrentPlatform
+4. **Assert outcomes** — "frog hopped to row 7 and is alive" / "frog landed on log, CurrentPlatform is not null"
+5. **Take screenshots** — visual regression baseline
+
+Candidate approaches (from Sprint 2 spike):
+- **Remote Control API**: HTTP endpoints to query/set UObject properties at runtime
+- **Automation Driver**: UE's built-in framework for UI interaction + state queries
+- **Gauntlet**: UE's E2E test framework for headless gameplay scenarios
+
+Without this harness, every sprint will require stakeholder manual play-testing to catch wiring/visual bugs.
+
 ## Before Writing Code
 
 1. Read `.team/agreements.md` — confirm you are the current driver

@@ -186,3 +186,55 @@ Sprint 2 goal: "Make UnrealFrog playable from the editor." Press Play and experi
 - Phase 3: 1 session (map, integration tests, audio, PlayUnreal, spike)
 - Play-test fixes: 1 session (lighting, HUD wiring, camera angle)
 - **Total: ~5 sessions. Play-test fixes added an unplanned session.**
+
+---
+
+## Post-Sprint 2 Hotfix — QA Play-Test Defects
+
+### Context
+After Sprint 2 was "complete" (builds passing, 81 tests green), the stakeholder play-tested the game and found 4 critical defects that made the game unplayable. A hotfix session was required to resolve them. This retroactive added a 6th unplanned session to Sprint 2.
+
+### Defects Found
+
+| # | Defect | Root Cause | Fix |
+|---|--------|------------|-----|
+| 1 | All meshes render gray (no colors) | `SetVectorParameterValue("BaseColor", ...)` does nothing — UE5's BasicShapeMaterial has no "BaseColor" parameter | Created `FlatColorMaterial.h` — runtime UMaterial with "Color" VectorParameter connected to BaseColor |
+| 2 | Frog always dies on river logs | `SetActorLocation()` defers overlap events; physics overlap query had stale body data; mid-hop overlap/end-overlap cycles clear CurrentPlatform | Replaced physics-based query with direct `TActorIterator` position check; added `bIsHopping` guard on `HandlePlatformEndOverlap` |
+| 3 | Score never updates | `OnHopCompleted`/`OnFrogDied` delegate handler methods existed but were never bound via `AddDynamic` | Wired all delegates in `GameMode::BeginPlay()`; HUD polls ScoreSubsystem each frame |
+| 4 | No restart after game over | Nobody calls `Respawn()` or `StartNewGame()` | Added to `StartGame()` and `OnSpawningComplete()` |
+
+### What Went Wrong
+
+1. **Unit tests are blind to runtime behavior.** All 81 tests passed, yet 4 critical gameplay bugs existed. The tests verified logic in isolation (HandleHazardOverlap works, CheckRiverDeath works, ScoreSubsystem arithmetic works) but never tested the WIRING between systems in a running game. Delegates can be unbound, materials can be misconfigured, and physics events can be deferred — none of which appear in unit tests.
+
+2. **No agent could independently play-test.** The QA Lead had no way to launch the game, send inputs, and observe results. `run-tests.sh` runs headless unit tests only. The stakeholder was the only one who could actually play. This violates the autonomous team principle.
+
+3. **UE5 material system is a hidden trap.** BasicShapeMaterial's lack of exposed parameters is not documented in any obvious place. The fix required editor-only APIs (`WITH_EDITORONLY_DATA`) which won't work in packaged builds — a deferred risk.
+
+4. **Physics overlap timing is non-obvious.** `SetActorLocation` → `OverlapMultiByObjectType` in the same frame can return stale results. The fix required understanding UE's physics sync pipeline, which is not covered in tutorials.
+
+5. **"It compiles and tests pass" is NOT "it works."** The team had a false sense of completion because the CI-equivalent checks (build + tests) all passed. The Definition of Done (§5a) requires play-testing, but no agent could perform it.
+
+### Agreements Changed
+
+1. **NEW §11**: UE5 Material Coloring — never use BasicShapeMaterial parameters; always create custom material
+2. **NEW §12**: Overlap Detection Timing — prefer direct position checks over physics queries for same-frame logic
+3. **NEW §13**: Delegate Wiring Verification — grep for AddDynamic bindings, not just method definitions
+4. **NEW §14**: Game Launch Commands — correct macOS launch flags, windowed mode, GUI vs headless binary
+5. **UPDATED engine-architect.md**: Added UE5 Runtime Gotchas section
+6. **UPDATED qa-lead.md**: Added pre-play-test verification checklist
+7. **UPDATED devops-engineer.md**: Added PlayUnreal E2E test requirement for Sprint 3
+
+### Action Items for Sprint 3
+
+- [ ] **P0: Build PlayUnreal E2E harness** — agents must be able to launch the game, send inputs, and verify outcomes programmatically (DevOps Engineer)
+- [ ] Create persistent M_FlatColor .uasset for packaged builds (Engine Architect)
+- [ ] Add integration tests that verify delegate bindings exist (QA Lead)
+- [ ] Add a "wiring smoke test" that spawns GameMode + Frog + ScoreSubsystem and verifies delegates fire end-to-end (Engine Architect)
+
+### Open Questions
+
+- [x] How to handle frog-on-river mounting? → Direct position check via TActorIterator, not physics overlaps
+- [ ] Should PlayUnreal use Remote Control API, Automation Driver, or both?
+- [ ] Can we automate visual regression testing (screenshot comparison)?
+- [ ] Should we add a packaging step to CI to catch WITH_EDITORONLY_DATA issues early?
