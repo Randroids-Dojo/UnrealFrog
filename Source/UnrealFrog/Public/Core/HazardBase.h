@@ -11,6 +11,14 @@ class UBoxComponent;
 class UStaticMesh;
 class UStaticMeshComponent;
 
+UENUM(BlueprintType)
+enum class ESubmergePhase : uint8
+{
+	Surface		UMETA(DisplayName = "Surface"),
+	Warning		UMETA(DisplayName = "Warning"),
+	Submerged	UMETA(DisplayName = "Submerged")
+};
+
 UCLASS()
 class UNREALFROG_API AHazardBase : public AActor
 {
@@ -42,13 +50,23 @@ public:
 	// -- Turtle submerge --------------------------------------------------
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hazard|Turtle")
-	float SubmergeInterval = 3.0f;
+	float SurfaceDuration = 4.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hazard|Turtle")
-	float SubmergeDuration = 1.5f;
+	float WarningDuration = 1.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hazard|Turtle")
+	float SubmergeDuration = 2.0f;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "State")
 	bool bIsSubmerged = false;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "State")
+	ESubmergePhase SubmergePhase = ESubmergePhase::Surface;
+
+	/** Current wave number — used to gate submerge (Wave 2+ only). Set by LaneManager. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hazard|Turtle")
+	int32 CurrentWave = 1;
 
 	// -- Grid references (set by LaneManager) -----------------------------
 

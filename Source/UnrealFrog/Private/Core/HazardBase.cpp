@@ -2,6 +2,7 @@
 
 #include "Core/HazardBase.h"
 #include "Core/FlatColorMaterial.h"
+#include "Core/UnrealFrogGameMode.h"
 #include "Components/BoxComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -49,6 +50,18 @@ void AHazardBase::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
+	// Stop all movement and timers while game is paused
+	if (UWorld* World = GetWorld())
+	{
+		if (AUnrealFrogGameMode* GM = Cast<AUnrealFrogGameMode>(World->GetAuthGameMode()))
+		{
+			if (GM->CurrentState == EGameState::Paused)
+			{
+				return;
+			}
+		}
+	}
+
 	TickMovement(DeltaTime);
 
 	if (HazardType == EHazardType::TurtleGroup)
@@ -71,25 +84,41 @@ void AHazardBase::TickMovement(float DeltaTime)
 
 void AHazardBase::TickSubmerge(float DeltaTime)
 {
+	// Wave 1: turtles are always solid, never submerge
+	if (CurrentWave <= 1)
+	{
+		return;
+	}
+
 	SubmergeTimer += DeltaTime;
 
-	if (!bIsSubmerged)
+	switch (SubmergePhase)
 	{
-		// Surfaced: wait for SubmergeInterval to elapse, then submerge
-		if (SubmergeTimer >= SubmergeInterval)
+	case ESubmergePhase::Surface:
+		if (SubmergeTimer >= SurfaceDuration)
 		{
+			SubmergePhase = ESubmergePhase::Warning;
+			SubmergeTimer = 0.0f;
+		}
+		break;
+
+	case ESubmergePhase::Warning:
+		if (SubmergeTimer >= WarningDuration)
+		{
+			SubmergePhase = ESubmergePhase::Submerged;
 			bIsSubmerged = true;
 			SubmergeTimer = 0.0f;
 		}
-	}
-	else
-	{
-		// Submerged: wait for SubmergeDuration to elapse, then surface
+		break;
+
+	case ESubmergePhase::Submerged:
 		if (SubmergeTimer >= SubmergeDuration)
 		{
+			SubmergePhase = ESubmergePhase::Surface;
 			bIsSubmerged = false;
 			SubmergeTimer = 0.0f;
 		}
+		break;
 	}
 }
 

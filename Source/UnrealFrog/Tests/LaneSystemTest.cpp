@@ -256,8 +256,10 @@ bool FHazardBase_TurtleSubmerge::RunTest(const FString& Parameters)
 	AHazardBase* Turtle = NewObject<AHazardBase>();
 	Turtle->HazardType = EHazardType::TurtleGroup;
 	Turtle->bIsRideable = true;
-	Turtle->SubmergeInterval = 3.0f;
-	Turtle->SubmergeDuration = 1.5f;
+	Turtle->CurrentWave = 2; // Wave 2+: submerge enabled
+	Turtle->SurfaceDuration = 4.0f;
+	Turtle->WarningDuration = 1.0f;
+	Turtle->SubmergeDuration = 2.0f;
 	Turtle->Speed = 80.0f;
 	Turtle->bMovesRight = true;
 	Turtle->GridColumns = 13;
@@ -266,14 +268,22 @@ bool FHazardBase_TurtleSubmerge::RunTest(const FString& Parameters)
 
 	// Initially not submerged
 	TestFalse(TEXT("Turtle starts surfaced"), Turtle->bIsSubmerged);
+	TestEqual(TEXT("Surface phase"), Turtle->SubmergePhase, ESubmergePhase::Surface);
 
-	// Tick 3.0 seconds -- should trigger submerge
-	Turtle->TickSubmerge(3.0f);
-	TestTrue(TEXT("Turtle submerged after interval"), Turtle->bIsSubmerged);
+	// Tick past surface phase (4.0s) → warning
+	Turtle->TickSubmerge(4.1f);
+	TestEqual(TEXT("Warning phase"), Turtle->SubmergePhase, ESubmergePhase::Warning);
+	TestFalse(TEXT("Not submerged during warning"), Turtle->bIsSubmerged);
 
-	// Tick 1.5 more seconds -- should surface again
-	Turtle->TickSubmerge(1.5f);
-	TestFalse(TEXT("Turtle surfaced after submerge duration"), Turtle->bIsSubmerged);
+	// Tick past warning phase (1.0s) → submerged
+	Turtle->TickSubmerge(1.1f);
+	TestEqual(TEXT("Submerged phase"), Turtle->SubmergePhase, ESubmergePhase::Submerged);
+	TestTrue(TEXT("Turtle submerged"), Turtle->bIsSubmerged);
+
+	// Tick past submerge phase (2.0s) → back to surface
+	Turtle->TickSubmerge(2.1f);
+	TestEqual(TEXT("Back to Surface"), Turtle->SubmergePhase, ESubmergePhase::Surface);
+	TestFalse(TEXT("Turtle surfaced again"), Turtle->bIsSubmerged);
 
 	return true;
 }

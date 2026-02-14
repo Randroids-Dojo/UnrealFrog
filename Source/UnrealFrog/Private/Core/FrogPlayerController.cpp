@@ -188,6 +188,18 @@ void AFrogPlayerController::HandleStart()
 
 void AFrogPlayerController::HandlePause()
 {
-	// Stubbed -- full pause/resume toggle deferred to Sprint 3.
-	// When implemented, this will toggle PauseGame/ResumeGame.
+	if (UWorld* World = GetWorld())
+	{
+		if (AUnrealFrogGameMode* GM = Cast<AUnrealFrogGameMode>(World->GetAuthGameMode()))
+		{
+			if (GM->CurrentState == EGameState::Playing)
+			{
+				GM->PauseGame();
+			}
+			else if (GM->CurrentState == EGameState::Paused)
+			{
+				GM->ResumeGame();
+			}
+		}
+	}
 }

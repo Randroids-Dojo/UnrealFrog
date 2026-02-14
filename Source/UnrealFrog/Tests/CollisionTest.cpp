@@ -133,4 +133,132 @@ bool FCollision_EndOverlapDifferentPlatform::RunTest(const FString& Parameters)
 	return true;
 }
 
+// ---------------------------------------------------------------------------
+// Test: Turtle submerge cycle timing (Wave 2+)
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FCollision_TurtleSubmergeCycle,
+	"UnrealFrog.Collision.TurtleSubmergeCycle",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FCollision_TurtleSubmergeCycle::RunTest(const FString& Parameters)
+{
+	AHazardBase* Turtle = NewObject<AHazardBase>();
+	Turtle->HazardType = EHazardType::TurtleGroup;
+	Turtle->bIsRideable = true;
+	Turtle->CurrentWave = 2; // Wave 2+: submerge enabled
+	Turtle->SurfaceDuration = 4.0f;
+	Turtle->WarningDuration = 1.0f;
+	Turtle->SubmergeDuration = 2.0f;
+
+	// Starts surfaced
+	TestFalse(TEXT("Starts surfaced"), Turtle->bIsSubmerged);
+	TestEqual(TEXT("Starts in Surface phase"), Turtle->SubmergePhase, ESubmergePhase::Surface);
+
+	// Tick through surface phase (4.0s)
+	Turtle->TickSubmerge(3.9f);
+	TestEqual(TEXT("Still Surface at 3.9s"), Turtle->SubmergePhase, ESubmergePhase::Surface);
+
+	Turtle->TickSubmerge(0.2f); // 4.1s total → warning
+	TestEqual(TEXT("Warning at 4.1s"), Turtle->SubmergePhase, ESubmergePhase::Warning);
+	TestFalse(TEXT("Not submerged during warning"), Turtle->bIsSubmerged);
+
+	// Tick through warning phase (1.0s)
+	Turtle->TickSubmerge(0.9f);
+	TestEqual(TEXT("Still Warning at 5.0s"), Turtle->SubmergePhase, ESubmergePhase::Warning);
+
+	Turtle->TickSubmerge(0.2f); // 5.2s → submerged
+	TestEqual(TEXT("Submerged at 5.2s"), Turtle->SubmergePhase, ESubmergePhase::Submerged);
+	TestTrue(TEXT("bIsSubmerged true"), Turtle->bIsSubmerged);
+
+	// Tick through submerge phase (2.0s)
+	Turtle->TickSubmerge(1.9f);
+	TestEqual(TEXT("Still Submerged at 7.1s"), Turtle->SubmergePhase, ESubmergePhase::Submerged);
+
+	Turtle->TickSubmerge(0.2f); // 7.3s → back to surface
+	TestEqual(TEXT("Back to Surface at 7.3s"), Turtle->SubmergePhase, ESubmergePhase::Surface);
+	TestFalse(TEXT("bIsSubmerged false"), Turtle->bIsSubmerged);
+
+	return true;
+}
+
+// ---------------------------------------------------------------------------
+// Test: Wave 1 turtles never submerge
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FCollision_Wave1TurtlesNeverSubmerge,
+	"UnrealFrog.Collision.Wave1TurtlesNeverSubmerge",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FCollision_Wave1TurtlesNeverSubmerge::RunTest(const FString& Parameters)
+{
+	AHazardBase* Turtle = NewObject<AHazardBase>();
+	Turtle->HazardType = EHazardType::TurtleGroup;
+	Turtle->bIsRideable = true;
+	Turtle->CurrentWave = 1; // Wave 1: no submerge
+	Turtle->SurfaceDuration = 4.0f;
+	Turtle->WarningDuration = 1.0f;
+	Turtle->SubmergeDuration = 2.0f;
+
+	// Tick well past the full cycle
+	Turtle->TickSubmerge(20.0f);
+
+	TestFalse(TEXT("Wave 1 turtle never submerges"), Turtle->bIsSubmerged);
+	TestEqual(TEXT("Phase stays Surface"), Turtle->SubmergePhase, ESubmergePhase::Surface);
+
+	return true;
+}
+
+// ---------------------------------------------------------------------------
+// Test: Frog on submerged turtle dies
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FCollision_FrogDiesOnSubmergedTurtle,
+	"UnrealFrog.Collision.FrogDiesOnSubmergedTurtle",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FCollision_FrogDiesOnSubmergedTurtle::RunTest(const FString& Parameters)
+{
+	AFrogCharacter* Frog = NewObject<AFrogCharacter>();
+	AHazardBase* Turtle = NewObject<AHazardBase>();
+	Turtle->HazardType = EHazardType::TurtleGroup;
+	Turtle->bIsRideable = true;
+	Turtle->bIsSubmerged = true;
+
+	// Frog is on a river row
+	Frog->GridPosition = FIntPoint(6, 8);
+	Frog->CurrentPlatform = Turtle;
+
+	// CheckRiverDeath should return true when platform is submerged
+	TestTrue(TEXT("River death on submerged turtle"), Frog->CheckRiverDeath());
+
+	return true;
+}
+
+// ---------------------------------------------------------------------------
+// Test: Frog on surfaced turtle survives
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FCollision_FrogSurvivesOnSurfacedTurtle,
+	"UnrealFrog.Collision.FrogSurvivesOnSurfacedTurtle",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FCollision_FrogSurvivesOnSurfacedTurtle::RunTest(const FString& Parameters)
+{
+	AFrogCharacter* Frog = NewObject<AFrogCharacter>();
+	AHazardBase* Turtle = NewObject<AHazardBase>();
+	Turtle->HazardType = EHazardType::TurtleGroup;
+	Turtle->bIsRideable = true;
+	Turtle->bIsSubmerged = false;
+
+	// Frog is on a river row with the turtle
+	Frog->GridPosition = FIntPoint(6, 8);
+	Frog->CurrentPlatform = Turtle;
+
+	// CheckRiverDeath should return false when platform is surfaced
+	TestFalse(TEXT("No river death on surfaced turtle"), Frog->CheckRiverDeath());
+
+	return true;
+}
+
 #endif // WITH_AUTOMATION_TESTS

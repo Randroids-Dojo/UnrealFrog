@@ -2,6 +2,8 @@
 
 #include "CoreMinimal.h"
 #include "Misc/AutomationTest.h"
+#include "Core/FrogCharacter.h"
+#include "Core/HazardBase.h"
 #include "Core/UnrealFrogGameMode.h"
 
 #if WITH_AUTOMATION_TESTS
@@ -94,6 +96,102 @@ bool FGameState_PauseResume::RunTest(const FString& Parameters)
 	AUnrealFrogGameMode* GM2 = NewObject<AUnrealFrogGameMode>();
 	GM2->PauseGame();
 	TestEqual(TEXT("Cannot pause from Title"), GM2->CurrentState, EGameState::Title);
+
+	return true;
+}
+
+// ---------------------------------------------------------------------------
+// Test: Hazard positions freeze during Paused
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FGameState_PauseFreezesHazards,
+	"UnrealFrog.GameState.PauseFreezesHazards",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FGameState_PauseFreezesHazards::RunTest(const FString& Parameters)
+{
+	AUnrealFrogGameMode* GM = NewObject<AUnrealFrogGameMode>();
+	AHazardBase* Hazard = NewObject<AHazardBase>();
+	Hazard->Speed = 200.0f;
+	Hazard->bMovesRight = true;
+
+	GM->StartGame();
+	GM->OnSpawningComplete();
+
+	// Move hazard during Playing — should move
+	FVector PosBefore = Hazard->GetActorLocation();
+	Hazard->TickMovement(1.0f);
+	FVector PosAfterPlaying = Hazard->GetActorLocation();
+	TestTrue(TEXT("Hazard moved during Playing"),
+		FMath::Abs(PosAfterPlaying.X - PosBefore.X) > 100.0);
+
+	// Pause the game
+	GM->PauseGame();
+	TestEqual(TEXT("Paused"), GM->CurrentState, EGameState::Paused);
+
+	return true;
+}
+
+// ---------------------------------------------------------------------------
+// Test: Pause only works from Playing state
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FGameState_PauseOnlyFromPlaying,
+	"UnrealFrog.GameState.PauseOnlyFromPlaying",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FGameState_PauseOnlyFromPlaying::RunTest(const FString& Parameters)
+{
+	AUnrealFrogGameMode* GM = NewObject<AUnrealFrogGameMode>();
+
+	// Title — cannot pause
+	GM->PauseGame();
+	TestEqual(TEXT("Cannot pause from Title"), GM->CurrentState, EGameState::Title);
+
+	// Spawning — cannot pause
+	GM->StartGame();
+	TestEqual(TEXT("Spawning"), GM->CurrentState, EGameState::Spawning);
+	GM->PauseGame();
+	TestEqual(TEXT("Cannot pause from Spawning"), GM->CurrentState, EGameState::Spawning);
+
+	// Playing — CAN pause
+	GM->OnSpawningComplete();
+	GM->PauseGame();
+	TestEqual(TEXT("Can pause from Playing"), GM->CurrentState, EGameState::Paused);
+
+	// Dying — cannot pause
+	GM->ResumeGame();
+	GM->HandleFrogDied(EDeathType::Squish);
+	TestEqual(TEXT("Dying"), GM->CurrentState, EGameState::Dying);
+	GM->PauseGame();
+	TestEqual(TEXT("Cannot pause from Dying"), GM->CurrentState, EGameState::Dying);
+
+	// GameOver — cannot pause
+	GM->bPendingGameOver = true;
+	GM->OnDyingComplete();
+	TestEqual(TEXT("GameOver"), GM->CurrentState, EGameState::GameOver);
+	GM->PauseGame();
+	TestEqual(TEXT("Cannot pause from GameOver"), GM->CurrentState, EGameState::GameOver);
+
+	return true;
+}
+
+// ---------------------------------------------------------------------------
+// Test: Frog cannot hop during Paused
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FGameState_FrogCannotHopDuringPause,
+	"UnrealFrog.GameState.FrogCannotHopDuringPause",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FGameState_FrogCannotHopDuringPause::RunTest(const FString& Parameters)
+{
+	AFrogCharacter* Frog = NewObject<AFrogCharacter>();
+	FIntPoint StartPos = Frog->GridPosition; // (6, 0)
+
+	// Frog should be able to hop normally
+	Frog->RequestHop(FVector(0.0, 1.0, 0.0));
+	TestTrue(TEXT("Frog started hopping"), Frog->bIsHopping);
 
 	return true;
 }

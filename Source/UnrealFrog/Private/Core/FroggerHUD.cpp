@@ -54,6 +54,8 @@ FString AFroggerHUD::GetOverlayText() const
 	{
 	case EGameState::Title:
 		return TEXT("PRESS START");
+	case EGameState::Paused:
+		return TEXT("PAUSED");
 	case EGameState::GameOver:
 		return TEXT("GAME OVER");
 	case EGameState::RoundComplete:
