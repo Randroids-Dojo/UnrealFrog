@@ -2,9 +2,16 @@
 # run-tests.sh — Headless test runner for UnrealFrog automation tests
 #
 # Usage:
-#   ./Tools/PlayUnreal/run-tests.sh                  # Run all UnrealFrog tests
-#   ./Tools/PlayUnreal/run-tests.sh "UnrealFrog.Unit" # Run specific test group
-#   ./Tools/PlayUnreal/run-tests.sh --list            # List available tests
+#   ./Tools/PlayUnreal/run-tests.sh                       # Run all UnrealFrog tests
+#   ./Tools/PlayUnreal/run-tests.sh "UnrealFrog.Wiring"   # Run specific test category
+#   ./Tools/PlayUnreal/run-tests.sh --list                 # List available tests
+#   ./Tools/PlayUnreal/run-tests.sh --report               # Generate JSON test report
+#   ./Tools/PlayUnreal/run-tests.sh --functional           # Run functional tests (needs editor, not NullRHI)
+#
+# Exit codes:
+#   0 = all tests passed
+#   1 = one or more tests failed
+#   2 = timeout, crash, or no tests matched
 #
 # Requirements:
 #   - UE 5.7 installed at /Users/Shared/Epic Games/UE_5.7/
@@ -19,30 +26,59 @@ EDITOR_CMD="${ENGINE_DIR}/Engine/Binaries/Mac/UnrealEditor-Cmd"
 PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 PROJECT_FILE="${PROJECT_ROOT}/UnrealFrog.uproject"
 LOG_DIR="${PROJECT_ROOT}/Saved/Logs"
-# macOS UE 5.7 ignores -Log path and writes to ~/Library/Logs/Unreal Engine/
-# We'll search for the most recent log after the test run
+REPORT_DIR="${PROJECT_ROOT}/Saved/Reports"
 TEST_LOG="${LOG_DIR}/TestRunner.log"
 MACOS_LOG_DIR="${HOME}/Library/Logs/Unreal Engine/UnrealFrogEditor"
 
-# Default test filter: all UnrealFrog tests
-TEST_FILTER="${1:-UnrealFrog}"
+# -- Parse arguments ---------------------------------------------------------
+
+TEST_FILTER="UnrealFrog"
+LIST_MODE=false
+REPORT_MODE=false
+FUNCTIONAL_MODE=false
+TIMEOUT_SECONDS=300  # 5 minutes
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --list)
+            LIST_MODE=true
+            shift
+            ;;
+        --report)
+            REPORT_MODE=true
+            shift
+            ;;
+        --functional)
+            FUNCTIONAL_MODE=true
+            shift
+            ;;
+        --timeout)
+            TIMEOUT_SECONDS="$2"
+            shift 2
+            ;;
+        *)
+            TEST_FILTER="$1"
+            shift
+            ;;
+    esac
+done
 
 # -- Validation --------------------------------------------------------------
 
 if [ ! -f "${EDITOR_CMD}" ]; then
     echo "ERROR: UnrealEditor-Cmd not found at: ${EDITOR_CMD}"
     echo "       Is UE 5.7 installed?"
-    exit 1
+    exit 2
 fi
 
 if [ ! -f "${PROJECT_FILE}" ]; then
     echo "ERROR: Project file not found at: ${PROJECT_FILE}"
-    exit 1
+    exit 2
 fi
 
 # -- List mode ---------------------------------------------------------------
 
-if [ "${TEST_FILTER}" = "--list" ]; then
+if [ "${LIST_MODE}" = true ]; then
     echo "Listing available UnrealFrog automation tests..."
     "${EDITOR_CMD}" \
         "${PROJECT_FILE}" \
@@ -59,15 +95,34 @@ if [ "${TEST_FILTER}" = "--list" ]; then
     exit 0
 fi
 
+# -- Build RHI flags ---------------------------------------------------------
+
+RHI_FLAGS="-NullRHI -NoSound"
+if [ "${FUNCTIONAL_MODE}" = true ]; then
+    # Functional tests need a rendering context
+    RHI_FLAGS="-NoSound"
+fi
+
+# -- Build report flags ------------------------------------------------------
+
+REPORT_FLAGS=""
+if [ "${REPORT_MODE}" = true ]; then
+    mkdir -p "${REPORT_DIR}"
+    REPORT_FLAGS="-ReportExportPath=${REPORT_DIR}"
+fi
+
 # -- Run tests ---------------------------------------------------------------
 
 echo "============================================"
 echo "  UnrealFrog Headless Test Runner"
 echo "============================================"
-echo "  Engine:  ${ENGINE_DIR}"
-echo "  Project: ${PROJECT_FILE}"
-echo "  Filter:  ${TEST_FILTER}"
-echo "  Log:     ${TEST_LOG}"
+echo "  Engine:     ${ENGINE_DIR}"
+echo "  Project:    ${PROJECT_FILE}"
+echo "  Filter:     ${TEST_FILTER}"
+echo "  Mode:       $([ "${FUNCTIONAL_MODE}" = true ] && echo "Functional" || echo "Unit/Integration")"
+echo "  Report:     $([ "${REPORT_MODE}" = true ] && echo "${REPORT_DIR}" || echo "Off")"
+echo "  Timeout:    ${TIMEOUT_SECONDS}s"
+echo "  Log:        ${TEST_LOG}"
 echo "============================================"
 echo ""
 
@@ -79,20 +134,43 @@ echo ""
 # Timestamp marker so we can find the correct log on macOS
 touch /tmp/.unreafrog_test_start
 
-# Launch editor in headless mode, run automation tests, then quit
-"${EDITOR_CMD}" \
-    "${PROJECT_FILE}" \
-    -NullRHI \
-    -NoSound \
-    -NoSplash \
-    -Unattended \
-    -NoPause \
-    -ExecCmds="Automation RunTests ${TEST_FILTER}; Quit" \
-    -Log="${TEST_LOG}" \
-    2>&1 | tee /dev/stderr | {
-        # Capture output for exit code determination
-        TEST_OUTPUT=$(cat)
-    } || true
+# Launch editor in headless mode with timeout
+EDITOR_PID=""
+EXIT_CODE=0
+
+# Run with timeout
+(
+    "${EDITOR_CMD}" \
+        "${PROJECT_FILE}" \
+        ${RHI_FLAGS} \
+        -NoSplash \
+        -Unattended \
+        -NoPause \
+        ${REPORT_FLAGS} \
+        -ExecCmds="Automation RunTests ${TEST_FILTER}; Quit" \
+        -Log="${TEST_LOG}" \
+        2>&1
+) &
+EDITOR_PID=$!
+
+# Monitor timeout
+ELAPSED=0
+while kill -0 "${EDITOR_PID}" 2>/dev/null; do
+    sleep 1
+    ELAPSED=$((ELAPSED + 1))
+    if [ "${ELAPSED}" -ge "${TIMEOUT_SECONDS}" ]; then
+        echo ""
+        echo "TIMEOUT: Editor did not finish within ${TIMEOUT_SECONDS}s — killing process"
+        kill -9 "${EDITOR_PID}" 2>/dev/null || true
+        wait "${EDITOR_PID}" 2>/dev/null || true
+        echo ""
+        echo "RESULT: TIMEOUT"
+        exit 2
+    fi
+done
+
+# Capture exit code from editor process
+wait "${EDITOR_PID}" 2>/dev/null || EXIT_CODE=$?
 
 # -- Parse results -----------------------------------------------------------
 
@@ -120,8 +198,6 @@ fi
 
 if [ -n "${ACTUAL_LOG}" ] && [ -f "${ACTUAL_LOG}" ]; then
     # Count passed/failed from log
-    # Note: grep -c outputs "0" AND exits 1 when no matches, so we must
-    # avoid the || echo "0" pattern which would produce "0\n0"
     PASSED=$(grep -c "Test Completed\. Result={Success}" "${ACTUAL_LOG}" 2>/dev/null) || true
     FAILED=$(grep -c "Test Completed\. Result={Fail}" "${ACTUAL_LOG}" 2>/dev/null) || true
     PASSED=${PASSED:-0}
@@ -144,6 +220,14 @@ if [ -n "${ERRORS}" ]; then
     echo "FAILURES:"
     echo "${ERRORS}"
     echo ""
+fi
+
+# Report location
+if [ "${REPORT_MODE}" = true ] && [ -d "${REPORT_DIR}" ]; then
+    REPORT_FILE=$(ls -t "${REPORT_DIR}"/*.json 2>/dev/null | head -1)
+    if [ -n "${REPORT_FILE}" ]; then
+        echo "Report: ${REPORT_FILE}"
+    fi
 fi
 
 echo "Full log: ${TEST_LOG}"
