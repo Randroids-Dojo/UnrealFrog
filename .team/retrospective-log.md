@@ -238,3 +238,86 @@ After Sprint 2 was "complete" (builds passing, 81 tests green), the stakeholder 
 - [ ] Should PlayUnreal use Remote Control API, Automation Driver, or both?
 - [ ] Can we automate visual regression testing (screenshot comparison)?
 - [ ] Should we add a packaging step to CI to catch WITH_EDITORONLY_DATA issues early?
+
+---
+
+## Retrospective 3 — Post-Sprint 2 Hotfix through Sprint 2 Completion
+
+### Context
+After Sprint 2's retrospective, the team shipped a hotfix for 4 critical gameplay bugs (materials, overlaps, delegates, HUD), then continued to build out the test infrastructure and implement two new gameplay features (pause state, turtle submerge). Two additional fix commits were needed during this period. 6 commits total, 20 files across test and implementation code.
+
+### What Was Built
+| System | Files | Tests |
+|--------|-------|-------|
+| Hotfix: 4 critical gameplay bugs | 15 files (impl + agents + agreements) | Updated existing |
+| Delegate wiring verification tests | DelegateWiringTest.cpp | 9 wiring verifications |
+| Integration smoke tests | IntegrationTest.cpp | 5 full-chain tests |
+| Functional test framework | 8 new files (base class + 5 actors + header) | 5 AFunctionalTest actors |
+| FlatColor .uasset fallback + Python script | 2 files | 0 |
+| run-tests.sh improvements | 1 file | --report, --functional, --timeout |
+| Pause state | FrogPlayerController, FroggerHUD, HazardBase | 3 tests |
+| Turtle submerge mechanic | HazardBase.h/.cpp | 4 tests |
+| River hop snapping fix | FrogCharacter, LaneManager, GameMode | Updated existing |
+| Home slot completion flow | GameMode | Updated existing |
+| **Total** | **~30 files touched** | **~21 new tests** |
+
+### What Went Well
+
+1. **Hotfix was surgical and well-documented.** The 4 critical bugs were diagnosed with clear root causes, fixed in one commit, and each fix was codified as a permanent team agreement (sections 11-14). This is exactly how hotfixes should work — fix it, then make it impossible to recur.
+
+2. **Test infrastructure matured significantly.** The team now has three testing layers: unit tests (102 test macros), delegate wiring verification tests (9 bindings checked), and AFunctionalTest actors (5 gameplay scenarios). The `run-tests.sh` script gained `--functional`, `--report`, and `--timeout` modes. This addresses the Sprint 2 gap where "tests pass but game is broken."
+
+3. **New features shipped with tests from the start.** Pause state and turtle submerge each arrived with 3-4 tests. No post-hoc "we forgot to test this" issues. TDD discipline held.
+
+4. **Platform-specific bugs are now understood.** River hop snapping (log drift ignored) and home slot completion (no respawn/transition) were real gameplay logic bugs, not engine gotchas. They were found via play-testing and fixed cleanly.
+
+5. **FlatColorMaterial now has a .uasset fallback path.** `LoadObject` tries the persistent asset first, falling back to runtime creation. Python script exists for generating the .uasset. This partially resolves the packaging risk.
+
+### What Caused Friction
+
+1. **Fix ratio is too high.** 2 of 6 commits (33%) were bug fixes discovered during play-testing, not during TDD. The bugs (hop snapping from moving platforms, missing home slot flow) were integration-level issues where individual systems worked correctly but their interaction was wrong. Unit tests for hopping and unit tests for platforms both passed, but hopping FROM a platform was untested.
+
+   **Root cause:** Tests verify systems in isolation. No tests verify the seams between systems (e.g., "hop while riding a log" or "land on the home row"). The functional test actors address this partially, but they require a running editor with a map, which is heavyweight.
+
+2. **Functional tests cannot run in CI yet.** The 5 AFunctionalTest actors need a rendering context (no NullRHI). They exist as code but cannot be executed via `run-tests.sh` without `--functional` mode, which requires a display. This means the most valuable tests (the ones that would have caught Sprint 2's bugs) are the hardest to run.
+
+3. **PlayUnreal E2E harness is still incomplete.** The test runner improved, but agents still cannot programmatically: launch the game, send hop inputs, query frog position, or take screenshots. The stakeholder remains the only one who can truly play-test. This was the P0 action item from the last retro.
+
+4. **Log-riding physics are fragile.** The river hop snapping fix (use actual actor position instead of grid position when on a platform) works, but it couples the hop system to the platform-carrying system. If the platform movement changes, hopping will break again. There is no test that validates "hop from a moving platform lands at the correct position."
+
+### Agreements to Change
+
+1. **UPDATE §2: TDD scope.** Add: "For every pair of interacting systems, write at least one seam test that exercises their interface (e.g., 'hop while on a moving platform,' 'die on a submerged turtle'). Isolation tests are necessary but not sufficient."
+
+2. **UPDATE §5a: Definition of Done.** Add: "Seam tests exist for all system interactions introduced in this sprint."
+
+3. **NEW §15: Moving Platform Hop Convention.** When the frog is on a moving platform, `StartHop` must use the frog's actual world position (not its grid position) as the hop origin. `FinishHop` must update `GridPosition` from the actual landing location. This prevents drift-induced teleportation.
+
+### Changes Made
+
+1. `.team/agreements.md` §2: Added seam test requirement
+2. `.team/agreements.md` §5a: Added seam test to Definition of Done
+3. `.team/agreements.md` §15: New section on moving platform hop convention
+
+### Previous Retro Action Items — Status
+
+- [x] **P0: Build PlayUnreal E2E harness** — Partially done. `run-tests.sh` improved with --functional/--report/--timeout. AFunctionalTest actors created. Full input-send + state-query E2E still missing. Carrying forward.
+- [x] **Create persistent M_FlatColor .uasset** — Partially done. LoadObject fallback path + Python script exist. Actual .uasset generation not yet run in editor. Carrying forward.
+- [x] **Add integration tests that verify delegate bindings exist** — DONE. DelegateWiringTest.cpp verifies 9 delegate bindings.
+- [x] **Add wiring smoke test** — DONE. IntegrationTest.cpp has 5 full-chain tests (hop->score, death->life, timeout->death, etc.)
+
+### Action Items for Sprint 3
+
+- [ ] **P0: Complete PlayUnreal E2E harness** — Must support: launch game, send inputs (hop/pause), query state (position/score/lives), assert outcomes. Without this, every sprint requires manual play-testing. (DevOps Engineer)
+- [ ] **P0: Add seam tests for system interactions** — At minimum: hop-from-moving-platform, die-on-submerged-turtle, pause-during-river-ride. These are lightweight unit tests that create two systems and verify their boundary behavior. (Engine Architect)
+- [ ] **P1: Generate M_FlatColor.uasset** — Run `create_flat_color_material.py` in the editor to create the persistent material asset. Verify it loads correctly. (DevOps Engineer)
+- [ ] **P1: Run functional tests in CI** — Investigate Xvfb/virtual display or Gauntlet headless mode for running AFunctionalTest actors without a physical display. (DevOps Engineer)
+- [ ] **P2: Add platform-hop regression test** — Test that verifies: spawn frog on a moving log, hop north, frog lands at (log_x + hop_offset, new_row) not (grid_x, new_row). (Engine Architect)
+
+### Open Questions
+
+- [ ] Should PlayUnreal use Remote Control API, Automation Driver, or Gauntlet? (Carried forward)
+- [ ] Can we automate visual regression testing (screenshot comparison)? (Carried forward)
+- [ ] Should we add a packaging step to CI to catch WITH_EDITORONLY_DATA issues early? (Carried forward)
+- [ ] How should seam tests be organized — separate test file, or integrated into existing test files by system?
+- [ ] Should AFunctionalTest actors be runnable in NullRHI mode with a mock renderer?

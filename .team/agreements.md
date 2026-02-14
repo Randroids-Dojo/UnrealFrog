@@ -1,7 +1,7 @@
 # Team Working Agreements
 
 *This is a living document. Updated during retrospectives by the XP Coach.*
-*Last updated: Sprint 2 Retrospective*
+*Last updated: Post-Sprint 2 Hotfix Retrospective*
 
 ## Day 0 Agreements
 
@@ -20,6 +20,7 @@ These are our starting agreements. They WILL evolve through retrospectives.
 - Implement the minimum code to pass (Green)
 - Refactor while tests still pass (Refactor)
 - No code merges without passing tests
+- **Seam tests are mandatory for interacting systems.** For every pair of systems that interact (e.g., frog + moving platform, frog + submerging turtle, pause + hazard movement), write at least one test that exercises their boundary. Isolation tests verify each system alone; seam tests verify the handshake between them. (Added: Post-Sprint 2 Hotfix Retrospective — 33% of commits were fixes at system boundaries that isolation tests missed.)
 
 ### 3. Communication Protocol
 
@@ -53,6 +54,7 @@ These are our starting agreements. They WILL evolve through retrospectives.
 A sprint is NOT done until:
 - The project builds successfully (Game + Editor targets)
 - All automated tests pass
+- **Seam tests exist** for all new system interactions introduced this sprint (Added: Post-Sprint 2 Hotfix Retrospective)
 - **Visual smoke test passes** after foundation phase: game launches, ground visible, player visible, camera correct, HUD renders (Added Sprint 2: three visual bugs were invisible to unit tests)
 - The game is playable — you can press Play and interact with the game
 - QA Lead has verified gameplay via PlayUnreal or manual play-testing
@@ -154,6 +156,17 @@ Key rules:
 - **`-game` uses the Editor binary** — always rebuild the Editor target before play-testing
 - **Kill existing editor instances** before launching — shared memory conflicts cause silent startup failures
 - Logs are at `~/Library/Logs/Unreal Engine/UnrealFrogEditor/`, NOT `Saved/Logs/`
+
+### 15. Moving Platform Hop Convention (Added: Post-Sprint 2 Hotfix Retrospective)
+
+When the frog is riding a moving platform (river log or turtle), the hop origin must be the frog's **actual world position**, not its stored `GridPosition`. After the hop completes, `FinishHop` must update `GridPosition` by back-calculating from the actual landing location.
+
+Rules:
+- `StartHop()`: if `CurrentPlatform != nullptr`, use `GetActorLocation()` as origin, not `GridToWorld(GridPosition)`
+- `FinishHop()`: always update `GridPosition` from `WorldToGrid(GetActorLocation())`
+- Never assume `GridPosition` is accurate while the frog is on a moving platform — the platform drifts the frog between hops
+
+**Why:** The frog teleported sideways when hopping from a moving log because `StartHop` used the stale grid position (where the frog originally landed) instead of the current position (where the log had carried it). The frog would land in empty river and die instantly.
 
 ## Things We Will Figure Out Together
 
