@@ -336,8 +336,39 @@ void AUnrealFrogGameMode::HandleHopCompleted(FIntPoint NewGridPosition)
 					Scoring->ResetMultiplier();
 				}
 			}
+
+			// Check if all home slots are filled → round complete
+			if (HomeSlotsFilledCount >= HomeSlotColumns.Num())
+			{
+				SetState(EGameState::RoundComplete);
+
+				if (UWorld* World = GetWorld())
+				{
+					World->GetTimerManager().SetTimer(
+						RoundCompleteTimerHandle, this,
+						&AUnrealFrogGameMode::OnRoundCompleteFinished,
+						RoundCompleteDuration, false);
+				}
+			}
+			else
+			{
+				// Slot filled but more to go — respawn frog at start
+				SetState(EGameState::Spawning);
+
+				if (UWorld* World = GetWorld())
+				{
+					World->GetTimerManager().SetTimer(
+						SpawningTimerHandle, this,
+						&AUnrealFrogGameMode::OnSpawningComplete,
+						SpawningDuration, false);
+				}
+			}
 		}
-		// If not a valid home slot column, frog just sits on the goal row
+		else
+		{
+			// Not a valid home slot column — death (landed in the bushes)
+			HandleFrogDied(EDeathType::Squish);
+		}
 	}
 }
 

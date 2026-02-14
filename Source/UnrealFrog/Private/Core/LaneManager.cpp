@@ -151,40 +151,40 @@ void ALaneManager::SetupDefaultLaneConfigs()
 
 	// -- River lanes (rows 7-12) ------------------------------------------
 
-	// Row 7: SmallLog, 100 UU/s, width 2, gap 3, RIGHT
+	// Row 7: SmallLog, 100 UU/s, width 2, gap 2, RIGHT
 	{
 		FLaneConfig C;
 		C.LaneType = ELaneType::River;
 		C.HazardType = EHazardType::SmallLog;
 		C.Speed = 100.0f;
 		C.HazardWidth = 2;
-		C.MinGapCells = 3;
+		C.MinGapCells = 2;
 		C.bMovesRight = true;
 		C.RowIndex = 7;
 		LaneConfigs.Add(C);
 	}
 
-	// Row 8: TurtleGroup, 80 UU/s, width 3, gap 3, LEFT
+	// Row 8: TurtleGroup, 80 UU/s, width 3, gap 2, LEFT
 	{
 		FLaneConfig C;
 		C.LaneType = ELaneType::River;
 		C.HazardType = EHazardType::TurtleGroup;
 		C.Speed = 80.0f;
 		C.HazardWidth = 3;
-		C.MinGapCells = 3;
+		C.MinGapCells = 2;
 		C.bMovesRight = false;
 		C.RowIndex = 8;
 		LaneConfigs.Add(C);
 	}
 
-	// Row 9: LargeLog, 120 UU/s, width 4, gap 3, RIGHT
+	// Row 9: LargeLog, 120 UU/s, width 4, gap 2, RIGHT
 	{
 		FLaneConfig C;
 		C.LaneType = ELaneType::River;
 		C.HazardType = EHazardType::LargeLog;
 		C.Speed = 120.0f;
 		C.HazardWidth = 4;
-		C.MinGapCells = 3;
+		C.MinGapCells = 2;
 		C.bMovesRight = true;
 		C.RowIndex = 9;
 		LaneConfigs.Add(C);
@@ -203,14 +203,14 @@ void ALaneManager::SetupDefaultLaneConfigs()
 		LaneConfigs.Add(C);
 	}
 
-	// Row 11: TurtleGroup, 80 UU/s, width 3, gap 4, RIGHT
+	// Row 11: TurtleGroup, 80 UU/s, width 3, gap 2, RIGHT
 	{
 		FLaneConfig C;
 		C.LaneType = ELaneType::River;
 		C.HazardType = EHazardType::TurtleGroup;
 		C.Speed = 80.0f;
 		C.HazardWidth = 3;
-		C.MinGapCells = 4;
+		C.MinGapCells = 2;
 		C.bMovesRight = true;
 		C.RowIndex = 11;
 		LaneConfigs.Add(C);

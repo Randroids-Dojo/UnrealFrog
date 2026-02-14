@@ -238,10 +238,15 @@ bool FWiring_OnWaveCompletedFires::RunTest(const FString& Parameters)
 	GM->OnSpawningComplete();
 
 	// Fill all 5 home slots to trigger wave complete
+	// Each non-final fill transitions to Spawning, cycle back to Playing
 	GM->HandleHopCompleted(FIntPoint(1, 14));
+	GM->OnSpawningComplete();
 	GM->HandleHopCompleted(FIntPoint(4, 14));
+	GM->OnSpawningComplete();
 	GM->HandleHopCompleted(FIntPoint(6, 14));
+	GM->OnSpawningComplete();
 	GM->HandleHopCompleted(FIntPoint(8, 14));
+	GM->OnSpawningComplete();
 	GM->HandleHopCompleted(FIntPoint(11, 14));
 
 	// Trigger the round complete → next wave transition

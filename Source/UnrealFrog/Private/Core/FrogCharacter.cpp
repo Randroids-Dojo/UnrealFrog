@@ -194,8 +194,24 @@ void AFrogCharacter::StartHop(FVector Direction)
 	bIsHopping = true;
 	HopElapsed = 0.0f;
 	CurrentHopDuration = GetHopDurationForDirection(Direction);
-	HopStartLocation = GridToWorld(GridPosition);
-	HopEndLocation = GridToWorld(TargetPos);
+
+	// When riding a moving platform, use actual actor position as hop origin
+	// instead of grid-snapped position (the log may have carried us between cells)
+	FVector ActualPos = GetActorLocation();
+	if (CurrentPlatform.IsValid())
+	{
+		HopStartLocation = ActualPos;
+		// Keep actual X, advance Y to target row
+		HopEndLocation = FVector(
+			ActualPos.X + static_cast<float>(Delta.X) * GridCellSize,
+			static_cast<float>(TargetPos.Y) * GridCellSize,
+			0.0f);
+	}
+	else
+	{
+		HopStartLocation = GridToWorld(GridPosition);
+		HopEndLocation = GridToWorld(TargetPos);
+	}
 
 	// Update logical grid position immediately so collision checks use the target
 	GridPosition = TargetPos;
@@ -205,8 +221,15 @@ void AFrogCharacter::FinishHop()
 {
 	bIsHopping = false;
 
-	// Snap precisely to grid to avoid floating-point drift
-	SetActorLocation(GridToWorld(GridPosition));
+	// Snap to landing position. On river rows, update GridPosition.X to reflect
+	// where we actually land (we may have drifted while riding a log).
+	FVector LandingPos = HopEndLocation;
+	LandingPos.Z = 0.0f;
+	FIntPoint LandingGrid = WorldToGrid(LandingPos);
+	LandingGrid.X = FMath::Clamp(LandingGrid.X, 0, GridColumns - 1);
+	LandingGrid.Y = FMath::Clamp(LandingGrid.Y, 0, GridRows - 1);
+	GridPosition = LandingGrid;
+	SetActorLocation(LandingPos);
 
 	// Synchronous platform detection — bypasses deferred overlap event timing
 	FindPlatformAtCurrentPosition();

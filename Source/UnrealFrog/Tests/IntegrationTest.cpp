@@ -102,10 +102,15 @@ bool FIntegration_FullRoundCycle::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Wave 1"), GM->CurrentWave, 1);
 
 	// Fill all 5 home slots via HandleHopCompleted
+	// Each non-final fill transitions to Spawning (frog respawn), cycle back
 	GM->HandleHopCompleted(FIntPoint(1, 14));
+	GM->OnSpawningComplete();
 	GM->HandleHopCompleted(FIntPoint(4, 14));
+	GM->OnSpawningComplete();
 	GM->HandleHopCompleted(FIntPoint(6, 14));
+	GM->OnSpawningComplete();
 	GM->HandleHopCompleted(FIntPoint(8, 14));
+	GM->OnSpawningComplete();
 	GM->HandleHopCompleted(FIntPoint(11, 14));
 
 	TestEqual(TEXT("RoundComplete state"), GM->CurrentState, EGameState::RoundComplete);
@@ -303,8 +308,10 @@ bool FIntegration_WiringSmokeTest::RunTest(const FString& Parameters)
 
 	GM->HandleHopCompleted(FIntPoint(1, 14)); // Home slot column
 	TestEqual(TEXT("Home slot filled count is 1"), GM->HomeSlotsFilledCount, 1);
+	TestEqual(TEXT("Spawning after home slot fill"), GM->CurrentState, EGameState::Spawning);
 
 	// -- Step 6: Verify timer ticks during Playing --
+	GM->OnSpawningComplete();
 	float TimeBefore = GM->RemainingTime;
 	GM->TickTimer(1.0f);
 	TestTrue(TEXT("Timer decremented during Playing"), GM->RemainingTime < TimeBefore);

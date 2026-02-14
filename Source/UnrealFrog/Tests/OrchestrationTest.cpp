@@ -213,13 +213,20 @@ bool FOrchestration_AllHomeSlotsFilled::RunTest(const FString& Parameters)
 	GM->OnSpawningComplete();
 
 	// Fill all 5 home slot columns: 1, 4, 6, 8, 11
+	// Each non-final fill transitions to Spawning (frog respawn), so cycle back to Playing
 	GM->HandleHopCompleted(FIntPoint(1, 14));
-	GM->HandleHopCompleted(FIntPoint(4, 14));
-	GM->HandleHopCompleted(FIntPoint(6, 14));
-	GM->HandleHopCompleted(FIntPoint(8, 14));
+	TestEqual(TEXT("Spawning after slot 1"), GM->CurrentState, EGameState::Spawning);
+	GM->OnSpawningComplete();
 
+	GM->HandleHopCompleted(FIntPoint(4, 14));
+	GM->OnSpawningComplete();
+
+	GM->HandleHopCompleted(FIntPoint(6, 14));
+	GM->OnSpawningComplete();
+
+	GM->HandleHopCompleted(FIntPoint(8, 14));
 	TestEqual(TEXT("4 slots filled"), GM->HomeSlotsFilledCount, 4);
-	TestEqual(TEXT("Still Playing"), GM->CurrentState, EGameState::Playing);
+	GM->OnSpawningComplete();
 
 	GM->HandleHopCompleted(FIntPoint(11, 14));
 	TestEqual(TEXT("State is RoundComplete"), GM->CurrentState, EGameState::RoundComplete);
@@ -245,10 +252,15 @@ bool FOrchestration_RoundCompleteToSpawning::RunTest(const FString& Parameters)
 	int32 InitialWave = GM->CurrentWave;
 
 	// Fill all home slots to trigger round complete
+	// Each non-final fill transitions to Spawning, cycle back to Playing
 	GM->HandleHopCompleted(FIntPoint(1, 14));
+	GM->OnSpawningComplete();
 	GM->HandleHopCompleted(FIntPoint(4, 14));
+	GM->OnSpawningComplete();
 	GM->HandleHopCompleted(FIntPoint(6, 14));
+	GM->OnSpawningComplete();
 	GM->HandleHopCompleted(FIntPoint(8, 14));
+	GM->OnSpawningComplete();
 	GM->HandleHopCompleted(FIntPoint(11, 14));
 
 	TestEqual(TEXT("State is RoundComplete"), GM->CurrentState, EGameState::RoundComplete);
