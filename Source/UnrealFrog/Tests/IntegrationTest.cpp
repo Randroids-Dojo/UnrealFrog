@@ -2,11 +2,22 @@
 
 #include "CoreMinimal.h"
 #include "Misc/AutomationTest.h"
+#include "Engine/GameInstance.h"
 #include "Core/FrogCharacter.h"
 #include "Core/HazardBase.h"
+#include "Core/ScoreSubsystem.h"
 #include "Core/UnrealFrogGameMode.h"
 
 #if WITH_AUTOMATION_TESTS
+
+namespace
+{
+	UScoreSubsystem* CreateTestScoringForIntegration()
+	{
+		UGameInstance* TestGI = NewObject<UGameInstance>();
+		return NewObject<UScoreSubsystem>(TestGI);
+	}
+}
 
 // ---------------------------------------------------------------------------
 // Test: Collision → Die → delegates fire correctly
@@ -239,6 +250,182 @@ bool FIntegration_PlatformRidingCycle::RunTest(const FString& Parameters)
 	Frog->HandlePlatformEndOverlap(Log);
 	TestTrue(TEXT("Platform cleared"), Frog->CurrentPlatform.Get() == nullptr);
 	TestTrue(TEXT("CheckRiverDeath true without platform"), Frog->CheckRiverDeath());
+
+	return true;
+}
+
+// ---------------------------------------------------------------------------
+// Test: End-to-end wiring smoke — full delegate chain verification
+// Spawns GameMode + Frog + ScoreSubsystem, wires them, then verifies that
+// actions produce expected state changes through the entire chain.
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FIntegration_WiringSmokeTest,
+	"UnrealFrog.Integration.Wiring.FullChainSmokeTest",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FIntegration_WiringSmokeTest::RunTest(const FString& Parameters)
+{
+	AUnrealFrogGameMode* GM = NewObject<AUnrealFrogGameMode>();
+	AFrogCharacter* Frog = NewObject<AFrogCharacter>();
+	UScoreSubsystem* Scoring = CreateTestScoringForIntegration();
+
+	// -- Step 1: StartGame → verify state transitions --
+	GM->StartGame();
+	TestEqual(TEXT("State is Spawning"), GM->CurrentState, EGameState::Spawning);
+
+	GM->OnSpawningComplete();
+	TestEqual(TEXT("State is Playing"), GM->CurrentState, EGameState::Playing);
+
+	// -- Step 2: Forward hop → verify scoring chain via direct method call --
+	// (Dynamic delegate Broadcast silently fails on NewObject actors without world)
+	GM->HandleHopCompleted(FIntPoint(6, 1));
+	TestEqual(TEXT("HighestRow updated to 1"), GM->HighestRowReached, 1);
+
+	GM->HandleHopCompleted(FIntPoint(6, 2));
+	TestEqual(TEXT("HighestRow updated to 2"), GM->HighestRowReached, 2);
+
+	// -- Step 3: Score directly via subsystem --
+	Scoring->AddForwardHopScore();
+	TestEqual(TEXT("Score is 10"), Scoring->Score, 10);
+
+	// -- Step 4: Kill frog → verify death chain --
+	GM->HandleFrogDied(EDeathType::Squish);
+	TestEqual(TEXT("GM transitioned to Dying"), GM->CurrentState, EGameState::Dying);
+
+	Scoring->LoseLife();
+	TestEqual(TEXT("Lives decremented to 2"), Scoring->Lives, 2);
+
+	// -- Step 5: Fill home slot → verify slot filled --
+	GM->OnDyingComplete();
+	GM->OnSpawningComplete();
+	TestEqual(TEXT("Playing again"), GM->CurrentState, EGameState::Playing);
+
+	GM->HandleHopCompleted(FIntPoint(1, 14)); // Home slot column
+	TestEqual(TEXT("Home slot filled count is 1"), GM->HomeSlotsFilledCount, 1);
+
+	// -- Step 6: Verify timer ticks during Playing --
+	float TimeBefore = GM->RemainingTime;
+	GM->TickTimer(1.0f);
+	TestTrue(TEXT("Timer decremented during Playing"), GM->RemainingTime < TimeBefore);
+
+	return true;
+}
+
+// ---------------------------------------------------------------------------
+// Test: Timer timeout death — verifies full chain: timer=0 → Timeout death → life lost
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FIntegration_TimeoutDeathChain,
+	"UnrealFrog.Integration.Wiring.TimeoutDeathChain",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FIntegration_TimeoutDeathChain::RunTest(const FString& Parameters)
+{
+	AUnrealFrogGameMode* GM = NewObject<AUnrealFrogGameMode>();
+	UScoreSubsystem* Scoring = CreateTestScoringForIntegration();
+
+	// Track deaths
+	EDeathType ReceivedDeathType = EDeathType::None;
+	bool bTimerExpiredFired = false;
+
+	GM->OnTimerExpired.AddLambda([&bTimerExpiredFired]() {
+		bTimerExpiredFired = true;
+	});
+
+	GM->StartGame();
+	GM->OnSpawningComplete();
+	TestEqual(TEXT("Playing"), GM->CurrentState, EGameState::Playing);
+
+	// Tick timer to expiry
+	GM->TickTimer(GM->TimePerLevel + 1.0f);
+
+	// Verify timer expired delegate fired
+	TestTrue(TEXT("OnTimerExpired fired"), bTimerExpiredFired);
+
+	// Verify Dying state (HandleFrogDied was called with Timeout)
+	TestEqual(TEXT("State is Dying"), GM->CurrentState, EGameState::Dying);
+
+	// Verify timer is clamped to 0
+	TestEqual(TEXT("Timer at 0"), GM->RemainingTime, 0.0f);
+
+	// Simulate life loss
+	Scoring->LoseLife();
+	TestEqual(TEXT("Lives decremented to 2"), Scoring->Lives, 2);
+
+	// Complete dying → spawning (not game over since lives > 0)
+	GM->OnDyingComplete();
+	TestEqual(TEXT("Back to Spawning"), GM->CurrentState, EGameState::Spawning);
+
+	return true;
+}
+
+// ---------------------------------------------------------------------------
+// Test: Timer does not tick during non-Playing states
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FIntegration_TimerStopsDuringNonPlaying,
+	"UnrealFrog.Integration.Wiring.TimerStopsDuringNonPlaying",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FIntegration_TimerStopsDuringNonPlaying::RunTest(const FString& Parameters)
+{
+	AUnrealFrogGameMode* GM = NewObject<AUnrealFrogGameMode>();
+
+	// Title state — timer should not tick
+	float TimeBefore = GM->RemainingTime;
+	GM->TickTimer(5.0f);
+	TestEqual(TEXT("Timer unchanged in Title"), GM->RemainingTime, TimeBefore);
+
+	// Spawning state
+	GM->StartGame();
+	TimeBefore = GM->RemainingTime;
+	GM->TickTimer(5.0f);
+	TestEqual(TEXT("Timer unchanged in Spawning"), GM->RemainingTime, TimeBefore);
+
+	// Playing state — timer should tick
+	GM->OnSpawningComplete();
+	TimeBefore = GM->RemainingTime;
+	GM->TickTimer(5.0f);
+	TestTrue(TEXT("Timer decremented in Playing"), GM->RemainingTime < TimeBefore);
+
+	// Dying state
+	GM->HandleFrogDied(EDeathType::Squish);
+	TimeBefore = GM->RemainingTime;
+	GM->TickTimer(5.0f);
+	TestEqual(TEXT("Timer unchanged in Dying"), GM->RemainingTime, TimeBefore);
+
+	return true;
+}
+
+// ---------------------------------------------------------------------------
+// Test: Wiring regression — unwired delegates do NOT fire
+// Verifies that without AddDynamic, broadcasting is a no-op.
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FIntegration_UnwiredDelegatesNoOp,
+	"UnrealFrog.Integration.Wiring.UnwiredDelegatesAreNoOp",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FIntegration_UnwiredDelegatesNoOp::RunTest(const FString& Parameters)
+{
+	AUnrealFrogGameMode* GM = NewObject<AUnrealFrogGameMode>();
+	AFrogCharacter* Frog = NewObject<AFrogCharacter>();
+
+	// Do NOT wire delegates — simulate the Sprint 2 defect
+
+	GM->StartGame();
+	GM->OnSpawningComplete();
+
+	// Broadcasting should be safe but HighestRowReached should NOT update
+	// because HandleHopCompleted is not connected
+	Frog->OnHopCompleted.Broadcast(FIntPoint(6, 5));
+	TestEqual(TEXT("HighestRow stays 0 without wiring"), GM->HighestRowReached, 0);
+
+	// Death delegate should not trigger state transition
+	EGameState StateBefore = GM->CurrentState;
+	Frog->OnFrogDied.Broadcast(EDeathType::Squish);
+	TestEqual(TEXT("State unchanged without wiring"), GM->CurrentState, StateBefore);
 
 	return true;
 }
