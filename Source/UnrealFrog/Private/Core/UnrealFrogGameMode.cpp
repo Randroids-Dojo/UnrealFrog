@@ -8,12 +8,11 @@
 #include "Core/GroundBuilder.h"
 #include "Core/LaneManager.h"
 #include "Core/ScoreSubsystem.h"
+#include "Core/FroggerAudioManager.h"
 #include "Components/LightComponent.h"
 #include "Engine/DirectionalLight.h"
 #include "Kismet/GameplayStatics.h"
 #include "TimerManager.h"
-
-DEFINE_LOG_CATEGORY_STATIC(LogFrogGameAudio, Log, All);
 
 AUnrealFrogGameMode::AUnrealFrogGameMode()
 {
@@ -59,6 +58,36 @@ void AUnrealFrogGameMode::BeginPlay()
 	{
 		Frog->OnHopCompleted.AddDynamic(this, &AUnrealFrogGameMode::HandleHopCompleted);
 		Frog->OnFrogDied.AddDynamic(this, &AUnrealFrogGameMode::HandleFrogDied);
+	}
+
+	// Wire AudioManager to game events
+	if (UGameInstance* GI = GetGameInstance())
+	{
+		if (UFroggerAudioManager* Audio = GI->GetSubsystem<UFroggerAudioManager>())
+		{
+			Audio->LoadSoundWaves();
+
+			// Frog events
+			if (Frog)
+			{
+				Frog->OnHopStartedNative.AddUObject(Audio, &UFroggerAudioManager::PlayHopSound);
+				Frog->OnFrogDiedNative.AddUObject(Audio, &UFroggerAudioManager::PlayDeathSound);
+			}
+
+			// GameMode events — use native delegates for lambda wiring
+			OnHomeSlotFilled.AddDynamic(Audio, &UFroggerAudioManager::HandleHomeSlotFilled);
+
+			OnWaveCompleted.AddLambda([Audio](int32, int32) {
+				Audio->PlayRoundCompleteSound();
+			});
+
+			// Extra life from ScoreSubsystem
+			if (UScoreSubsystem* Scoring = GI->GetSubsystem<UScoreSubsystem>())
+			{
+				Scoring->OnExtraLife.AddDynamic(Audio, &UFroggerAudioManager::HandleExtraLife);
+				Scoring->OnGameOver.AddDynamic(Audio, &UFroggerAudioManager::HandleGameOver);
+			}
+		}
 	}
 }
 
@@ -379,14 +408,12 @@ void AUnrealFrogGameMode::OnSpawningComplete()
 		return;
 	}
 
-	// Respawn the frog at start position so it's alive for the new round
+	// Always reset frog to start position — whether it died (respawn) or
+	// successfully filled a home slot (alive but at the top of the screen)
 	if (AFrogCharacter* Frog = Cast<AFrogCharacter>(
 			UGameplayStatics::GetPlayerPawn(this, 0)))
 	{
-		if (Frog->bIsDead)
-		{
-			Frog->Respawn();
-		}
+		Frog->Respawn();
 	}
 
 	SetState(EGameState::Playing);
@@ -444,16 +471,4 @@ void AUnrealFrogGameMode::OnRoundCompleteFinished()
 			&AUnrealFrogGameMode::OnSpawningComplete,
 			SpawningDuration, false);
 	}
-}
-
-// -- Audio stubs ----------------------------------------------------------
-
-void AUnrealFrogGameMode::PlayRoundCompleteSound()
-{
-	UE_LOG(LogFrogGameAudio, Verbose, TEXT("PlayRoundCompleteSound: stub"));
-}
-
-void AUnrealFrogGameMode::PlayGameOverSound()
-{
-	UE_LOG(LogFrogGameAudio, Verbose, TEXT("PlayGameOverSound: stub"));
 }

@@ -186,14 +186,6 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Orchestration")
 	void OnRoundCompleteFinished();
 
-	// -- Audio stubs (log-only until real audio assets exist) --------------
-
-	UFUNCTION(BlueprintCallable, Category = "Audio")
-	void PlayRoundCompleteSound();
-
-	UFUNCTION(BlueprintCallable, Category = "Audio")
-	void PlayGameOverSound();
-
 private:
 	/** Reset all home slots to unfilled. */
 	void ResetHomeSlots();

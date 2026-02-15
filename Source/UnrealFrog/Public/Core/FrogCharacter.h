@@ -15,6 +15,7 @@ class AHazardBase;
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHopCompleted, FIntPoint, NewGridPosition);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnFrogDied, EDeathType, DeathType);
 DECLARE_MULTICAST_DELEGATE_OneParam(FOnFrogDiedNative, EDeathType);
+DECLARE_MULTICAST_DELEGATE(FOnHopStartedNative);
 
 UCLASS()
 class UNREALFROG_API AFrogCharacter : public APawn
@@ -92,6 +93,9 @@ public:
 	/** Native C++ delegate for lambda binding (tests, C++ listeners). Not exposed to Blueprint. */
 	FOnFrogDiedNative OnFrogDiedNative;
 
+	/** Native C++ delegate that fires when a hop starts (for audio). */
+	FOnHopStartedNative OnHopStartedNative;
+
 	// -- Public interface -------------------------------------------------
 
 	UFUNCTION(BlueprintCallable, Category = "Movement")
@@ -148,17 +152,6 @@ public:
 
 	/** Process end of overlap with a platform: clear CurrentPlatform if it matches. */
 	void HandlePlatformEndOverlap(AHazardBase* Hazard);
-
-	// -- Audio stubs (log-only until real audio assets exist) --------------
-
-	UFUNCTION(BlueprintCallable, Category = "Audio")
-	void PlayHopSound();
-
-	UFUNCTION(BlueprintCallable, Category = "Audio")
-	void PlayDeathSound(EDeathType DeathType);
-
-	UFUNCTION(BlueprintCallable, Category = "Audio")
-	void PlayHomeSlotSound();
 
 protected:
 	// -- Components -------------------------------------------------------

@@ -2,8 +2,14 @@
 # run-tests.sh — Headless test runner for UnrealFrog automation tests
 #
 # Usage:
-#   ./Tools/PlayUnreal/run-tests.sh                       # Run all UnrealFrog tests
-#   ./Tools/PlayUnreal/run-tests.sh "UnrealFrog.Wiring"   # Run specific test category
+#   ./Tools/PlayUnreal/run-tests.sh                       # Run all UnrealFrog tests (default)
+#   ./Tools/PlayUnreal/run-tests.sh --all                  # Same as above — run all tests
+#   ./Tools/PlayUnreal/run-tests.sh --seam                 # Run seam tests only
+#   ./Tools/PlayUnreal/run-tests.sh --audio                # Run audio tests only
+#   ./Tools/PlayUnreal/run-tests.sh --e2e                  # Run PlayUnreal E2E tests only
+#   ./Tools/PlayUnreal/run-tests.sh --integration          # Run integration tests only
+#   ./Tools/PlayUnreal/run-tests.sh --wiring               # Run delegate wiring tests only
+#   ./Tools/PlayUnreal/run-tests.sh "UnrealFrog.Wiring"    # Run custom filter (any UE test path)
 #   ./Tools/PlayUnreal/run-tests.sh --list                 # List available tests
 #   ./Tools/PlayUnreal/run-tests.sh --report               # Generate JSON test report
 #   ./Tools/PlayUnreal/run-tests.sh --functional           # Run functional tests (needs editor, not NullRHI)
@@ -30,9 +36,27 @@ REPORT_DIR="${PROJECT_ROOT}/Saved/Reports"
 TEST_LOG="${LOG_DIR}/TestRunner.log"
 MACOS_LOG_DIR="${HOME}/Library/Logs/Unreal Engine/UnrealFrogEditor"
 
+# -- Category filter map (--flag → UE test path prefix) ---------------------
+
+resolve_category_filter() {
+    case "$1" in
+        --all)          echo "UnrealFrog" ;;
+        --seam)         echo "UnrealFrog.Seam" ;;
+        --audio)        echo "UnrealFrog.Audio" ;;
+        --e2e)          echo "UnrealFrog.PlayUnreal" ;;
+        --integration)  echo "UnrealFrog.Integration" ;;
+        --wiring)       echo "UnrealFrog.Wiring" ;;
+        *)              echo "" ;;
+    esac
+}
+
+# Known category names for per-category reporting
+KNOWN_CATEGORIES="Character Collision Ground Input Score LaneSystem HUD Mesh Camera Orchestration GameState Wiring Integration Seam Audio PlayUnreal"
+
 # -- Parse arguments ---------------------------------------------------------
 
 TEST_FILTER="UnrealFrog"
+CATEGORY_NAME=""
 LIST_MODE=false
 REPORT_MODE=false
 FUNCTIONAL_MODE=false
@@ -55,6 +79,11 @@ while [[ $# -gt 0 ]]; do
         --timeout)
             TIMEOUT_SECONDS="$2"
             shift 2
+            ;;
+        --all|--seam|--audio|--e2e|--integration|--wiring)
+            CATEGORY_NAME="$1"
+            TEST_FILTER="$(resolve_category_filter "$1")"
+            shift
             ;;
         *)
             TEST_FILTER="$1"
@@ -113,12 +142,17 @@ fi
 
 # -- Run tests ---------------------------------------------------------------
 
+FILTER_LABEL="${CATEGORY_NAME:-custom}"
+if [ -z "${CATEGORY_NAME}" ] && [ "${TEST_FILTER}" = "UnrealFrog" ]; then
+    FILTER_LABEL="--all"
+fi
+
 echo "============================================"
 echo "  UnrealFrog Headless Test Runner"
 echo "============================================"
 echo "  Engine:     ${ENGINE_DIR}"
 echo "  Project:    ${PROJECT_FILE}"
-echo "  Filter:     ${TEST_FILTER}"
+echo "  Filter:     ${TEST_FILTER} (${FILTER_LABEL})"
 echo "  Mode:       $([ "${FUNCTIONAL_MODE}" = true ] && echo "Functional" || echo "Unit/Integration")"
 echo "  Report:     $([ "${REPORT_MODE}" = true ] && echo "${REPORT_DIR}" || echo "Off")"
 echo "  Timeout:    ${TIMEOUT_SECONDS}s"
@@ -214,6 +248,35 @@ echo "  Total:  ${TOTAL}"
 echo "  Passed: ${PASSED}"
 echo "  Failed: ${FAILED}"
 echo "============================================"
+
+# -- Per-category breakdown --------------------------------------------------
+# Show pass/fail counts per category when running --all or the default filter
+
+if [ -n "${ACTUAL_LOG}" ] && [ -f "${ACTUAL_LOG}" ] && [ "${TOTAL}" -gt 0 ]; then
+    echo ""
+    echo "  Per-Category Breakdown:"
+    echo "  -------------------------------------------"
+    printf "  %-20s %6s %6s %6s\n" "Category" "Pass" "Fail" "Total"
+    echo "  -------------------------------------------"
+
+    for CAT in ${KNOWN_CATEGORIES}; do
+        CAT_PASS=$(grep "Test Completed\. Result={Success}.*Path={UnrealFrog\.${CAT}\." "${ACTUAL_LOG}" 2>/dev/null | wc -l | tr -d ' ') || true
+        CAT_FAIL=$(grep "Test Completed\. Result={Fail}.*Path={UnrealFrog\.${CAT}\." "${ACTUAL_LOG}" 2>/dev/null | wc -l | tr -d ' ') || true
+        CAT_PASS=${CAT_PASS:-0}
+        CAT_FAIL=${CAT_FAIL:-0}
+        CAT_TOTAL=$((CAT_PASS + CAT_FAIL))
+
+        if [ "${CAT_TOTAL}" -gt 0 ]; then
+            MARKER=""
+            if [ "${CAT_FAIL}" -gt 0 ]; then
+                MARKER=" FAIL"
+            fi
+            printf "  %-20s %6d %6d %6d%s\n" "${CAT}" "${CAT_PASS}" "${CAT_FAIL}" "${CAT_TOTAL}" "${MARKER}"
+        fi
+    done
+
+    echo "  -------------------------------------------"
+fi
 
 if [ -n "${ERRORS}" ]; then
     echo ""

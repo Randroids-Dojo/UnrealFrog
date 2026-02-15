@@ -11,8 +11,6 @@
 #include "TimerManager.h"
 #include "UObject/ConstructorHelpers.h"
 
-DEFINE_LOG_CATEGORY_STATIC(LogFrogAudio, Log, All);
-
 AFrogCharacter::AFrogCharacter()
 {
 	PrimaryActorTick.bCanEverTick = true;
@@ -215,6 +213,8 @@ void AFrogCharacter::StartHop(FVector Direction)
 
 	// Update logical grid position immediately so collision checks use the target
 	GridPosition = TargetPos;
+
+	OnHopStartedNative.Broadcast();
 }
 
 void AFrogCharacter::FinishHop()
@@ -466,19 +466,3 @@ void AFrogCharacter::OnEndOverlap(UPrimitiveComponent* OverlappedComp,
 	}
 }
 
-// -- Audio stubs (log-only placeholders) ----------------------------------
-
-void AFrogCharacter::PlayHopSound()
-{
-	UE_LOG(LogFrogAudio, Verbose, TEXT("PlayHopSound: stub"));
-}
-
-void AFrogCharacter::PlayDeathSound(EDeathType DeathType)
-{
-	UE_LOG(LogFrogAudio, Verbose, TEXT("PlayDeathSound: type=%d (stub)"), static_cast<uint8>(DeathType));
-}
-
-void AFrogCharacter::PlayHomeSlotSound()
-{
-	UE_LOG(LogFrogAudio, Verbose, TEXT("PlayHomeSlotSound: stub"));
-}
