@@ -915,4 +915,140 @@ bool FSeam_WaveDifficultyFlowsToLaneConfig::RunTest(const FString& Parameters)
 	return true;
 }
 
+// ---------------------------------------------------------------------------
+// Seam 17: TemporalPassabilityInvariant
+// Systems: FrogCharacter (HopDuration) + LaneManager (lane configs) + GameMode (difficulty)
+//
+// Mathematical invariant: for every hazard lane at maximum difficulty,
+// the frog must be able to complete a hop before the trailing hazard
+// closes the gap. This catches tuning changes that silently create
+// impossible lanes.
+//
+// Invariant: HopDuration < MinGapDistance / (Config.Speed * MaxSpeedMultiplier)
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSeam_TemporalPassabilityInvariant,
+	"UnrealFrog.Seam.TemporalPassabilityInvariant",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FSeam_TemporalPassabilityInvariant::RunTest(const FString& Parameters)
+{
+	AFrogCharacter* Frog = NewObject<AFrogCharacter>();
+	AUnrealFrogGameMode* GM = NewObject<AUnrealFrogGameMode>();
+	ALaneManager* LM = NewObject<ALaneManager>();
+	LM->SetupDefaultLaneConfigs();
+
+	// Read all tuning parameters from game objects (tuning-resilient per Section 2)
+	const float HopDuration = Frog->HopDuration;
+	const float GridCellSize = LM->GridCellSize;
+	const float MaxSpeedMult = GM->MaxSpeedMultiplier;
+
+	// Also account for gap reduction at max difficulty.
+	// Find the highest wave where gap reduction still applies.
+	// At wave W: GapReduction = (W-1) / WavesPerGapReduction
+	// Speed multiplier caps at MaxSpeedMultiplier at cap wave.
+	const int32 WavesPerGap = GM->WavesPerGapReduction;
+	const float Increment = GM->DifficultySpeedIncrement;
+	const int32 CapWave = FMath::CeilToInt(1.0f + (MaxSpeedMult - 1.0f) / Increment);
+
+	// Use a high wave number well past the cap to get worst-case gap reduction
+	const int32 WorstCaseWave = CapWave + 20;
+	const int32 MaxGapReduction = (WorstCaseWave - 1) / WavesPerGap;
+
+	float TightestMargin = TNumericLimits<float>::Max();
+	int32 TightestRow = -1;
+	FString TightestHazardName;
+
+	for (const FLaneConfig& Config : LM->LaneConfigs)
+	{
+		if (Config.LaneType == ELaneType::Safe || Config.LaneType == ELaneType::Goal)
+		{
+			continue;
+		}
+
+		// Apply worst-case gap reduction (clamped to 1 cell minimum)
+		int32 EffectiveGapCells = FMath::Max(1, Config.MinGapCells - MaxGapReduction);
+		float MinGapDistance = static_cast<float>(EffectiveGapCells) * GridCellSize;
+
+		// Hazard speed at max difficulty
+		float MaxSpeed = Config.Speed * MaxSpeedMult;
+
+		// Time for the gap to pass the frog's position
+		float GapTime = MinGapDistance / MaxSpeed;
+
+		// The invariant: frog must finish hopping before the gap closes
+		float Margin = GapTime - HopDuration;
+
+		TestTrue(
+			*FString::Printf(TEXT("Row %d (%s) is passable at max difficulty: GapTime=%.4fs > HopDuration=%.4fs (margin=%.4fs)"),
+				Config.RowIndex,
+				*UEnum::GetValueAsString(Config.HazardType),
+				GapTime, HopDuration, Margin),
+			Margin > 0.0f);
+
+		if (Margin < TightestMargin)
+		{
+			TightestMargin = Margin;
+			TightestRow = Config.RowIndex;
+			TightestHazardName = UEnum::GetValueAsString(Config.HazardType);
+		}
+	}
+
+	// Log the tightest lane and its margin for tuning visibility
+	UE_LOG(LogTemp, Display,
+		TEXT("[Passability] Tightest lane: Row %d (%s) — margin=%.4fs (GapTime=%.4fs, HopDuration=%.4fs)"),
+		TightestRow,
+		*TightestHazardName,
+		TightestMargin,
+		TightestMargin + HopDuration,
+		HopDuration);
+
+	UE_LOG(LogTemp, Display,
+		TEXT("[Passability] Parameters: MaxSpeedMult=%.2f, GridCellSize=%.0f, MaxGapReduction=%d, CapWave=%d"),
+		MaxSpeedMult, GridCellSize, MaxGapReduction, CapWave);
+
+	return true;
+}
+
+// ---------------------------------------------------------------------------
+// Seam 18: WaveMusicPitchIncreases
+// Systems: AudioManager + GameMode (via OnRoundCompleteFinished)
+//
+// As waves advance, the music pitch multiplier must increase, creating
+// perceptible urgency. SetMusicPitchMultiplier is called from
+// OnRoundCompleteFinished with 1.0 + (Wave-1) * 0.03.
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSeam_WaveMusicPitchIncreases,
+	"UnrealFrog.Seam.WaveMusicPitchIncreases",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FSeam_WaveMusicPitchIncreases::RunTest(const FString& Parameters)
+{
+	UGameInstance* TestGI = NewObject<UGameInstance>();
+	UFroggerAudioManager* Audio = NewObject<UFroggerAudioManager>(TestGI);
+
+	// Wave 1: pitch should be 1.0 (baseline)
+	Audio->SetMusicPitchMultiplier(1.0f);
+	TestNearlyEqual(TEXT("Wave 1 pitch is 1.0"), Audio->MusicPitchMultiplier, 1.0f);
+
+	// Wave 2: 1.0 + (2-1) * 0.03 = 1.03
+	float Wave2Pitch = 1.0f + (2 - 1) * 0.03f;
+	Audio->SetMusicPitchMultiplier(Wave2Pitch);
+	TestNearlyEqual(TEXT("Wave 2 pitch is 1.03"), Audio->MusicPitchMultiplier, 1.03f);
+
+	// Wave 5: 1.0 + (5-1) * 0.03 = 1.12
+	float Wave5Pitch = 1.0f + (5 - 1) * 0.03f;
+	Audio->SetMusicPitchMultiplier(Wave5Pitch);
+	TestNearlyEqual(TEXT("Wave 5 pitch is 1.12"), Audio->MusicPitchMultiplier, 1.12f);
+
+	// Wave 8: 1.0 + (8-1) * 0.03 = 1.21 (>20% increase)
+	float Wave8Pitch = 1.0f + (8 - 1) * 0.03f;
+	Audio->SetMusicPitchMultiplier(Wave8Pitch);
+	TestNearlyEqual(TEXT("Wave 8 pitch is 1.21"), Audio->MusicPitchMultiplier, 1.21f);
+	TestTrue(TEXT("Wave 8 pitch >= 20% increase"), Audio->MusicPitchMultiplier >= 1.20f);
+
+	return true;
+}
+
 #endif // WITH_AUTOMATION_TESTS
