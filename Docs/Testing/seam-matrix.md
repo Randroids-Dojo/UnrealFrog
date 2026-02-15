@@ -1,6 +1,6 @@
 # Seam Test Coverage Matrix
 
-*Last updated: Sprint 7*
+*Last updated: Sprint 8*
 
 ## Purpose
 
@@ -38,3 +38,9 @@ or an explicit "deferred" acknowledgment. This matrix tracks coverage.
 | 17 | GroundBuilder | LaneManager | Ground rows match lane config rows | DEFERRED | Low risk -- both read from same constants |
 | 18 | VFXManager | GameMode (Tick) | TickVFX driven from GameMode::Tick for animation | COVERED | `FSeam_VFXTickDrivesAnimation` |
 | 19 | AudioManager | GameMode (Timer) | Timer warning sound fires at <16.7% threshold | COVERED | `FSeam_TimerWarningFiresAtThreshold` |
+| 20 | PlayUnreal (Python) | GameMode (GetGameStateJSON) | Remote Control calls GetGameStateJSON; returned JSON has score, lives, wave, frogPos, gameState, timeRemaining, homeSlotsFilledCount | COVERED | `FPlayUnreal_GetGameStateJSON` + `Tools/PlayUnreal/acceptance_test.py` |
+| 21 | PlayUnreal (Python) | FrogCharacter (RequestHop) | Remote Control invokes RequestHop; frog position advances by one grid cell | COVERED | `FPlayUnreal_ForwardProgress` + `Tools/PlayUnreal/acceptance_test.py` |
+| 22 | FroggerHUD | APlayerController | Score pop position uses ProjectWorldLocationToScreen on frog world location, not hardcoded screen coords | COVERED | `FHUD_ScorePopUsesWorldProjection` |
+| 23 | FroggerVFXManager | Camera (distance + FOV) | CalculateScaleForScreenSize computes scale from camera distance and FOV; death puff StartScale >= 5% of visible width | COVERED | `FVFX_DeathPuffScaleForCameraDistance` |
+| 24 | FroggerVFXManager | GameMode (HomeSlotColumns, HomeSlotRow) | Home slot celebration positions derived from GameMode grid config, not hardcoded magic numbers | COVERED | `FVFX_HomeSlotSparkleReadsGridConfig` |
+| 25 | Difficulty scaling | Human perception threshold | Cumulative audio pitch + ground color change >= perceptible threshold by Wave 3 (5-second test) | DEFERRED | Game Designer implementing perception signals (Tasks 13-15) -- update to COVERED when tests land |
