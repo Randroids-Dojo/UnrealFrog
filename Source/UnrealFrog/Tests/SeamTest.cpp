@@ -599,6 +599,9 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FSeam_TimerWarningFiresAtThreshold::RunTest(const FString& Parameters)
 {
+	// NewObject GameMode has no world context — suppress expected UE error
+	AddExpectedError(TEXT("No world was found"), EAutomationExpectedErrorFlags::Contains, 0);
+
 	AUnrealFrogGameMode* GM = NewObject<AUnrealFrogGameMode>();
 
 	// Start game and get to Playing state
@@ -610,13 +613,13 @@ bool FSeam_TimerWarningFiresAtThreshold::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Warning not played initially"), GM->bTimerWarningPlayed);
 
 	// TimePerLevel = 30.0f. 16.7% of 30 = 5.01. Tick to just above threshold.
-	// After ticking 25.0s: RemainingTime = 5.0, percent = 5.0/30.0 = 0.1667 (just above 0.167)
-	GM->TickTimer(25.0f);
-	TestNearlyEqual(TEXT("Timer at ~5.0s"), GM->RemainingTime, 5.0f);
+	// After ticking 24.9s: RemainingTime = 5.1, percent = 5.1/30.0 = 0.17 (above 0.167)
+	GM->TickTimer(24.9f);
+	TestNearlyEqual(TEXT("Timer at ~5.1s"), GM->RemainingTime, 5.1f);
 	TestFalse(TEXT("Warning not yet played at boundary"), GM->bTimerWarningPlayed);
 
-	// Tick 0.1s more: RemainingTime = 4.9, percent = 4.9/30.0 = 0.1633 (below 0.167)
-	GM->TickTimer(0.1f);
+	// Tick 0.2s more: RemainingTime = 4.9, percent = 4.9/30.0 = 0.1633 (below 0.167)
+	GM->TickTimer(0.2f);
 	TestNearlyEqual(TEXT("Timer at ~4.9s"), GM->RemainingTime, 4.9f);
 	TestTrue(TEXT("Warning played after crossing threshold"), GM->bTimerWarningPlayed);
 
