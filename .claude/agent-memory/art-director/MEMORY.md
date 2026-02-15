@@ -80,7 +80,14 @@
 ### Sprint 6 Recommendations (from Art Director)
 - Custom pixel/arcade font for HUD (elevates entire visual identity)
 - VFX rotation animation (spinning sparkles, tumbling dust)
-- Screen flash on death (full-screen red overlay, 0.1s)
+- Screen flash on death (full-screen red overlay, 0.1s) -- DONE (Commit 4)
 - Scanline overlay effect for CRT/arcade feel
 - Alpha fade on VFX geometry (not just scale)
 - Consistent VFX shape language: all spheres, or all cubes, not mixed
+
+### Sprint 6 Commit 4: HUD Fixes
+- **Score pop proportional positioning**: Replaced hardcoded `FVector2D(160.0f, 10.0f)` with `FVector2D(20.0f + ScoreText.Len() * 10.0f, 10.0f)` -- pop appears right after the score text regardless of digit count
+- **Death flash overlay**: Full-screen red `FColor(255, 0, 0, Alpha)` with `SE_BLEND_Translucent`, triggered at alpha 0.5 on `EGameState::Dying`, decays at 1.67/s (~0.3s total). Drawn before score panel so it underlays HUD text.
+- **TickDeathFlash()**: Public method for test-driven decay verification without Canvas dependency
+- **DrawDeathFlash()**: Private Canvas drawing helper, full-screen FCanvasTileItem
+- **Tests added**: `FHUD_DeathFlashActivates` (trigger logic), `FHUD_DeathFlashDecays` (decay math via TickDeathFlash)

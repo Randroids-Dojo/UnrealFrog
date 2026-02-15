@@ -134,3 +134,18 @@
   - Dynamic material created per-hazard with BaseColor parameter
 - Tests: 2 automation tests in Tests/MeshTest.cpp
   - FrogCharacterHasMesh, HazardBaseHasMesh
+
+## Sprint 6 Changes
+
+### TickVFX Wiring (Commit 1)
+- **Bug**: UFroggerVFXManager::TickVFX() was defined but never called from GameMode::Tick. VFX spawned static, relied on SetLifeSpan(5.0f) auto-destroy only.
+- **Fix**: GameMode::Tick now calls VFX->TickVFX(GetWorld()->GetTimeSeconds()) after TickTimer. Gets VFXManager via GetGameInstance()->GetSubsystem<UFroggerVFXManager>().
+- **Seam test**: FSeam_VFXTickDrivesAnimation (Seam 13 in SeamTest.cpp) -- creates VFXManager, adds FActiveVFX with null actor, calls TickVFX, verifies cleanup.
+- **Pattern**: TickVFX removes entries with nullptr Actor immediately (line 171-175 of FroggerVFXManager.cpp), before checking duration. Test exploits this for verification without a UWorld.
+
+### High Score Persistence (Commit 3)
+- **Feature**: File I/O save/load of a single integer to `Saved/highscore.txt`
+- **API**: `LoadHighScore()` reads file via FFileHelper::LoadFileToString, sets HighScore if loaded value > current. `SaveHighScore()` writes HighScore via FFileHelper::SaveStringToFile.
+- **Integration**: `StartNewGame()` calls `LoadHighScore()` as first line. `NotifyScoreChanged()` calls `SaveHighScore()` inside the `if (Score > HighScore)` block.
+- **Tests**: FScore_HighScorePersistsSaveLoad (save/load round-trip), FScore_HighScoreLoadMissingFile (graceful missing file). Both clean up via IFileManager::Get().Delete().
+- **Includes added**: Misc/FileHelper.h, HAL/PlatformFilemanager.h in ScoreSubsystem.cpp
