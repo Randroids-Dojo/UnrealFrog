@@ -1,7 +1,7 @@
 # Team Working Agreements
 
 *This is a living document. Updated during retrospectives by the XP Coach.*
-*Last updated: Sprint 4 Retrospective*
+*Last updated: Sprint 5 Retrospective*
 
 ## Day 0 Agreements
 
@@ -13,6 +13,7 @@ These are our starting agreements. They WILL evolve through retrospectives.
 - **Driver rotation**: The XP Coach assigns the driver for each task based on domain expertise.
 - **Navigators review in real-time.** Don't wait until the end — flag issues as you see them.
 - **Any agent can call "Stop"** if they see a problem. The driver must pause and discuss.
+- **Mandatory review gates for large tasks.** For any task producing more than 200 lines of new code, the driver must pause after each logical subsystem (new header/implementation pair, new test file, new tool/script) and post a summary for navigator review before proceeding. The summary must include: what was built, what tests cover it, and what comes next. If no navigator is available, the driver self-reviews by re-reading the code after a context switch. (Added: Sprint 5 Retrospective -- two consecutive sprints were delivered as solo-programmed monolithic commits with no intermediate review.)
 
 ### 2. TDD is Mandatory
 
@@ -34,6 +35,7 @@ These are our starting agreements. They WILL evolve through retrospectives.
 
 - Conventional Commits format: `feat:`, `fix:`, `refactor:`, `test:`, `docs:`, `chore:`
 - Each commit is one logical change
+- **Sprints must not be delivered as a single monolithic commit.** Each independently testable subsystem (new class + its tests, new tool/script, configuration changes) must be its own commit. A sprint delivering N new subsystems should have at minimum N commits. The only exception is tightly coupled changes where one subsystem cannot compile without the other. (Added: Sprint 5 Retrospective -- Sprints 4 and 5 were each delivered as single 2000+ line commits, eliminating rollback granularity and intermediate review.)
 - Commit message explains WHY, not WHAT (the diff shows what)
 - Never commit broken builds
 - **Build verification is mandatory before every commit.** Run the UBT build for BOTH Game AND Editor targets and confirm `Result: Succeeded` before `git commit`. Never build just one target — the `-game` flag uses Editor binaries. (Updated Sprint 2: building only the Game target caused debugging confusion.)
@@ -48,7 +50,7 @@ These are our starting agreements. They WILL evolve through retrospectives.
 6. **Build verification** — UBT build must succeed (Game + Editor targets)
 7. Tests pass → merge
 8. **Play-test before marking gameplay tasks complete.** Run `play-game.sh` and execute the feature manually. One minute of play-testing catches bugs that 100 tests miss. (Updated: Sprint 4 Retrospective)
-9. **QA Lead play-tests** using PlayUnreal automation harness and owns the Definition of Done checklist. QA Lead signs off explicitly before a sprint exits. (Updated: Sprint 4 Retrospective)
+9. **QA Lead play-tests BEFORE the sprint commit is created**, not after. If QA finds defects, they are fixed and re-tested before committing. The commit message may include "QA: verified" only after explicit QA sign-off. If QA play-test is not possible (no display, no QA agent available), the commit message must note "QA: pending" and a follow-up play-test is a P0 for the next session. (Updated: Sprint 5 Retrospective -- QA play-test was skipped in Sprint 5, breaking the Definition of Done.)
 10. XP Coach runs retrospective
 
 ### 5a. Definition of Done (Added: Stakeholder Review)
@@ -181,6 +183,12 @@ Process:
 4. Once validated, proceed with full implementation
 
 **Why:** Sprint 4 burned 4 iterations discovering that `USoundWave::RawPCMData` is editor-only in UE 5.7. Only `USoundWaveProcedural` + `QueueAudio()` works for runtime-generated audio. A 10-minute spike would have caught this immediately.
+
+### 17. Deferred Item Deadline (Added: Sprint 5 Retrospective)
+
+**Any P1 action item deferred 3 consecutive sprints must be resolved in the next sprint: either completed or explicitly dropped.** When dropping, record the rationale in the retrospective log and remove from the carry-forward list. No more silent carry-forward.
+
+**Why:** M_FlatColor.uasset and functional-tests-in-CI have been deferred for 4 sprints. Chronic carry-forward items create noise in retrospectives and signal that the team is not honest about its priorities.
 
 ## Things We Will Figure Out Together
 

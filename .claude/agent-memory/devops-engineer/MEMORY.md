@@ -24,6 +24,27 @@
 - AFrogCharacter extends APawn (not ACharacter)
 - AUnrealFrogGameMode extends AGameModeBase
 - UScoreSubsystem extends UGameInstanceSubsystem
+- UFroggerAudioManager extends UGameInstanceSubsystem
+- UFroggerVFXManager extends UGameInstanceSubsystem
 - ALaneManager extends AActor
 - AHazardBase extends AActor
 - All classes expose both dynamic (BP) and native (C++) delegates
+
+## Sprint 5 State
+- 148 tests passing, 0 failures, 17 categories
+- Build times: Editor ~12s, Game ~26s
+- run-tests.sh supports: --all, --seam, --audio, --e2e, --integration, --wiring, --vfx, --list, --report, --functional
+- Binary assets in git: Content/Audio/Music/*.wav (~4.4 MB), Content/Audio/SFX/*.wav
+- Seam matrix at Docs/Testing/seam-matrix.md: 12 COVERED, 5 DEFERRED
+
+## Known Issues Carrying Forward
+- TickVFX() is defined in UFroggerVFXManager but NEVER called from Tick(). VFX spawn but don't animate (scale/rise). SetLifeSpan(5.0f) prevents leaks, but effects sit static then pop away.
+- Music looping: bLooping=true on USoundWaveProcedural + single QueueAudio() call. Untested in live playback. QueueAudio buffer may drain without re-fill callback.
+- M_FlatColor.uasset: 5th sprint without generating it. Runtime fallback works but WITH_EDITORONLY_DATA will fail in packaged builds.
+- Functional tests (AFunctionalTest actors) still cannot run in CI (need rendering context).
+- No packaging step in CI.
+
+## Stale P1 Items (Tracking)
+- M_FlatColor.uasset generation: deferred Sprints 3, 4, 5 (now 3 sprints)
+- Functional tests in CI: deferred Sprints 3, 4, 5
+- Packaging step in CI: deferred Sprints 4, 5

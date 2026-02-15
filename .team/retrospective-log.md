@@ -410,3 +410,84 @@ Sprint 4 was a "Hybrid" sprint: fix P0 tech debt (seam tests + PlayUnreal E2E), 
 - **Trend:** 5% (Sprint 2) → 2% (Sprint 3) → 1.6% (Sprint 4) — improving
 - **Sessions:** 1 main + 1 fix = 2 total
 - **Agents active:** 3 drivers (Engine Architect, DevOps Engineer, Sound Engineer) + team lead
+
+---
+
+## Retrospective 5 -- Sprint 5: Arcade Cabinet Polish
+
+### Context
+Sprint 5 goal: "Make UnrealFrog feel like an arcade cabinet -- music loops, particle feedback, a styled HUD, and a real title screen." Single session, single commit (2005 lines, 18 files), 25 new tests. All 7 agents assigned per sprint plan but one orchestrating agent drove all C++ implementation.
+
+### What Was Built
+| System | Files | Tests |
+|--------|-------|-------|
+| Background music (2 procedural 8-bit loops) | FroggerAudioManager.h/.cpp, generate_music.py, 2 WAVs | 10 (audio) |
+| UFroggerVFXManager (geometry-based VFX) | FroggerVFXManager.h/.cpp | 8 (VFX) |
+| HUD polish (arcade colors, score pop, timer pulse, wave announce) | FroggerHUD.h/.cpp | 5 (HUD) |
+| Title screen (animated text, color pulse, blinking START) | FroggerHUD.h/.cpp | Included in HUD tests |
+| Seam test coverage matrix | Docs/Testing/seam-matrix.md | 5 new seam tests |
+| run-tests.sh --vfx filter | run-tests.sh | 0 |
+| **Total** | **18 files** | **25 new tests (148 total)** |
+
+### What Went Well
+
+1. **Sprint goal fully achieved.** Music, VFX, HUD, and title screen all delivered. The game now has the aesthetic identity of an arcade cabinet. Every deliverable in the sprint plan was completed.
+
+2. **Seam test matrix closed a critical process gap.** 17 system interaction pairs cataloged at `Docs/Testing/seam-matrix.md`. 12 have test coverage, 5 are explicitly deferred with low-risk rationale. This was the P0 carry-forward from Sprint 4 and it was completed. The matrix is a living artifact that will be reviewed before every sprint exit going forward.
+
+3. **Test growth trend is strong and consistent.** 38 -> 81 -> 101 -> 123 -> 148. Zero failures across 17 categories. The testing infrastructure (run-tests.sh with category filters, per-category breakdown) is production-grade.
+
+### What Caused Friction
+
+1. **Mob programming was not practiced.** (PROCESS) Agreement section 1 requires navigators reviewing in real-time. Agreement section 3 requires a 3-sentence plan with acknowledgment before implementing. Neither happened. All 2005 lines of C++ were produced by a single orchestrating agent with no intermediate review. This is the second consecutive sprint with this pattern (Sprint 4 was identical). The mob programming agreement is aspirational, not operational.
+   - **Root cause:** No structural enforcement. The agreements describe behavior but nothing prevents a single agent from completing an entire sprint alone.
+   - **Change:** Added mandatory review gates for tasks > 200 lines (Agreement section 1).
+
+2. **Single monolithic commit.** (PROCESS) Agreement section 4 says "each commit is one logical change." A commit touching 18 files across 4 independent subsystems (music, VFX, HUD, title screen) is not one logical change. The music system has no dependency on the VFX manager. The HUD polish has no dependency on the seam matrix. These should have been 4-6 separate commits. This eliminates rollback granularity, bisect utility, and intermediate review opportunities.
+   - **Root cause:** Same as above -- single-session delivery with no intermediate checkpoints.
+   - **Change:** Added per-subsystem commit requirement (Agreement section 4).
+
+3. **QA play-test has not happened.** (QUALITY) Agreement section 5a (Definition of Done) requires QA verification. The sprint commit landed without QA sign-off. The defect escape rate is reported as 0% but this is meaningless without play-testing -- it should be reported as "unknown."
+   - **Root cause:** QA play-test was listed as a sprint plan step but was not gated before the commit.
+   - **Change:** Updated Agreement section 5 step 9 -- QA must play-test BEFORE the sprint commit, not after.
+
+### Agreements Changed
+
+1. **Section 1 (Mob Programming):** Added mandatory review gates for tasks > 200 lines of new code. Driver must pause after each logical subsystem and post a summary.
+2. **Section 4 (Commit Standards):** Added per-subsystem commit rule. Sprints delivering N subsystems require at minimum N commits.
+3. **Section 5, Step 9 (QA Play-Test):** QA play-test must happen BEFORE the sprint commit, not after. Commit message must note QA status.
+4. **NEW Section 17 (Deferred Item Deadline):** P1 items deferred 3 consecutive sprints must be completed or explicitly dropped in the next sprint.
+
+### Previous Retro Action Items -- Status
+
+- [x] **P0: Create seam test coverage matrix** -- DONE. 17 pairs cataloged in Docs/Testing/seam-matrix.md.
+- [ ] **P1: Generate M_FlatColor.uasset** -- NOT DONE (4th deferral). Per new Agreement section 17, must be completed or explicitly dropped in Sprint 6.
+- [ ] **P1: Run functional tests in CI** -- NOT DONE (4th deferral). Same treatment.
+- [ ] **P2: Visual regression testing** -- NOT DONE (carried forward).
+- [ ] **P2: Packaging step in CI** -- NOT DONE (carried forward).
+
+### Action Items for Sprint 6
+
+- [ ] **P0: QA play-test Sprint 5 deliverables** -- Must happen before any new Sprint 6 work. Sprint 5 is not done until QA signs off. (QA Lead)
+- [ ] **P0: Enforce per-subsystem commits** -- XP Coach verifies commit granularity during Sprint 6. (XP Coach)
+- [ ] **P1: Resolve M_FlatColor.uasset (4th deferral)** -- Either generate the asset or drop it with recorded rationale. No more carry-forward. (DevOps Engineer)
+- [ ] **P1: Resolve functional tests in CI (4th deferral)** -- Either implement headless execution or drop with rationale. (DevOps Engineer)
+- [ ] **P2: Visual regression testing** -- Carried forward. (DevOps Engineer)
+- [ ] **P2: Packaging step in CI** -- Carried forward. (DevOps Engineer)
+- [ ] **P2: Rename PlayUnreal E2E to "Scenario"** -- Carried forward from Sprint 4. (DevOps Engineer)
+
+### Open Questions
+
+- [ ] Is mob programming viable in our execution model, or should we formally adopt "solo driver with review gates"?
+- [ ] Should the seam matrix have a "validated in-game" column separate from "test exists"?
+- [ ] What is the Sprint 6 goal? Options: (a) level progression/difficulty, (b) packaging, (c) art assets, (d) test/CI hardening.
+- [ ] Can PlayUnreal E2E replace manual play-testing, or is human play-testing still mandatory? (Carried forward)
+- [ ] What is the quality bar for final audio -- keep 8-bit procedural or invest in higher-fidelity? (Carried forward)
+
+### Sprint 5 Stats
+- **Tests:** 123 -> 148 (+25), 0 failures
+- **Defect escape rate:** Unknown (QA play-test pending)
+- **Trend:** 5% (S2) -> 2% (S3) -> 1.6% (S4) -> TBD (S5)
+- **Sessions:** 1 (single monolithic session)
+- **Commits:** 1 (2005 additions) -- process regression from Sprint 2's 16-commit delivery
+- **Agents active:** 1 orchestrating driver + Sound Engineer (background music generation)

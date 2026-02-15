@@ -58,3 +58,24 @@
 8. Score/Lives/Timer visible
 9. Game Over on 0 lives
 10. Home slots fillable + round completion
+
+## Sprint 5 Game Feel Assessment
+### What was designed this sprint
+- Title screen: animated "UNREAL FROG" (green<->yellow pulse 1.5Hz), blinking "PRESS START" (2Hz), high score display (conditional on >0), credits line
+- Score pop animation: +N text, rises 60px over 1.5s with alpha fade, yellow for <=100pts, white for >100pts
+- Wave announcement timing: 0.3s fade in, 1.0s hold, 0.7s fade out = 2.0s total
+- Timer pulse: activates at <16.7% remaining, bar oscillates 8-14px height at ~1Hz, red flash
+- VFX types: hop dust (3 brown cubes, 0.2s), death puff (expanding sphere, 0.5s, color-coded), home sparkle (4 gold spheres rising, 1.0s), round celebration (sparkle at all 5 slots, 2.0s)
+
+### Music integration
+- Two tracks: Music_Title and Music_Gameplay
+- HandleGameStateChanged switches automatically: Title->title music, Playing->gameplay music, GameOver->stop
+- Music adds significant atmosphere and pacing
+
+### Feel gaps identified for Sprint 6
+1. No transition animations between states (hard cuts Title->Spawning->Playing)
+2. Death puff needs supplemental juice: screen shake (0.2s) + freeze frame (0.1s pause)
+3. Round complete celebration at top of screen may be missed — needs center-screen acknowledgment
+4. No high score persistence (resets every session)
+5. No difficulty communication to player ("SPEED UP!" text on wave increase)
+6. Timer warning is visual-only — SFX_TimerWarning exists but is not wired to timer pulse

@@ -38,3 +38,49 @@
 - 13 columns x 15 rows, 100 UU per cell
 - Playfield: 1300 UU wide x 1500 UU deep
 - Ground planes at Z=-1 to avoid Z-fighting
+
+## Sprint 5 Visual Additions
+
+### HUD Arcade Color Scheme
+- Score text: Green FColor(0, 255, 100, 255) -- classic arcade readout
+- High score text: Yellow FColor(255, 255, 0, 255) -- top-center
+- Lives/wave text: Red-tinted FColor(255, 100, 100, 255) -- top-right
+- Timer background: Near-black FColor(20, 20, 20, 220)
+- Timer foreground: Green->Red gradient based on TimerPercent
+- Timer pulse: Height oscillation (8-14px) + red flash when <16.7% remaining
+- Overlay backgrounds: Semi-transparent black FColor(0,0,0,180)
+- Score pops: Yellow for normal, White for bonus (>100 pts), 1.5s rise+fade
+- Wave announcement: Yellow, fade-in 0.3s -> hold 1.0s -> fade-out 0.7s
+
+### Title Screen
+- Full-screen dark overlay FColor(10, 10, 20, 240)
+- "UNREAL FROG" title: Color pulse green(0,255,100)<->yellow(255,255,0) at 1.5Hz
+- "PRESS START" blinks on/off at 2Hz, white
+- "HI-SCORE: N" shown in yellow when > 0
+- "A MOB PROGRAMMING PRODUCTION" credits: Dim gray FColor(100,100,100,200) at bottom
+
+### VFX System (UFroggerVFXManager)
+- Death puff sphere: red(1,0.2,0.2) squish/timeout, blue(0.2,0.4,1) splash, yellow(1,1,0.2) offscreen
+- Hop dust: 3 cubes, brown(0.6,0.5,0.3), 0.2s pop, triangular spread 20UU
+- Home slot sparkle: 4 spheres, gold(1,0.85,0), 1.0s rise at 60 UU/s
+- Round complete: Sparkles at all 5 home slot positions
+- Animation: Scale-only (StartScale->EndScale over Duration). No rotation, no alpha fade.
+- MaxActiveVFX = 10 (oldest destroyed when cap reached)
+- 5.0s auto-lifespan failsafe via SetLifeSpan
+- bDisabled flag for CI/headless testing
+
+### Visual Concerns Noted
+- All rendering uses Canvas API with GEngine->GetMediumFont/GetLargeFont -- no custom fonts
+- VFX are scale-only animation (no rotation, no alpha fade on geometry)
+- Timer bar height oscillation is unsmoothened (raw sine)
+- No consistent VFX shape language (sphere for death + sparkle, cube for dust)
+- Score pop text uses DrawText with no outline/shadow for readability
+- FlatColorMaterial.h still used -- M_FlatColor.uasset still deferred
+
+### Sprint 6 Recommendations (from Art Director)
+- Custom pixel/arcade font for HUD (elevates entire visual identity)
+- VFX rotation animation (spinning sparkles, tumbling dust)
+- Screen flash on death (full-screen red overlay, 0.1s)
+- Scanline overlay effect for CRT/arcade feel
+- Alpha fade on VFX geometry (not just scale)
+- Consistent VFX shape language: all spheres, or all cubes, not mixed
