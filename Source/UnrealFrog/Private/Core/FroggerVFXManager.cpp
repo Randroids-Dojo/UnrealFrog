@@ -2,13 +2,26 @@
 
 #include "Core/FroggerVFXManager.h"
 #include "Core/FlatColorMaterial.h"
+#include "Core/UnrealFrogGameMode.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Engine/World.h"
+#include "Camera/PlayerCameraManager.h"
 #include "Kismet/GameplayStatics.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogFroggerVFX, Log, All);
+
+// -- Camera-relative scaling --------------------------------------------------
+
+float UFroggerVFXManager::CalculateScaleForScreenSize(float CameraDistance, float FOVDegrees,
+	float DesiredScreenFraction, float MeshBaseDiameter)
+{
+	float FOVRadians = FMath::DegreesToRadians(FOVDegrees);
+	float VisibleWidth = 2.0f * CameraDistance * FMath::Tan(FOVRadians * 0.5f);
+	float DesiredWorldSize = VisibleWidth * DesiredScreenFraction;
+	return DesiredWorldSize / FMath::Max(MeshBaseDiameter, 1.0f);
+}
 
 // -- VFX spawn interface ------------------------------------------------------
 
@@ -44,8 +57,19 @@ void UFroggerVFXManager::SpawnDeathPuff(FVector Location, EDeathType DeathType)
 		break;
 	}
 
+	// Compute camera-relative scale for visibility at gameplay distance
+	float StartScale = 0.5f;
+	float EndScale = 3.0f;
+	if (APlayerCameraManager* CamMgr = UGameplayStatics::GetPlayerCameraManager(World, 0))
+	{
+		float CamDist = CamMgr->GetCameraLocation().Z - Location.Z;
+		float FOV = CamMgr->GetFOVAngle();
+		StartScale = CalculateScaleForScreenSize(CamDist, FOV, 0.05f); // 5% of screen
+		EndScale = StartScale * 2.5f;
+	}
+
 	AActor* VFXActor = SpawnVFXActor(World, Location,
-		TEXT("/Engine/BasicShapes/Sphere.Sphere"), Color, 0.5f);
+		TEXT("/Engine/BasicShapes/Sphere.Sphere"), Color, StartScale);
 
 	if (VFXActor)
 	{
@@ -54,8 +78,8 @@ void UFroggerVFXManager::SpawnDeathPuff(FVector Location, EDeathType DeathType)
 		Effect.SpawnLocation = Location;
 		Effect.SpawnTime = World->GetTimeSeconds();
 		Effect.Duration = 0.5f;
-		Effect.StartScale = 0.5f;
-		Effect.EndScale = 3.0f;
+		Effect.StartScale = StartScale;
+		Effect.EndScale = EndScale;
 		ActiveEffects.Add(Effect);
 		EnforceActiveCap();
 	}
@@ -74,6 +98,17 @@ void UFroggerVFXManager::SpawnHopDust(FVector Location)
 		return;
 	}
 
+	// Compute camera-relative scale for hop dust (2% of screen — subtle)
+	float DustStartScale = 0.15f;
+	float DustEndScale = 0.4f;
+	if (APlayerCameraManager* CamMgr = UGameplayStatics::GetPlayerCameraManager(World, 0))
+	{
+		float CamDist = CamMgr->GetCameraLocation().Z - Location.Z;
+		float FOV = CamMgr->GetFOVAngle();
+		DustStartScale = CalculateScaleForScreenSize(CamDist, FOV, 0.02f);
+		DustEndScale = DustStartScale * 2.0f;
+	}
+
 	// Spawn 3 small cubes around the hop origin
 	FLinearColor DustColor(0.6f, 0.5f, 0.3f); // Light brown
 	float Spread = 20.0f;
@@ -86,7 +121,7 @@ void UFroggerVFXManager::SpawnHopDust(FVector Location)
 	for (int32 i = 0; i < 3; ++i)
 	{
 		AActor* VFXActor = SpawnVFXActor(World, Location + Offsets[i],
-			TEXT("/Engine/BasicShapes/Cube.Cube"), DustColor, 0.15f);
+			TEXT("/Engine/BasicShapes/Cube.Cube"), DustColor, DustStartScale);
 
 		if (VFXActor)
 		{
@@ -95,8 +130,8 @@ void UFroggerVFXManager::SpawnHopDust(FVector Location)
 			Effect.SpawnLocation = Location + Offsets[i];
 			Effect.SpawnTime = World->GetTimeSeconds();
 			Effect.Duration = 0.2f;
-			Effect.StartScale = 0.15f;
-			Effect.EndScale = 0.4f;
+			Effect.StartScale = DustStartScale;
+			Effect.EndScale = DustEndScale;
 			ActiveEffects.Add(Effect);
 		}
 	}
@@ -116,6 +151,17 @@ void UFroggerVFXManager::SpawnHomeSlotSparkle(FVector Location)
 		return;
 	}
 
+	// Compute camera-relative scale for sparkle (3% of screen)
+	float SparkleStartScale = 0.1f;
+	float SparkleEndScale = 0.3f;
+	if (APlayerCameraManager* CamMgr = UGameplayStatics::GetPlayerCameraManager(World, 0))
+	{
+		float CamDist = CamMgr->GetCameraLocation().Z - Location.Z;
+		float FOV = CamMgr->GetFOVAngle();
+		SparkleStartScale = CalculateScaleForScreenSize(CamDist, FOV, 0.03f);
+		SparkleEndScale = SparkleStartScale * 2.0f;
+	}
+
 	// 4 small spheres that rise upward
 	FLinearColor GoldColor(1.0f, 0.85f, 0.0f); // Golden yellow
 	float Spread = 15.0f;
@@ -126,7 +172,7 @@ void UFroggerVFXManager::SpawnHomeSlotSparkle(FVector Location)
 		FVector Offset(FMath::Cos(Angle) * Spread, FMath::Sin(Angle) * Spread, 0.0);
 
 		AActor* VFXActor = SpawnVFXActor(World, Location + Offset,
-			TEXT("/Engine/BasicShapes/Sphere.Sphere"), GoldColor, 0.1f);
+			TEXT("/Engine/BasicShapes/Sphere.Sphere"), GoldColor, SparkleStartScale);
 
 		if (VFXActor)
 		{
@@ -135,8 +181,8 @@ void UFroggerVFXManager::SpawnHomeSlotSparkle(FVector Location)
 			Effect.SpawnLocation = Location + Offset;
 			Effect.SpawnTime = World->GetTimeSeconds();
 			Effect.Duration = 1.0f;
-			Effect.StartScale = 0.1f;
-			Effect.EndScale = 0.3f;
+			Effect.StartScale = SparkleStartScale;
+			Effect.EndScale = SparkleEndScale;
 			Effect.RiseVelocity = FVector(0.0, 0.0, 60.0); // Rise upward
 			ActiveEffects.Add(Effect);
 		}
@@ -151,13 +197,22 @@ void UFroggerVFXManager::SpawnRoundCompleteCelebration()
 		return;
 	}
 
-	// Spawn sparkle at all 5 home slot positions
-	// HomeSlotColumns = {1, 4, 6, 8, 11}, row 14, cell size 100
-	TArray<int32> SlotColumns = {1, 4, 6, 8, 11};
-	for (int32 Col : SlotColumns)
+	UWorld* World = GetWorld();
+	if (!World)
 	{
-		FVector SlotLocation(Col * 100.0, 14 * 100.0, 50.0);
-		SpawnHomeSlotSparkle(SlotLocation);
+		return;
+	}
+
+	// Read home slot config from GameMode — no hardcoded positions
+	AUnrealFrogGameMode* GM = Cast<AUnrealFrogGameMode>(World->GetAuthGameMode());
+	if (!GM)
+	{
+		return;
+	}
+
+	for (int32 i = 0; i < GM->HomeSlotColumns.Num(); ++i)
+	{
+		SpawnHomeSlotSparkle(GetHomeSlotWorldLocation(i));
 	}
 }
 
@@ -201,13 +256,29 @@ void UFroggerVFXManager::TickVFX(float CurrentTime)
 
 void UFroggerVFXManager::HandleHomeSlotFilled(int32 SlotIndex, int32 TotalFilled)
 {
-	// HomeSlotColumns = {1, 4, 6, 8, 11}, cell size 100
-	TArray<int32> SlotColumns = {1, 4, 6, 8, 11};
-	if (SlotColumns.IsValidIndex(SlotIndex))
+	SpawnHomeSlotSparkle(GetHomeSlotWorldLocation(SlotIndex));
+}
+
+FVector UFroggerVFXManager::GetHomeSlotWorldLocation(int32 SlotIndex) const
+{
+	// Read config from GameMode — no hardcoded positions
+	UWorld* World = GetWorld();
+	if (World)
 	{
-		FVector Location(SlotColumns[SlotIndex] * 100.0, 14 * 100.0, 50.0);
-		SpawnHomeSlotSparkle(Location);
+		if (const AUnrealFrogGameMode* GM = Cast<AUnrealFrogGameMode>(World->GetAuthGameMode()))
+		{
+			if (GM->HomeSlotColumns.IsValidIndex(SlotIndex))
+			{
+				float CellSize = 100.0f; // GridCellSize from FrogCharacter default
+				float Col = static_cast<float>(GM->HomeSlotColumns[SlotIndex]);
+				float Row = static_cast<float>(GM->HomeSlotRow);
+				return FVector(Col * CellSize, Row * CellSize, 50.0);
+			}
+		}
 	}
+
+	// Fallback: return origin (no world or invalid index)
+	return FVector::ZeroVector;
 }
 
 // -- Internal -----------------------------------------------------------------

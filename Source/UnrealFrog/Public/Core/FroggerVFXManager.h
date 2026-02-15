@@ -44,9 +44,19 @@ public:
 	/** Maximum active VFX actors. Oldest destroyed when cap reached. */
 	static constexpr int32 MaxActiveVFX = 10;
 
+	// -- Camera-relative scaling -------------------------------------------
+
+	/** Calculate the actor scale needed for a mesh to fill a given fraction
+	 *  of the screen at the current camera distance.
+	 *  @param DesiredScreenFraction 0.05 = 5% of visible width
+	 *  @param MeshBaseDiameter diameter of the mesh at scale 1.0 (100 for engine sphere/cube) */
+	static float CalculateScaleForScreenSize(float CameraDistance, float FOVDegrees,
+		float DesiredScreenFraction, float MeshBaseDiameter = 100.0f);
+
 	// -- VFX spawn interface -----------------------------------------------
 
-	/** Expanding sphere, color by death type. 0.5s duration. */
+	/** Expanding sphere, color by death type. 0.5s duration.
+	 *  Scale computed from camera distance for visibility at Z=2200. */
 	UFUNCTION(BlueprintCallable, Category = "VFX")
 	void SpawnDeathPuff(FVector Location, EDeathType DeathType);
 
@@ -58,9 +68,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "VFX")
 	void SpawnHomeSlotSparkle(FVector Location);
 
-	/** Sparkles at all 5 home slot positions. 2.0s duration. */
+	/** Sparkles at all home slot positions read from GameMode config. */
 	UFUNCTION(BlueprintCallable, Category = "VFX")
 	void SpawnRoundCompleteCelebration();
+
+	/** Get the world location of a home slot by index, read from GameMode. */
+	FVector GetHomeSlotWorldLocation(int32 SlotIndex) const;
 
 	/** Tick-driven animation: scale, move, and destroy completed effects. */
 	void TickVFX(float CurrentTime);

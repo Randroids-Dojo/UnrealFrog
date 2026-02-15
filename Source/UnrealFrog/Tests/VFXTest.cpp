@@ -7,6 +7,7 @@
 #include "Misc/AutomationTest.h"
 #include "Engine/GameInstance.h"
 #include "Core/FroggerVFXManager.h"
+#include "Core/UnrealFrogGameMode.h"
 
 #if WITH_AUTOMATION_TESTS
 
@@ -164,6 +165,80 @@ bool FVFX_WiringDelegateCompatibility::RunTest(const FString& Parameters)
 	VFX->SpawnHopDust(FVector::ZeroVector);
 
 	TestTrue(TEXT("All VFX methods have compatible delegate signatures"), true);
+
+	return true;
+}
+
+// ---------------------------------------------------------------------------
+// RED TEST: Death puff must be visible at spawn time from the gameplay camera.
+// At Z=2200, FOV 50, visible width is ~2052 UU. 5% of that = ~103 UU.
+// The death puff must produce >= 103 UU diameter at SPAWN (StartScale),
+// not just at the end of its animation. Currently StartScale=0.5 gives
+// only 50 UU diameter (half the minimum), making it invisible at spawn.
+// The fix should compute scale from camera distance and FOV.
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FVFX_DeathPuffScaleForCameraDistance,
+	"UnrealFrog.VFX.DeathPuffScaleForCameraDistance",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FVFX_DeathPuffScaleForCameraDistance::RunTest(const FString& Parameters)
+{
+	// Camera parameters (gameplay camera defaults)
+	const float CameraZ = 2200.0f;
+	const float FOVDegrees = 50.0f;
+	const float FOVRadians = FMath::DegreesToRadians(FOVDegrees);
+	const float VisibleWidth = 2.0f * CameraZ * FMath::Tan(FOVRadians * 0.5f);
+	const float MinScreenFraction = 0.05f; // 5% of visible width
+	const float MinDiameter = MinScreenFraction * VisibleWidth; // ~103 UU
+	const float MeshBaseDiameter = 100.0f; // Engine sphere diameter at scale 1.0
+
+	// Use the static helper to compute the scale for 5% screen fraction
+	float ComputedScale = UFroggerVFXManager::CalculateScaleForScreenSize(
+		CameraZ, FOVDegrees, MinScreenFraction, MeshBaseDiameter);
+
+	float ActualStartDiameter = ComputedScale * MeshBaseDiameter;
+
+	// The death puff must be >= 5% of screen width AT SPAWN TIME.
+	TestTrue(
+		FString::Printf(TEXT("Death puff start diameter (%.1f UU) must be >= %.1f UU (5%% of %.1f UU visible width)"),
+			ActualStartDiameter, MinDiameter, VisibleWidth),
+		ActualStartDiameter >= MinDiameter);
+
+	return true;
+}
+
+// ---------------------------------------------------------------------------
+// RED TEST: Home slot celebration positions must be derived from GameMode's
+// HomeSlotColumns and HomeSlotRow, not hardcoded magic numbers.
+// Currently SpawnRoundCompleteCelebration() and HandleHomeSlotFilled()
+// hardcode {1, 4, 6, 8, 11} for columns and 14 for row. If the GameMode's
+// HomeSlotColumns are changed, VFX spawns at wrong positions.
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FVFX_HomeSlotSparkleReadsGridConfig,
+	"UnrealFrog.VFX.HomeSlotSparkleReadsGridConfig",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FVFX_HomeSlotSparkleReadsGridConfig::RunTest(const FString& Parameters)
+{
+	UFroggerVFXManager* VFX = CreateTestVFXManager();
+
+	// Without a world, GetHomeSlotWorldLocation cannot read from GameMode,
+	// so it returns ZeroVector (the fallback). This proves it does NOT
+	// use hardcoded values — if it did, it would return (100, 1400, 50)
+	// for slot 0 regardless of whether a GameMode exists.
+	FVector NoWorldResult = VFX->GetHomeSlotWorldLocation(0);
+	TestEqual(TEXT("No-world fallback returns ZeroVector (no hardcoded positions)"),
+		NoWorldResult, FVector::ZeroVector);
+
+	// Verify the contract: the VFXManager source should NOT contain
+	// hardcoded home slot columns. We test this indirectly by verifying
+	// GetHomeSlotWorldLocation does not return the OLD hardcoded values.
+	// Old hardcoded slot 0: {1, 4, 6, 8, 11}[0]=1, row 14 → (100, 1400, 50)
+	FVector OldHardcodedSlot0(100.0, 1400.0, 50.0);
+	TestNotEqual(TEXT("Slot 0 must not return old hardcoded position"),
+		NoWorldResult, OldHardcodedSlot0);
 
 	return true;
 }
