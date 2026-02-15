@@ -49,6 +49,15 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Lanes")
 	void SetupDefaultLaneConfigs();
 
+	/** Apply wave difficulty scaling to all spawned hazards.
+	 *  Sets Speed = BaseSpeed * SpeedMultiplier on each hazard (no compounding).
+	 *  Updates turtle CurrentWave for submerge gating. */
+	UFUNCTION(BlueprintCallable, Category = "Lanes")
+	void ApplyWaveDifficulty(float SpeedMultiplier, int32 WaveNumber);
+
+	/** Add a hazard to the pool for a given row. Exposed for unit testing. */
+	void AddHazardToPool(int32 RowIndex, AHazardBase* Hazard);
+
 private:
 	// -- Object pool (one array of hazards per lane index) ----------------
 

@@ -264,6 +264,32 @@ void ALaneManager::SpawnLaneHazards(const FLaneConfig& Config)
 	}
 }
 
+void ALaneManager::ApplyWaveDifficulty(float SpeedMultiplier, int32 WaveNumber)
+{
+	for (auto& Pair : HazardPool)
+	{
+		for (AHazardBase* Hazard : Pair.Value)
+		{
+			if (!Hazard)
+			{
+				continue;
+			}
+
+			Hazard->Speed = Hazard->BaseSpeed * SpeedMultiplier;
+
+			if (Hazard->HazardType == EHazardType::TurtleGroup)
+			{
+				Hazard->CurrentWave = WaveNumber;
+			}
+		}
+	}
+}
+
+void ALaneManager::AddHazardToPool(int32 RowIndex, AHazardBase* Hazard)
+{
+	HazardPool.FindOrAdd(RowIndex).Add(Hazard);
+}
+
 void ALaneManager::CalculateSpawnPositions(const FLaneConfig& Config, TArray<float>& OutXPositions) const
 {
 	float GridWorldWidth = static_cast<float>(GridColumns) * GridCellSize;

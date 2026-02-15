@@ -35,6 +35,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hazard")
 	float Speed = 0.0f;
 
+	/** Original speed from lane config. Used by ApplyWaveDifficulty to avoid compounding. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Hazard")
+	float BaseSpeed = 0.0f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hazard")
 	int32 HazardWidthCells = 1;
 

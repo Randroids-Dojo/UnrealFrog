@@ -30,6 +30,7 @@ DECLARE_MULTICAST_DELEGATE_TwoParams(FOnWaveCompletedNative, int32 /*CompletedWa
 
 class UFroggerVFXManager;
 class UFroggerAudioManager;
+class ALaneManager;
 
 UCLASS()
 class UNREALFROG_API AUnrealFrogGameMode : public AGameModeBase
@@ -212,6 +213,9 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<UFroggerAudioManager> CachedAudioManager = nullptr;
+
+	UPROPERTY()
+	TObjectPtr<ALaneManager> CachedLaneManager = nullptr;
 
 	// -- Timer handles for timed state transitions ------------------------
 

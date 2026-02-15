@@ -125,6 +125,7 @@ void AHazardBase::TickSubmerge(float DeltaTime)
 void AHazardBase::InitFromConfig(const FLaneConfig& Config, float InGridCellSize, int32 InGridColumns)
 {
 	Speed = Config.Speed;
+	BaseSpeed = Config.Speed;
 	HazardWidthCells = Config.HazardWidth;
 	bMovesRight = Config.bMovesRight;
 	HazardType = Config.HazardType;

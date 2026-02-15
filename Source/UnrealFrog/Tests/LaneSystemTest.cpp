@@ -244,6 +244,90 @@ bool FHazard_DirectionAlternation::RunTest(const FString& Parameters)
 }
 
 // ---------------------------------------------------------------------------
+// Test: ApplyWaveDifficulty scales hazard speeds from base values
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FLaneManager_ApplyWaveDifficulty_ScalesSpeeds,
+	"UnrealFrog.LaneSystem.ApplyWaveDifficulty_ScalesSpeeds",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FLaneManager_ApplyWaveDifficulty_ScalesSpeeds::RunTest(const FString& Parameters)
+{
+	// Create hazards manually (no World needed for NewObject hazards)
+	AHazardBase* Car = NewObject<AHazardBase>();
+	Car->Speed = 150.0f;
+	Car->BaseSpeed = 150.0f;
+	Car->GridColumns = 13;
+	Car->GridCellSize = 100.0f;
+	Car->HazardType = EHazardType::Car;
+
+	AHazardBase* Log = NewObject<AHazardBase>();
+	Log->Speed = 100.0f;
+	Log->BaseSpeed = 100.0f;
+	Log->GridColumns = 13;
+	Log->GridCellSize = 100.0f;
+	Log->HazardType = EHazardType::SmallLog;
+	Log->bIsRideable = true;
+
+	AHazardBase* Turtle = NewObject<AHazardBase>();
+	Turtle->Speed = 80.0f;
+	Turtle->BaseSpeed = 80.0f;
+	Turtle->GridColumns = 13;
+	Turtle->GridCellSize = 100.0f;
+	Turtle->HazardType = EHazardType::TurtleGroup;
+	Turtle->bIsRideable = true;
+	Turtle->CurrentWave = 1;
+
+	ALaneManager* LM = NewObject<ALaneManager>();
+	LM->SetupDefaultLaneConfigs();
+
+	// Manually inject hazards into pool (normally done by SpawnLaneHazards)
+	LM->AddHazardToPool(1, Car);   // Row 1 = road
+	LM->AddHazardToPool(7, Log);   // Row 7 = river
+	LM->AddHazardToPool(8, Turtle); // Row 8 = river (turtle)
+
+	// Wave 1: multiplier 1.0, wave number 1
+	LM->ApplyWaveDifficulty(1.0f, 1);
+	TestNearlyEqual(TEXT("Car speed unchanged at wave 1"), Car->Speed, 150.0f);
+	TestNearlyEqual(TEXT("Log speed unchanged at wave 1"), Log->Speed, 100.0f);
+	TestNearlyEqual(TEXT("Turtle speed unchanged at wave 1"), Turtle->Speed, 80.0f);
+	TestEqual(TEXT("Turtle wave = 1"), Turtle->CurrentWave, 1);
+
+	// Wave 3: multiplier 1.2, wave number 3
+	LM->ApplyWaveDifficulty(1.2f, 3);
+	TestNearlyEqual(TEXT("Car speed scaled to 180 at wave 3"), Car->Speed, 180.0f);
+	TestNearlyEqual(TEXT("Log speed scaled to 120 at wave 3"), Log->Speed, 120.0f);
+	TestNearlyEqual(TEXT("Turtle speed scaled to 96 at wave 3"), Turtle->Speed, 96.0f);
+	TestEqual(TEXT("Turtle wave = 3"), Turtle->CurrentWave, 3);
+
+	// Wave 7: multiplier 1.6, wave number 7 -- verify no compounding
+	LM->ApplyWaveDifficulty(1.6f, 7);
+	TestNearlyEqual(TEXT("Car speed = 150*1.6 = 240, not compounded"), Car->Speed, 240.0f);
+	TestNearlyEqual(TEXT("Log speed = 100*1.6 = 160"), Log->Speed, 160.0f);
+	TestNearlyEqual(TEXT("Turtle speed = 80*1.6 = 128"), Turtle->Speed, 128.0f);
+	TestEqual(TEXT("Turtle wave = 7"), Turtle->CurrentWave, 7);
+
+	return true;
+}
+
+// ---------------------------------------------------------------------------
+// Test: ApplyWaveDifficulty handles empty pool gracefully
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FLaneManager_ApplyWaveDifficulty_EmptyPool,
+	"UnrealFrog.LaneSystem.ApplyWaveDifficulty_EmptyPool",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FLaneManager_ApplyWaveDifficulty_EmptyPool::RunTest(const FString& Parameters)
+{
+	ALaneManager* LM = NewObject<ALaneManager>();
+	// No hazards in pool — should not crash
+	LM->ApplyWaveDifficulty(1.5f, 3);
+	TestTrue(TEXT("No crash on empty pool"), true);
+	return true;
+}
+
+// ---------------------------------------------------------------------------
 // Test: Turtle submerge state toggling
 // ---------------------------------------------------------------------------
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(

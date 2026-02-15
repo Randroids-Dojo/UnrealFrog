@@ -14,6 +14,7 @@
 #include "Engine/DirectionalLight.h"
 #include "Kismet/GameplayStatics.h"
 #include "TimerManager.h"
+#include "EngineUtils.h"
 
 AUnrealFrogGameMode::AUnrealFrogGameMode()
 {
@@ -38,7 +39,7 @@ void AUnrealFrogGameMode::BeginPlay()
 	}
 
 	// Spawn support actors — the map is just an empty container
-	World->SpawnActor<ALaneManager>(ALaneManager::StaticClass());
+	CachedLaneManager = World->SpawnActor<ALaneManager>(ALaneManager::StaticClass());
 	World->SpawnActor<AGroundBuilder>(AGroundBuilder::StaticClass());
 	World->SpawnActor<AFroggerCameraActor>(AFroggerCameraActor::StaticClass());
 
@@ -527,6 +528,12 @@ void AUnrealFrogGameMode::OnRoundCompleteFinished()
 	HighestRowReached = 0;
 	RemainingTime = TimePerLevel;
 	bTimerWarningPlayed = false;
+
+	// Apply wave difficulty scaling to all hazards
+	if (CachedLaneManager)
+	{
+		CachedLaneManager->ApplyWaveDifficulty(GetSpeedMultiplier(), CurrentWave);
+	}
 
 	OnWaveCompleted.Broadcast(CompletedWave, CurrentWave);
 	OnWaveCompletedBP.Broadcast(CompletedWave, CurrentWave);
