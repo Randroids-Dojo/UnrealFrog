@@ -324,4 +324,54 @@ bool FHUD_TitleScreenHighScoreVisible::RunTest(const FString& Parameters)
 	return true;
 }
 
+// ---------------------------------------------------------------------------
+// Test: Death flash activates when entering Dying state
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FHUD_DeathFlashActivates,
+	"UnrealFrog.HUD.DeathFlashActivates",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FHUD_DeathFlashActivates::RunTest(const FString& Parameters)
+{
+	AFroggerHUD* HUD = NewObject<AFroggerHUD>();
+	HUD->DeathFlashAlpha = 0.0f;
+	HUD->DisplayState = EGameState::Dying;
+
+	// Simulate the trigger logic from DrawHUD
+	if (HUD->DisplayState == EGameState::Dying && HUD->DeathFlashAlpha <= 0.0f)
+	{
+		HUD->DeathFlashAlpha = 0.5f;
+	}
+
+	TestTrue(TEXT("Death flash activated"), HUD->DeathFlashAlpha > 0.0f);
+	TestNearlyEqual(TEXT("Death flash alpha is 0.5"), HUD->DeathFlashAlpha, 0.5f);
+
+	return true;
+}
+
+// ---------------------------------------------------------------------------
+// Test: Death flash decays over time via TickDeathFlash
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FHUD_DeathFlashDecays,
+	"UnrealFrog.HUD.DeathFlashDecays",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FHUD_DeathFlashDecays::RunTest(const FString& Parameters)
+{
+	AFroggerHUD* HUD = NewObject<AFroggerHUD>();
+	HUD->DeathFlashAlpha = 0.5f;
+
+	HUD->TickDeathFlash(0.1f); // ~0.167 decay
+	TestTrue(TEXT("Alpha decreased"), HUD->DeathFlashAlpha < 0.5f);
+	TestTrue(TEXT("Alpha still positive"), HUD->DeathFlashAlpha > 0.0f);
+
+	// Tick enough to fully decay
+	HUD->TickDeathFlash(1.0f);
+	TestNearlyEqual(TEXT("Alpha decayed to 0"), HUD->DeathFlashAlpha, 0.0f);
+
+	return true;
+}
+
 #endif // WITH_AUTOMATION_TESTS

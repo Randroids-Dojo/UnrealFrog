@@ -111,8 +111,9 @@ void AFroggerHUD::DrawHUD()
 
 		FScorePop Pop;
 		Pop.Text = FString::Printf(TEXT("+%d"), Delta);
-		// Position near the score display, slightly offset
-		Pop.Position = FVector2D(160.0f, 10.0f);
+		// Position proportionally after the score text
+		FString ScoreText = FString::Printf(TEXT("SCORE: %05d"), DisplayScore);
+		Pop.Position = FVector2D(20.0f + ScoreText.Len() * 10.0f, 10.0f);
 		Pop.SpawnTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
 		Pop.Duration = 1.5f;
 		Pop.Color = (Delta > 100) ? FColor::White : FColor::Yellow;
@@ -150,6 +151,19 @@ void AFroggerHUD::DrawHUD()
 	{
 		DrawTitleScreen();
 		return;
+	}
+
+	// Death flash: trigger on Dying state, decay over time
+	if (DisplayState == EGameState::Dying && DeathFlashAlpha <= 0.0f)
+	{
+		DeathFlashAlpha = 0.5f;
+	}
+	if (DeathFlashAlpha > 0.0f)
+	{
+		DrawDeathFlash();
+		// Decay at ~1.67/s -> 0.5 alpha decays to 0 in ~0.3s
+		float DeltaTime = GetWorld() ? GetWorld()->GetDeltaSeconds() : 0.016f;
+		DeathFlashAlpha = FMath::Max(0.0f, DeathFlashAlpha - DeltaTime * 1.67f);
 	}
 
 	DrawScorePanel();
@@ -384,6 +398,33 @@ void AFroggerHUD::DrawTitleScreen()
 		Canvas->DrawText(MediumFont, Credits,
 			(ScreenW - CredW) * 0.5f, ScreenH * 0.85f);
 	}
+}
+
+void AFroggerHUD::TickDeathFlash(float DeltaTime)
+{
+	if (DeathFlashAlpha > 0.0f)
+	{
+		DeathFlashAlpha = FMath::Max(0.0f, DeathFlashAlpha - DeltaTime * 1.67f);
+	}
+}
+
+void AFroggerHUD::DrawDeathFlash()
+{
+	if (!Canvas || DeathFlashAlpha <= 0.0f)
+	{
+		return;
+	}
+
+	float ScreenW = Canvas->SizeX;
+	float ScreenH = Canvas->SizeY;
+
+	uint8 Alpha = static_cast<uint8>(DeathFlashAlpha * 255.0f);
+	FCanvasTileItem FlashTile(
+		FVector2D(0.0f, 0.0f),
+		FVector2D(ScreenW, ScreenH),
+		FColor(255, 0, 0, Alpha));
+	FlashTile.BlendMode = SE_BLEND_Translucent;
+	Canvas->DrawItem(FlashTile);
 }
 
 void AFroggerHUD::DrawOverlay()

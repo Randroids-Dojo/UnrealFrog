@@ -80,6 +80,13 @@ public:
 	bool bShowingWaveAnnounce = false;
 	int32 PreviousWave = 1;
 
+	// -- Death flash state (public for test access) -------------------------
+
+	float DeathFlashAlpha = 0.0f;
+
+	/** Tick the death flash decay. Call each frame with DeltaTime. */
+	void TickDeathFlash(float DeltaTime);
+
 private:
 	// -- Drawing helpers --------------------------------------------------
 
@@ -89,4 +96,5 @@ private:
 	void DrawScorePops();
 	void DrawWaveAnnouncement();
 	void DrawTitleScreen();
+	void DrawDeathFlash();
 };
