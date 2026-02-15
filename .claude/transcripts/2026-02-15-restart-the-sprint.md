@@ -5,8 +5,8 @@
 | Date | 2026-02-15 |
 | Session ID | `9cad10df-a2ee-4650-adec-4a8034993a77` |
 | Model | claude-opus-4-6 |
-| Tokens | ~49,373,969 input, ~16,579 output |
-| Duration | 53m 49s |
+| Tokens | ~57,469,191 input, ~18,107 output |
+| Duration | 1h 11m |
 
 ---
 
@@ -4076,3 +4076,271 @@ Sprint 8 action items documented in retro log
 🤖️ Engine-architect and qa-lead confirmed shutdown. Still waiting on xp-coach, devops-engineer, and game-designer — though devops and game-designer already terminated earlier. The shutdown confirmations are just catching up due to message lag (exactly the pattern we documented in §1).
 
 Sprint 7 is fully done. Ready for your next task.
+
+## User (17:16 UTC)
+
+commit
+
+## Assistant (17:16 UTC)
+
+🤖️ Let me check if there are any uncommitted changes.
+
+- **Used Bash**: Show working tree status
+
+- **Used Bash**: Check xp-coach memory changes
+
+- **Used Bash**: Check recent commits
+
+## Assistant (17:16 UTC)
+
+The only uncommitted changes are:
+1. **`.claude/agent-memory/xp-coach/MEMORY.md`** — xp-coach's agent memory updated with Sprint 7 findings
+2. **~170 transcript files** in `.claude/transcripts/` — agent conversation logs from the sprint
+
+- **Used Bash**: Commit agent memory and transcripts
+
+## Assistant (17:16 UTC)
+
+Committed `81c95f0` — Sprint 7 agent transcripts and xp-coach memory update. 211 files (mostly transcript logs from the multi-agent session).
+
+- **Used Bash**: Verify clean working tree
+
+## Assistant (17:17 UTC)
+
+Working tree is clean. 7 commits ahead of origin:
+
+```
+81c95f0 docs: Sprint 7 agent transcripts and xp-coach memory update
+3d34a01 docs: Sprint 7 retrospective + agreement updates [retro]
+cca717a fix: run-tests.sh log parser now searches all candidate log locations
+ce6c6a0 feat: tune difficulty curve and enforce InputBufferWindow timing
+ea10b1a feat: wire wave difficulty scaling to hazard movement
+f620ef7 test: add seam tests for wave-complete and difficulty flow, fix headless test crash
+154320e fix: persist high score only at game over/title, deduplicate wave-complete, cache subsystem pointers
+```
+
+## User (17:17 UTC)
+
+<teammate-message teammate_id="xp-coach" color="blue" summary="Sprint 7 fully complete -- status report">
+Sprint 7 is fully complete. Here is the final status:
+
+**Commits (5 total, all per-subsystem per Section 4):**
+1. `154320e` -- Phase 0 engine fixes (SaveHighScore, wave-complete dedup, cached pointers)
+2. `f620ef7` -- Seam tests + ChaosSolverPlugin fix + run-tests.sh cleanup
+3. `ea10b1a` -- Wave difficulty wiring (Task 15)
+4. `ce6c6a0` -- Tuning pass + InputBufferWindow enforcement + edge case seam tests
+5. `cca717a` -- run-tests.sh log parser fix
+6. `3d34a01` -- Sprint 7 retrospective + agreement updates [retro]
+
+**Tasks: 10/10 completed** (Tasks #1-8, #14, #15)
+
+**Tests: 162 passing, 0 failures** across 17 categories
+
+**Retrospective: Written and committed** at `.team/retrospective-log.md` (Retrospective 7, lines 638-747)
+
+**Agreements updated (4 changes):**
+- Section 1: Accept message lag as normal in multi-agent sessions
+- Section 2: Tuning-resilient test design (read params at runtime, don't hardcode)
+- Section 18: XP Coach enforcement rule (no rationalizing exceptions)
+- NEW Section 19: One agent runs tests at a time (until lock file mechanism)
+
+**Sprint 8 P0 action items:**
+1. Lock file mechanism for run-tests.sh (DevOps)
+2. Visual play-test of Sprint 7 tuning changes (QA Lead)
+3. Temporal passability assertion (Engine Architect)
+
+**Agent memory updated** for both project-level and XP Coach agent-level.
+
+The project is in a clean state -- working tree is clean, HEAD at `3d34a01`, all builds verified, all tests passing. Ready for Sprint 8 whenever you are.
+</teammate-message>
+
+<teammate-message teammate_id="xp-coach" color="blue">
+{"type":"idle_notification","from":"xp-coach","timestamp":"2026-02-15T17:17:15.684Z","idleReason":"available"}
+</teammate-message>
+
+## Assistant (17:17 UTC)
+
+🤖️ Thanks xp-coach. Sprint 7 is fully wrapped up.
+
+- **Used SendMessage**
+
+## Assistant (17:17 UTC)
+
+XP Coach was the last active agent. Once it acknowledges shutdown, the team is fully disbanded. Working tree is clean, 7 commits ahead of origin, 162/162 tests passing.
+
+## User (17:17 UTC)
+
+<teammate-message teammate_id="xp-coach" color="blue">
+{"type":"shutdown_approved","requestId":"shutdown-1771175841301@xp-coach","from":"xp-coach","timestamp":"2026-02-15T17:17:26.265Z"}
+</teammate-message>
+
+## Assistant (17:17 UTC)
+
+🤖️ XP Coach confirmed shutdown. All 5 agents are now terminated. Sprint 7 is done.
+
+## User (17:17 UTC)
+
+<teammate-message teammate_id="system">
+{"type":"teammate_terminated","message":"xp-coach has shut down."}
+</teammate-message>
+
+## Assistant (17:17 UTC)
+
+🤖️ All agents shut down. Sprint 7 is fully complete — clean working tree, 162/162 tests, 7 commits on main. Ready for Sprint 8 whenever you are.
+
+## User (17:22 UTC)
+
+Let's go into the retro next. Here's some feedback from me: I don't see any real differences when playing the game compared to previous sprints. There also has been a long standing bug where certain elements are spawned out of place (e.g. explosion is barely visible at bottom left corner, +score text barely visible in the top left corner). I also am concerned that we haven't truly built the PlayUnreal, PlayWright like, tool for properly testing the game in real time using Python scripts. For example, an agent should be able to send a command or write a python script to jump all the away across the road and river to beat the level.
+
+## Assistant (17:22 UTC)
+
+🤖️ Great feedback. Let me capture this properly. Before writing the retro, let me understand the current state of what you're seeing.
+
+- **Used Task**: Investigate VFX/HUD positioning bugs
+
+- **Used Task**: Investigate PlayUnreal automation state
+
+- **Used Task**: Check TickVFX and gameplay changes
+
+## Assistant (17:24 UTC)
+
+Excellent feedback. Here's what the research found:
+
+### Your 3 Concerns — Root Causes
+
+**1. "No visible differences from previous sprints"**
+The difficulty scaling IS wired end-to-end (hazards do speed up each wave, turtles do submerge on Wave 2+, VFX do animate). But the visual *feedback* for these changes is broken — you can't tell because...
+
+**2. VFX/HUD elements spawning out of place**
+Two confirmed bugs:
+- **Score pops (+50, +100)**: Hardcoded to `FVector2D(20 + textLen*10, 10)` — always top-left corner near the score text. Should be projected from the frog's world position to screen coordinates using `Canvas->Project()`.
+- **VFX celebrations/sparkles**: Hardcoded to `Col * 100, 14 * 100, 50` — magic numbers that assume grid layout. Death puffs likely have similar origin issues.
+
+**3. PlayUnreal is not a real tool**
+The current "E2E" tests (`PlayUnrealTest.cpp`) call C++ methods directly — `GM->HandleHopCompleted()`, `Scoring->LoseLife()`. They **never send actual inputs to a running game**. There's no input injection, no screenshot capture, no external state query. PythonScriptPlugin is enabled but unused. An agent literally cannot "hop across the road" today.
+
+Let me write the stakeholder review retro entry.
+
+- **Used Read** on `.team/retrospective-log.md` (offset=738)
+
+- **Used Read** on `Source/UnrealFrog/Private/Core/FroggerVFXManager.cpp` (offset=90, limit=80)
+
+- **Used Read** on `Source/UnrealFrog/Private/Core/FroggerHUD.cpp` (offset=100, limit=40)
+
+## Assistant (17:24 UTC)
+
+Now let me also check the death puff/explosion positioning.
+
+- **Used Read** on `Source/UnrealFrog/Private/Core/FroggerVFXManager.cpp` (offset=40, limit=55)
+
+## Assistant (17:24 UTC)
+
+Now let me check how the VFX manager gets called — what Location is passed.
+
+- **Used Grep** for `SpawnDeathPuff|SpawnHopDust` in `Source/UnrealFrog/Private/Core/UnrealFrogGameMode.cpp`
+
+## Assistant (17:25 UTC)
+
+Good — the VFX does use `Frog->GetActorLocation()`, so the death puff spawns at the frog, not at origin. The "barely visible at bottom left" suggests the VFX is either too small at camera distance (2200 UU up) or the frog is near the screen edge when dying. The score pop is explicitly hardcoded to top-left by design (not the frog's position).
+
+Now let me write the stakeholder review retro.
+
+- **Used Edit** on `.team/retrospective-log.md`
+
+- **Used Read** on `.team/retrospective-log.md` (offset=740, limit=10)
+
+- **Used Edit** on `.team/retrospective-log.md`
+
+## Assistant (17:26 UTC)
+
+Now update agreements.md with the two changes.
+
+- **Used Read** on `.team/agreements.md` (offset=94, limit=15)
+
+- **Used Edit** on `.team/agreements.md`
+
+## Assistant (17:26 UTC)
+
+Now add §20 at the end.
+
+- **Used Read** on `.team/agreements.md` (offset=225)
+
+- **Used Edit** on `.team/agreements.md`
+
+## Assistant (17:26 UTC)
+
+Good. Now update the agreements timestamp.
+
+- **Used Edit** on `.team/agreements.md`
+
+## Assistant (17:26 UTC)
+
+Now commit the stakeholder review.
+
+- **Used Bash**: Check changes before commit
+
+- **Used Bash**: Commit stakeholder review retro
+
+## Assistant (17:27 UTC)
+
+Done. Here's the summary of the stakeholder review:
+
+### Stakeholder Review — Post Sprint 7
+
+**3 issues found:**
+
+1. **No visible gameplay differences** — Difficulty scaling works at the code level but the 15% speed increase per wave is imperceptible. No visual/audio feedback signals "things are getting harder."
+
+2. **VFX/HUD mispositioned** — Score pops hardcoded to `(20 + textLen*10, 10)` (always top-left). Death puff spawns at correct world position but is too small at Z=2200 camera distance. Home slot celebrations use magic number coordinates.
+
+3. **PlayUnreal is not real** — 5 sprints of deferrals. Current "E2E" tests just call C++ methods. No input injection, no state queries, no screenshots. An agent cannot play the game.
+
+**Agreement changes:**
+- **§9 expanded** — Visual smoke test required after ANY visual system, not just foundation
+- **§20 (NEW)** — PlayUnreal must support scripted Python gameplay (P0 for Sprint 8)
+
+**Sprint 8 P0s:**
+- Fix score pop positioning (world-to-screen projection)
+- Fix VFX visibility (scale for camera distance, increase duration)
+- Fix hardcoded VFX positions (read grid config)
+- Build PlayUnreal Python automation (HTTP server + Python client + acceptance test: script a level completion)
+
+## User (17:32 UTC)
+
+Did each agent participate in the retro? If not, get their feedbackk.
+
+## Assistant (17:32 UTC)
+
+🤖️ No — the retro was written by me alone. The agents were already shut down before the stakeholder feedback came in. Let me spin up the team and get each agent's perspective on your three findings.
+
+- **Used TeamCreate**
+
+- **Used Bash**: Clean up stale sprint7 team remnants
+
+- **Used TeamCreate**
+
+- **Used Bash**: Force clean all sprint7 team state
+
+- **Used Bash**: Check what teams/tasks still exist
+
+- **Used TeamDelete**
+
+- **Used TeamCreate**
+
+## Assistant (17:33 UTC)
+
+Good. Now let me spawn the 5 agents in parallel to get their retro feedback on the stakeholder's 3 findings.
+
+- **Used Task**: XP Coach retro feedback
+
+- **Used Task**: Engine Architect retro feedback
+
+- **Used Task**: QA Lead retro feedback
+
+- **Used Task**: Game Designer retro feedback
+
+- **Used Task**: DevOps retro feedback
+
+## Assistant (17:34 UTC)
+
+🤖️ All 5 agents spawned and working on their retro feedback. Waiting for their responses.

@@ -809,11 +809,60 @@ The team has deferred this since Sprint 3 (5 sprints). The "PlayUnreal E2E harne
 
 2. **NEW §20: PlayUnreal Must Support Scripted Gameplay.** The PlayUnreal tooling must support an agent writing a Python script that launches the game, sends hop commands, reads game state, and verifies outcomes. The minimal API: `hop(direction)`, `get_state()`, `screenshot()`. Until this exists, "QA: verified" in commit messages is only valid for code-level checks, not gameplay verification. This is a P0 for Sprint 8.
 
-### Action Items for Sprint 8
+### Agent Feedback (All 5 Agents)
 
-- [ ] **P0: Fix score pop positioning** — Project frog's world position to screen coordinates. Score pops appear at the frog, not top-left corner. (Engine Architect)
-- [ ] **P0: Fix VFX visibility** — Scale death puff and hop dust relative to camera distance. Increase duration. Verify visible from gameplay camera. (Engine Architect)
-- [ ] **P0: Fix VFX hardcoded positions** — Home slot celebrations must read grid config, not magic numbers. (Engine Architect)
-- [ ] **P0: Build PlayUnreal Python automation** — HTTP server in C++ (`UPlayUnrealServer`) exposing `/input/hop`, `/state/game`, `/screenshot`. Python client library at `Tools/PlayUnreal/client.py`. Test: agent writes a script that hops across road, crosses river, reaches home slot. (DevOps + Engine Architect)
-- [ ] **P1: Make difficulty progression perceptible** — Add visual/audio cues when wave starts (speed lines, color shift, sound pitch increase). The player should FEEL the difficulty change without looking at numbers. (Game Designer + Engine Architect)
-- [ ] **P1: Visual smoke test for all VFX/HUD** — Launch game, trigger every VFX effect and HUD element, screenshot each one, verify visibility. (QA Lead)
+**XP Coach (Process Failures):**
+- Three cascading process failures: (1) accepted code-level verification for visual features, (2) inconsistent §17 application — dropped M_FlatColor.uasset but let PlayUnreal defer indefinitely, (3) retrospectives asked "did tests pass?" instead of "did the player notice?"
+- Self-reflection: XP Coach should have enforced "launch the game" as a literal gate, not a suggestion. Checking `run-tests.sh` output is not play-testing.
+- Recommends PlayUnreal as sole Sprint 8 focus — everything else is polish that can't be verified without it.
+
+**Game Designer (Perception Gap):**
+- 15% speed increase per wave is below human perception threshold (~20-25% needed for conscious awareness). Classic arcade games use multi-modal feedback: Pac-Man changes ghost behavior AND maze color, Space Invaders speeds up AND changes music tempo.
+- Juice ranking by player impact: speed lines > screen shake > audio pitch shift > score pops at frog > wave fanfare. Current game has none of these.
+- Proposed "5-second test": show someone 5 seconds of Wave 1 and 5 seconds of Wave 3 — if they can't tell the difference, the feedback is insufficient.
+- PlayUnreal would enable A/B testing 20 tuning variations in 5 minutes vs. manual play-testing one at a time.
+
+**QA Lead (Testing Gaps):**
+- Self-critical: failed §5 step 9 (QA play-test before commit). Never actually launched the game for Sprints 5-7. Accepted test pass counts as proxy for quality.
+- 162 tests verify "does this actor exist?" and "does this value change?" — zero tests verify "is this visible from the gameplay camera?" and "does this appear at the correct screen position?"
+- Root cause: no PlayUnreal means manual play-testing is high-friction → consistently skipped → visual bugs persist indefinitely.
+- Proposed visual verification checklist: (1) score pop visible at frog position, (2) death VFX fills >5% of screen, (3) home celebration visible from gameplay camera, (4) wave announcement text readable.
+
+**Engine Architect (Technical Root Cause):**
+- VFX scale 0.5→3.0 world units projects to ~1.57 pixels from Z=2200 camera (FOV 50). Fix: camera-distance-relative scaling via `CalculateScreenSpaceScale(DesiredSize, Location)` — ~30 LOC across 3 callsites.
+- Score pop fix: `APlayerController::ProjectWorldLocationToScreen()` replaces hardcoded `FVector2D(20 + textLen*10, 10)`. ~15 LOC.
+- PlayUnreal: recommends Automation Driver Plugin (ships with UE 5.7) for input injection (`FAutomationDriverModule::Get().GetDriver()->PressKey()`). Enhanced Input `InjectInputForAction()` as alternative. Total ~150 LOC across 3 files.
+- Priority: score pop projection (P0, game feel) > VFX scaling (P1, polish) > PlayUnreal infra (P0, enables everything else).
+
+**DevOps Engineer (PlayUnreal Architecture):**
+- Recommends **PythonScriptPlugin** (Option C) over custom HTTP server or Remote Control API. Already enabled in .uproject, zero plugin setup, synchronous in-process API, agents write Python directly without C++ rebuild cycles.
+- Custom HTTP (Option A): 200+ LOC C++ subsystem, port management, security concerns. Remote Control API (Option B): WebSocket + async handling, overkill for local testing.
+- Minimal Python client API: `hop(direction)`, `get_state()`, `screenshot(path)`, `reset_game()`.
+- Acceptance test: `reset_game() → hop("up") x5 → assert frog_pos[1] == 5 → assert score > 0`.
+- CI integration: `--python <script>` flag in run-tests.sh, launches editor in PIE mode, parses exit code.
+
+### Consensus and Disagreements
+
+**Consensus:**
+- PlayUnreal is the #1 priority for Sprint 8 (all 5 agents agree)
+- VFX/HUD bugs are fixable with known approaches (~150 LOC total)
+- Code-level testing is necessary but not sufficient for visual features
+
+**Disagreement — PlayUnreal approach:**
+- Engine Architect recommends Automation Driver Plugin (C++ input injection, stays in UE ecosystem)
+- DevOps Engineer recommends PythonScriptPlugin (Python-first, no C++ rebuild cycles)
+- Resolution: **PythonScriptPlugin for the Python client layer + Automation Driver for input injection inside the engine.** They're complementary, not competing — Python scripts call into the editor which uses Automation Driver to inject inputs.
+
+**Disagreement — Priority of VFX fixes vs PlayUnreal:**
+- Engine Architect: fix score pops first (P0 game feel), PlayUnreal second
+- XP Coach: PlayUnreal first (enables verification of all other fixes)
+- Resolution: **PlayUnreal first.** Without it, we can't verify VFX fixes are actually visible. Build the tool, then use it to validate the fixes.
+
+### Action Items for Sprint 8 (Revised)
+
+- [ ] **P0: Build PlayUnreal Python automation** — PythonScriptPlugin + Automation Driver. Python client at `Tools/PlayUnreal/client.py` with `hop()`, `get_state()`, `screenshot()`, `reset_game()`. Acceptance test: script that hops across road and river to reach home slot. (DevOps drives, Engine Architect navigates)
+- [ ] **P0: Fix score pop positioning** — `ProjectWorldLocationToScreen()` to project frog world position to screen coords. ~15 LOC in FroggerHUD.cpp. (Engine Architect)
+- [ ] **P0: Fix VFX visibility** — Camera-distance-relative scaling via `CalculateScreenSpaceScale()`. ~30 LOC in FroggerVFXManager.cpp. (Engine Architect)
+- [ ] **P0: Fix VFX hardcoded positions** — Home slot celebrations read grid config, not magic numbers. (Engine Architect)
+- [ ] **P1: Make difficulty progression perceptible** — Multi-modal feedback: speed lines, audio pitch shift, color temperature change per wave. Perception threshold >=25%. (Game Designer drives, Engine Architect navigates)
+- [ ] **P1: Visual smoke test via PlayUnreal** — Script that triggers every VFX/HUD element and screenshots each. Automated visual verification. (QA Lead)
