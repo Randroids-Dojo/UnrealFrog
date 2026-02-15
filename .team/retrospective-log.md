@@ -491,3 +491,144 @@ Sprint 5 goal: "Make UnrealFrog feel like an arcade cabinet -- music loops, part
 - **Sessions:** 1 (single monolithic session)
 - **Commits:** 1 (2005 additions) -- process regression from Sprint 2's 16-commit delivery
 - **Agents active:** 1 orchestrating driver + Sound Engineer (background music generation)
+
+---
+
+## Retrospective 6 -- Sprint 6: Polish Fixes and Tech Debt
+
+### Context
+Sprint 6 was a focused polish sprint: wire the TickVFX dead code from Sprint 5, add death flash overlay, proportional score pop positioning, high score persistence, and timer warning sound. 5 commits across 12 files, 327 additions. Team of 3 agents operated (Engine Architect driver, QA Lead verification, XP Coach coordination). QA Lead performed a visual launch verification (no crashes, lane system initialized, clean shutdown) but full gameplay play-test was not completed.
+
+**Full-team retrospective.** All 5 agents (Engine Architect, QA Lead, Game Designer, XP Coach, DevOps) provided independent perspectives and voted on Sprint 7 decisions. Key disagreements and convergence documented below.
+
+### What Was Built
+| System | Files | Tests |
+|--------|-------|-------|
+| TickVFX wiring + timer warning in GameMode::Tick | UnrealFrogGameMode.h/.cpp, seam-matrix.md | 2 seam tests |
+| Death flash overlay (red screen on dying) | FroggerHUD.h/.cpp | 2 HUD tests |
+| Proportional score pop positioning | FroggerHUD.cpp | 0 (visual) |
+| High score persistence (save/load file) | ScoreSubsystem.h/.cpp | 2 score tests |
+| Timer warning seam test fix | SeamTest.cpp | 1 fix |
+| Agent memory updates | 3 MEMORY.md files | 0 |
+| **Total** | **12 files** | **6 new tests (154 total)** |
+
+### What Went Well
+
+1. **Per-subsystem commits actually happened.** Sprint 6 delivered 5 commits for 4 distinct subsystems. This is a direct improvement over Sprints 4-5 (each a single monolithic commit). The agreement from Sprint 5 retro (section 4) was followed. Each commit is independently revertable and bisectable.
+
+2. **Sprint 5 P0 tech debt was resolved.** TickVFX was the highest-priority known dead code. It is now wired in GameMode::Tick with a seam test covering the integration (`FSeam_VFXTickDrivesAnimation`). The timer warning sound was also wired with its own seam test. Both were identified in Sprint 5's retro and addressed immediately.
+
+3. **Test bug was caught and fixed quickly.** The `FSeam_TimerWarningFiresAtThreshold` test had a floating-point boundary error (5.0/30.0 = 0.1667 is BELOW 0.167, not above). The bug was in the test, not the game code. It was identified, root-caused, and fixed in a separate commit with clear documentation. This produced a reusable lesson about floating-point threshold testing.
+
+4. **Seam matrix grew to 19 entries (14 covered, 5 deferred).** Two new seams added for the TickVFX and timer warning integrations. All 5 deferred items have documented low-risk rationale.
+
+5. **High score persistence is clean and resilient.** File-based save/load with graceful handling of missing files. Two tests verify the round-trip and the missing-file case. Simple, testable, no engine dependencies.
+
+### What Caused Friction
+
+1. **QA play-test is still incomplete.** (QUALITY) Sprint 5 retro's P0 action item was "QA play-test Sprint 5 deliverables before any new Sprint 6 work." A visual launch verification happened (no crashes, clean startup), but full gameplay play-testing (hopping, dying, scoring, VFX animation, music, title screen) was not performed. The Sprint 5 defect escape rate remains "unknown." Two consecutive sprints now have unverified gameplay.
+   - **Root cause:** Same as Sprint 5 -- no structural gate prevents committing without gameplay verification. The visual launch check is necessary but not sufficient.
+   - **Impact:** Music looping, VFX animation quality, death flash visibility, and score pop positioning are all unverified in-game. Any of these could be broken.
+   - **Change:** Add a "QA: pending" or "QA: verified" tag to the seam matrix for visual/behavioral items that cannot be verified by unit tests alone.
+
+2. **M_FlatColor.uasset and functional-tests-in-CI hit the Section 17 deadline.** (PROCESS) Both P1 items have now been deferred for 5 consecutive sprints. Agreement section 17 says items deferred 3 sprints must be resolved or dropped. Neither happened in Sprint 6.
+   - **Root cause:** These items are genuinely low-priority (runtime fallback exists for FlatColor; functional tests need a display server). But carrying them forward sprint after sprint creates retrospective noise and signals dishonesty about priorities.
+   - **Change:** Drop both items with recorded rationale. See "Agreements Changed" below.
+
+3. **Mob programming question remains unresolved.** (PROCESS) Sprint 5 retro asked "Is mob programming viable, or should we formally adopt solo driver with review gates?" Sprint 6 used a small team (3 agents) but the actual implementation was still solo-driven by a single agent. The review gates from Section 1 were technically followed (no single task exceeded 200 lines), but navigators did not provide real-time feedback during implementation.
+   - **Root cause:** The team structure (one Claude instance driving) makes real-time mob review impractical. The "review gate" agreement is the realistic version of mob programming for this project.
+   - **Change:** Formally acknowledge "solo driver with review gates" as the operating model. Update Section 1.
+
+### Full-Team Perspectives (Sprint 6 Retro)
+
+**Engine Architect:**
+- GameMode is becoming a god object (12 responsibilities, 527 lines). Not emergency yet but trend is concerning. Recommends extracting delegate wiring into UFroggerGameCoordinator in Sprint 8.
+- SaveHighScore() fires on every score change (50+ disk writes per round). Should only persist at game over / title transition.
+- Duplicate wave-complete detection between HandleHopCompleted and TryFillHomeSlot — consolidation needed.
+- "Mob programming never lived — it was always solo driver. Name it honestly."
+
+**QA Lead:**
+- "0.65% defect escape rate is fiction" — denominator excludes gameplay bugs nobody looked for. Real rate for Sprint 5+6 is "unknown."
+- Two consecutive sprints without play-test is a pattern, not an incident. Process is broken if P0 keeps getting skipped.
+- Seam 14 (GameMode → LaneManager wave difficulty) should be promoted from DEFERRED to COVERED.
+- Won't sign off on Sprint 7 without completing an 11-point play-test checklist.
+
+**Game Designer:**
+- "We have built an excellent system but we have not yet built a fun game."
+- Difficulty curve is untested — wave progression formula was designed on paper in Sprint 1 and never validated.
+- Input responsiveness (HopDuration 0.15s, InputBuffer 0.1s) untested at game speed.
+- Wants multiplier visibility on HUD, death freeze frame + screen shake, wave transition ceremony.
+- Play-test should be a tuning pass on the 6 most important numbers, not just verification.
+
+**XP Coach:**
+- Process changes that only need the driver stick (commit granularity). Changes requiring a second agent to act (QA play-test) do not stick. Bottleneck is coordination, not discipline.
+- Proposes: QA tag in commit messages, post-implementation domain expert review, limit sprints to 2-3 deliverables, apply §17 to P2 carry-forwards.
+- "Sprint 7 should be a consolidation sprint. Verify, tune, fix. No new architecture."
+
+**DevOps:**
+- run-tests.sh needs pre-flight stale process cleanup (pkill before launch).
+- PlayUnreal E2E cannot replace manual play-testing with current architecture.
+- Wants screenshot capture in play-game.sh for visual baselines.
+- Basic CI (compile + test on push) is 1-2 hours but low priority for current team size.
+
+### Sprint 7 Decision Votes (5 agents, all participated)
+
+**Q1: GameCoordinator refactor vs. tuning + multiplier HUD?**
+Unanimous (5-0): **Tuning + multiplier HUD first.** Defer coordinator to Sprint 8. Player-facing improvements over internal restructuring.
+
+**Q2: Sprint scope?**
+3-2: **Option (a) play-test + tuning + quick fixes only.** (QA Lead, XP Coach, DevOps voted a; Engine Architect, Game Designer voted b with 1-2 feel features.) Feel features are stretch goals if play-test is clean.
+
+**Q3: Post-implementation review?**
+Unanimous (5-0): **Yes, add it.** Domain-expert reviewer, not random agent. Added as Section 18.
+
+### Agreements Changed
+
+1. **Section 1 (Mob Programming):** Renamed to "Driver Model" and updated to formally acknowledge solo driver with review gates as the operating model. Real-time navigator review is aspirational but not mandatory. The review gate for tasks > 200 lines remains enforced.
+
+2. **Section 17 (Deferred Item Deadline):** Applied to two chronic items:
+   - **M_FlatColor.uasset: DROPPED.** Rationale: Runtime `GetOrCreateFlatColorMaterial()` works for all current use cases. The .uasset is only needed for packaged (shipping) builds, which are not on the roadmap. If packaging becomes a goal, this item will be re-created as a P0 blocker for that sprint. 5 sprints of deferral confirms this is not a real priority.
+   - **Functional tests in CI: DROPPED.** Rationale: The SIMPLE_AUTOMATION_TEST suite (154 tests) runs in NullRHI headless mode and provides sufficient coverage. AFunctionalTest actors require a display server (Xvfb or similar), which adds infrastructure complexity for marginal coverage gain. The PlayUnreal E2E scenarios (5 tests) cover the integration layer. If visual regression testing becomes a goal, this will be revisited as part of that initiative.
+
+3. **Section 2 (TDD):** Added floating-point boundary testing rule.
+
+4. **Section 18 (NEW):** Post-implementation domain expert review. Before committing, the driver posts a summary and the domain expert reviews. Added by unanimous vote.
+
+### Previous Retro Action Items -- Status
+
+- [ ] **P0: QA play-test Sprint 5 deliverables** -- PARTIALLY DONE. Visual launch verified (no crashes). Full gameplay play-test not completed. Carrying forward as P0 for Sprint 7.
+- [x] **P0: Enforce per-subsystem commits** -- DONE. Sprint 6 has 5 commits for 4 subsystems. Agreement section 4 was followed.
+- [x] **P1: Resolve M_FlatColor.uasset (5th deferral)** -- DROPPED per Section 17. Runtime fallback sufficient. Will re-create if packaging becomes a sprint goal.
+- [x] **P1: Resolve functional tests in CI (5th deferral)** -- DROPPED per Section 17. NullRHI headless tests provide sufficient coverage. Will revisit if visual regression testing is prioritized.
+- [ ] **P2: Visual regression testing** -- NOT DONE (carried forward).
+- [ ] **P2: Packaging step in CI** -- NOT DONE (carried forward).
+- [ ] **P2: Rename PlayUnreal E2E to "Scenario"** -- NOT DONE (carried forward).
+
+### Action Items for Sprint 7
+
+- [ ] **P0: Full gameplay play-test + tuning pass** -- BLOCKS all feature work. 5 sessions through Wave 3+. Cover: hop responsiveness, death + respawn, scoring + high score, VFX animation, death flash, music looping, timer + warning sound, title screen, wave progression. Tune: HopDuration, HopArcHeight, InputBufferWindow, TimePerLevel, DifficultySpeedIncrement, WavesPerGapReduction. Two sprints of unverified gameplay ends here. (QA Lead + Game Designer)
+- [ ] **P0: Fix SaveHighScore per-tick writes** -- Only persist at game over / title transition, not every score change. 5-minute fix. (Engine Architect)
+- [ ] **P0: Fix duplicate wave-complete detection** -- Consolidate HandleHopCompleted and TryFillHomeSlot paths. 15-minute refactor. (Engine Architect)
+- [ ] **P1: Seam 14 test (wave difficulty)** -- Promote from DEFERRED to COVERED. Verify speed multiplier actually applies when wave increments. (QA Lead)
+- [ ] **P1: Cache subsystem pointers in BeginPlay** -- VFXManager and AudioManager lookups every frame in Tick. 10-minute cleanup. (Engine Architect)
+- [ ] **P1: Pre-flight cleanup in run-tests.sh** -- Add stale process kill before editor launch. 10 lines. (DevOps)
+- [ ] **Stretch: Multiplier visibility on HUD** -- "x3" display next to score. Only if play-test is clean. (Game Designer + Engine Architect)
+- [ ] **Stretch: Death freeze frame + screen shake** -- 0.05s pause + 0.2s shake. Only if play-test is clean. (Game Designer + Engine Architect)
+- [ ] **P2: Screenshot capture in play-game.sh** -- `--screenshot` flag for visual baselines. (DevOps)
+- [ ] **P2: Apply §17 to remaining P2 carry-forwards** -- Visual regression testing (4th deferral), packaging step (4th deferral), rename PlayUnreal E2E (5th deferral). Drop or do in Sprint 8.
+
+### Open Questions -- Resolved
+
+- [x] What is the Sprint 7 goal? **Resolved (vote):** Consolidation sprint — play-test, tune, fix. No new mechanics. Feel features are stretch goals.
+- [x] Can PlayUnreal E2E replace manual play-testing? **Resolved (DevOps):** No, not with current architecture. E2E tests call methods directly, don't exercise real rendering/input. Manual play-testing remains irreplaceable until input injection + screenshot capture exists.
+- [ ] What is the quality bar for final audio -- keep 8-bit procedural or invest in higher-fidelity? (Carried forward)
+- [ ] Should the seam matrix track "verified in-game" separately from "test exists"? (Carried forward)
+
+### Sprint 6 Stats
+- **Tests:** 148 -> 154 (+6), 0 failures (after test fix)
+- **Defect escape rate:** 0.65% test-only (1 test bug / 154 tests). Gameplay defect rate: UNKNOWN — no play-test for 2 sprints. (QA Lead dissent: "this number is fiction without gameplay verification")
+- **Trend:** 5% (S2) -> 2% (S3) -> 1.6% (S4) -> unknown (S5) -> 0.65% test-only (S6)
+- **Sessions:** 1 implementation + 1 full-team retrospective
+- **Commits:** 5 (327 additions) -- improvement over Sprints 4-5 (1 commit each)
+- **Agents active:** 3 during implementation (Engine Architect, QA Lead, XP Coach). 5 during retrospective (+ Game Designer, DevOps)
+- **Retro participation:** First full-team retrospective. 3 decision votes with all 5 agents.

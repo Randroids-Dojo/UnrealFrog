@@ -2,60 +2,66 @@
 
 *Persistent knowledge accumulated across sessions. First 200 lines loaded automatically.*
 
-## Sprint 5 State (current)
-- 24 test files, 148 total tests (0 failures) across 17 categories
-- New test files this sprint: VFXTest.cpp (7), HUDTest.cpp (7+4 title-specific), AudioTest.cpp (6 new music tests), SeamTest.cpp (5 new seams: 8-12)
-- Sprint goal: "Make UnrealFrog feel like an arcade cabinet -- music loops, particle feedback, styled HUD, title screen"
-- **PLAY-TEST HAS NOT HAPPENED** -- BLOCKER per agreements section 5a
+## Sprint 6 State (current)
+- 24 test files, 154 total tests (153 pass, 1 fail) across 17 categories
+- New tests this sprint: 2 Score (high score persistence), 2 HUD (death flash), 2 Seam (VFXTick + TimerWarning)
+- Sprint goal: Polish fixes -- TickVFX wiring, score pop positioning, high score persistence, death flash, timer warning sound
+- **1 TEST FAILURE**: `FSeam_TimerWarningFiresAtThreshold` -- test boundary math bug, NOT game bug
+- Visual launch verified: no crashes, lane system initialized, clean shutdown
 
-## Sprint 5 Critical Findings
+## Sprint 6 Findings
 
-### Confirmed Dead Code: TickVFX()
-- `UFroggerVFXManager::TickVFX()` is defined (FroggerVFXManager.cpp:164) but NEVER called from GameMode::Tick or anywhere else
-- VFX actors spawn at StartScale and never animate (no scale lerp, no rise)
-- Mitigated by `Actor->SetLifeSpan(5.0f)` -- effects auto-destroy, just don't animate
-- Grep results: only references are the definition and the header declaration
+### Test Bug: TimerWarningFiresAtThreshold (SeamTest.cpp:612-616)
+- Test ticks 25.0s, expects warning NOT fired (thinks 5.0/30.0 = 0.1667 > 0.167)
+- Actually: 5.0/30.0 = 0.16666... < 0.167, so warning fires immediately
+- Fix: change tick from 25.0f to 24.9f (RemainingTime=5.1, percent=0.17 > 0.167)
+- Game implementation is CORRECT. Only test math is wrong.
 
-### Music Looping Risk
-- `USoundWaveProcedural` with `bLooping = true` and one-shot `QueueAudio()` is unverified
-- QueueAudio fills an internal buffer; GeneratePCMData drains it. When the buffer empties, there is no re-queue callback
-- Risk: music plays once and stops, or has silence at loop point
-- Music tracks exist: Content/Audio/Music/Music_Title.wav, Music_Gameplay.wav
+### Sprint 5 Issues Resolved in Sprint 6
+- TickVFX dead code: NOW WIRED in GameMode::Tick (line 132)
+- Score pop hardcoded position: NOW PROPORTIONAL (20 + ScoreText.Len() * 10)
+- VFX TickVFX seam: NOW COVERED by FSeam_VFXTickDrivesAnimation
 
-### HUD: Score Pop Hardcoded Position
-- `FScorePop.Position = FVector2D(160.0f, 10.0f)` -- always top-left regardless of screen size
-- Should be relative to where "SCORE:" is drawn (20.0f, 10.0f)
-
-### HUD Tests Don't Test DrawHUD
-- All 11 HUD tests use `NewObject<AFroggerHUD>()` -- no Canvas, no GetWorld()
-- Score pop detection, wave announcement, and timer pulse all duplicate DrawHUD logic inline in the tests
-- Title screen (`DrawTitleScreen()`) cannot be tested without Canvas
-
-### VFX Tests Only Verify Null Safety
-- 7 VFX tests: 1 init, 4 null-world safety, 1 disabled flag, 1 delegate compat
-- Zero tests verify actual VFX spawning (because GetWorld() returns nullptr)
-- Zero tests for TickVFX animation logic
-
-### Seam Matrix Current State
-- 17 entries: 12 COVERED, 5 DEFERRED
-- Sprint 5 added seams 8-12 (audio+GM, VFX+frog, HUD+score, audio+mute)
-- Missing seam: VFX TickVFX integration (nobody calls TickVFX so the seam doesn't exist yet)
+### Outstanding Issues (Carried Forward)
+- Music looping unverified: bLooping=true with one-shot QueueAudio() -- needs manual play-test
+- HUD tests don't exercise DrawHUD (no Canvas in NewObject tests)
+- VFX tests only verify null safety (no world context for actual spawning tests)
+- No LaneManager actual spawning test
+- No input-to-movement pipeline test
 
 ## Defect Escape Rate Trend
 - Sprint 2: 5% (4 critical bugs from 81 tests)
 - Sprint 3: 2% (2 bugs from 101 tests)
 - Sprint 4: 1.6% (2 bugs from 123 tests)
-- Sprint 5: UNKNOWN (play-test not done -- expect at least TickVFX and music looping bugs)
+- Sprint 5: UNKNOWN (play-test not done)
+- Sprint 6: 0.65% (1 test bug from 154 tests, 0 game bugs found)
 
-## Key File Locations (updated Sprint 5)
+## Seam Matrix Current State (Sprint 6)
+- 19 entries: 14 COVERED, 5 DEFERRED
+- Sprint 6 added seams 18-19 (VFX+GM Tick, AudioManager+GM Timer)
+- All deferred items have documented rationale
+
+## Key File Locations (updated Sprint 6)
 - VFX Manager: /Source/UnrealFrog/Public/Core/FroggerVFXManager.h, Private/Core/FroggerVFXManager.cpp
 - Audio Manager: /Source/UnrealFrog/Public/Core/FroggerAudioManager.h, Private/Core/FroggerAudioManager.cpp
 - HUD: /Source/UnrealFrog/Public/Core/FroggerHUD.h, Private/Core/FroggerHUD.cpp
-- GameMode wiring: /Source/UnrealFrog/Private/Core/UnrealFrogGameMode.cpp (lines 98-117 = VFX wiring)
+- GameMode wiring: /Source/UnrealFrog/Private/Core/UnrealFrogGameMode.cpp
+  - VFX wiring: lines 98-117
+  - TickVFX call: line 132
+  - Timer warning: lines 278-290
+- Score persistence: /Source/UnrealFrog/Private/Core/ScoreSubsystem.cpp (LoadHighScore/SaveHighScore)
+- High score file: Saved/highscore.txt
 - Seam matrix: /Docs/Testing/seam-matrix.md
 - Tests: /Source/UnrealFrog/Tests/ (24 files)
 - Agreements: /.team/agreements.md
 - Retro log: /.team/retrospective-log.md
+
+## Floating Point Boundary Testing Lesson (Sprint 6)
+When testing threshold crossings (e.g., "fire at < 16.7%"), compute exact decimal values:
+- 5.0/30.0 = 0.16666... (BELOW 0.167, not above)
+- 5.01/30.0 = 0.167 (AT threshold)
+- 5.1/30.0 = 0.17 (ABOVE threshold)
+Always pick a value clearly on the correct side with margin, not at the mathematical edge.
 
 ## Spec-vs-Implementation Mismatches Found (Sprint 2 IPM)
 10 mismatches identified between sprint1-gameplay-spec.md and current code/tests:

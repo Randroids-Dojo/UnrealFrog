@@ -1,19 +1,19 @@
 # Team Working Agreements
 
 *This is a living document. Updated during retrospectives by the XP Coach.*
-*Last updated: Sprint 5 Retrospective*
+*Last updated: Sprint 6 Retrospective*
 
 ## Day 0 Agreements
 
 These are our starting agreements. They WILL evolve through retrospectives.
 
-### 1. Mob Programming Rules
+### 1. Driver Model (Updated: Sprint 6 Retrospective)
 
-- **One driver per file at a time.** Multiple drivers are OK if they touch zero overlapping files. (Updated Sprint 1: strict single-driver was unnecessarily slow for independent systems.)
+- **Solo driver with review gates.** The operating model is a single domain-expert driver per task, with structured review gates. Real-time mob/navigator review is aspirational but not mandatory. (Updated Sprint 6: Sprints 2-6 consistently showed solo-driver delivery. Formalizing reality rather than pretending otherwise.)
+- **One driver per file at a time.** Multiple drivers are OK if they touch zero overlapping files. (Updated Sprint 1.)
 - **Driver rotation**: The XP Coach assigns the driver for each task based on domain expertise.
-- **Navigators review in real-time.** Don't wait until the end — flag issues as you see them.
 - **Any agent can call "Stop"** if they see a problem. The driver must pause and discuss.
-- **Mandatory review gates for large tasks.** For any task producing more than 200 lines of new code, the driver must pause after each logical subsystem (new header/implementation pair, new test file, new tool/script) and post a summary for navigator review before proceeding. The summary must include: what was built, what tests cover it, and what comes next. If no navigator is available, the driver self-reviews by re-reading the code after a context switch. (Added: Sprint 5 Retrospective -- two consecutive sprints were delivered as solo-programmed monolithic commits with no intermediate review.)
+- **Mandatory review gates for large tasks.** For any task producing more than 200 lines of new code, the driver must pause after each logical subsystem (new header/implementation pair, new test file, new tool/script) and post a summary for navigator review before proceeding. The summary must include: what was built, what tests cover it, and what comes next. If no navigator is available, the driver self-reviews by re-reading the code after a context switch. (Added: Sprint 5 Retrospective.)
 
 ### 2. TDD is Mandatory
 
@@ -23,6 +23,7 @@ These are our starting agreements. They WILL evolve through retrospectives.
 - No code merges without passing tests
 - **Seam tests are mandatory for interacting systems.** For every pair of systems that interact (e.g., frog + moving platform, frog + submerging turtle, pause + hazard movement), write at least one test that exercises their boundary. Isolation tests verify each system alone; seam tests verify the handshake between them. (Added: Post-Sprint 2 Hotfix Retrospective — 33% of commits were fixes at system boundaries that isolation tests missed.)
 - **Seam test coverage matrix.** Maintain a seam test matrix in `Docs/Testing/seam-matrix.md` listing all pairs of systems with runtime interactions. Each pair must have either a test case name or an explicit "deferred — low risk" acknowledgment. Review the matrix before marking a sprint complete and add tests for any new seams. (Added: Sprint 4 Retrospective — round restart bug was a missed seam between RoundComplete → OnSpawningComplete → Respawn.)
+- **Floating-point boundary testing.** When writing tests for threshold/boundary conditions, compute exact decimal values and pick test inputs with clear margin from the boundary. Never rely on mental arithmetic for floating-point comparisons (e.g., 5.0/30.0 = 0.1667 is BELOW 0.167, not above). (Added: Sprint 6 Retrospective — timer warning seam test had a boundary math error.)
 
 ### 3. Communication Protocol
 
@@ -188,7 +189,25 @@ Process:
 
 **Any P1 action item deferred 3 consecutive sprints must be resolved in the next sprint: either completed or explicitly dropped.** When dropping, record the rationale in the retrospective log and remove from the carry-forward list. No more silent carry-forward.
 
-**Why:** M_FlatColor.uasset and functional-tests-in-CI have been deferred for 4 sprints. Chronic carry-forward items create noise in retrospectives and signal that the team is not honest about its priorities.
+**Why:** M_FlatColor.uasset and functional-tests-in-CI were deferred for 5 sprints. Chronic carry-forward items create noise in retrospectives and signal that the team is not honest about its priorities.
+
+**Items dropped (Sprint 6 Retrospective):**
+- **M_FlatColor.uasset**: DROPPED. Runtime `GetOrCreateFlatColorMaterial()` is sufficient for all current use cases. Persistent .uasset only needed for packaged builds, which are not on the roadmap. Re-create as P0 if packaging becomes a sprint goal.
+- **Functional tests in CI**: DROPPED. 154 SIMPLE_AUTOMATION_TESTs run in NullRHI headless mode. AFunctionalTest actors require display server infrastructure for marginal gain. Revisit if visual regression testing is prioritized.
+
+### 18. Post-Implementation Domain Expert Review (Added: Sprint 6 Retrospective)
+
+**Before committing, the driver must post a summary of changes and tag the domain expert for review.** The domain expert has one response cycle to approve or flag issues. If no domain expert is available, the driver self-reviews after a context break (re-read the diff cold).
+
+Domain expert assignments:
+- **Engine Architect**: C++ systems, architecture, subsystem patterns
+- **Game Designer**: Tuning values, player-facing behavior, game feel parameters
+- **QA Lead**: Test coverage, test correctness, quality gates
+- **DevOps**: Build tooling, test scripts, infrastructure
+
+This is lighter than a formal PR process but ensures a second pair of domain-expert eyes sees the code before it ships. Added by unanimous vote (5-0) during Sprint 6 full-team retrospective.
+
+**Why:** Sprint 6 shipped a seam test with incorrect floating-point boundary math. A reviewer with a testing mindset would have caught the error. The prior "review gate" rule (Section 1, >200 lines) did not trigger because all Sprint 6 tasks were under 200 lines.
 
 ## Things We Will Figure Out Together
 
@@ -196,6 +215,7 @@ Process:
 - How to handle disagreements between agents
 - When to bring in a specialist agent (Art Director, Sound Engineer, Level Designer not needed for Sprint 1)
 - ~~How to balance speed vs. quality~~ → Resolved: quality gate is "playable and building" (Stakeholder Review)
+- ~~Is mob programming viable?~~ → Resolved Sprint 6: Formally adopted "solo driver with review gates" model. See Section 1.
 
 ## Resolved Questions (Sprint 1)
 

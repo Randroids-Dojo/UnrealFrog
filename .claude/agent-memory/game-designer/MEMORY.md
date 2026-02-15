@@ -79,3 +79,17 @@
 4. No high score persistence (resets every session)
 5. No difficulty communication to player ("SPEED UP!" text on wave increase)
 6. Timer warning is visual-only — SFX_TimerWarning exists but is not wired to timer pulse
+
+### Sprint 6 addressed (of the above)
+- Items 4 (high score persistence) and 6 (timer warning sound wired) are DONE
+- Items 1, 2, 3, 5 remain open
+- Death flash overlay added (not on original list) — good but incomplete without shake+freeze
+
+### Sprint 7 Design Priorities (from retro input)
+- P0: Full play-test with tuning pass (HopDuration, InputBufferWindow, TimePerLevel, DifficultySpeedIncrement, WavesPerGapReduction, HopArcHeight)
+- P1: Multiplier visibility on HUD ("x3" display)
+- P2: Death freeze frame (0.05s) + screen shake (0.2s)
+- P3: Wave transition ceremony (freeze hazards, jingle, flash, then "WAVE N")
+- P4: Difficulty communication ("SPEED UP!" text)
+- Core concern: difficulty curve has NEVER been validated through play. Wave progression formula is untested.
+- Key risk: seam #14 (GameMode+LaneManager wave difficulty) is DEFERRED — should be COVERED
