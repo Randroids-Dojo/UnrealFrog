@@ -143,9 +143,30 @@
 - **Seam test**: FSeam_VFXTickDrivesAnimation (Seam 13 in SeamTest.cpp) -- creates VFXManager, adds FActiveVFX with null actor, calls TickVFX, verifies cleanup.
 - **Pattern**: TickVFX removes entries with nullptr Actor immediately (line 171-175 of FroggerVFXManager.cpp), before checking duration. Test exploits this for verification without a UWorld.
 
-### High Score Persistence (Commit 3)
+### High Score Persistence (Commit 3, updated Sprint 7)
 - **Feature**: File I/O save/load of a single integer to `Saved/highscore.txt`
 - **API**: `LoadHighScore()` reads file via FFileHelper::LoadFileToString, sets HighScore if loaded value > current. `SaveHighScore()` writes HighScore via FFileHelper::SaveStringToFile.
-- **Integration**: `StartNewGame()` calls `LoadHighScore()` as first line. `NotifyScoreChanged()` calls `SaveHighScore()` inside the `if (Score > HighScore)` block.
-- **Tests**: FScore_HighScorePersistsSaveLoad (save/load round-trip), FScore_HighScoreLoadMissingFile (graceful missing file). Both clean up via IFileManager::Get().Delete().
+- **Integration**: `StartNewGame()` calls `LoadHighScore()` as first line. `SaveHighScore()` is called ONLY from GameMode::HandleGameOver() and GameMode::ReturnToTitle() — NOT from NotifyScoreChanged() (Sprint 7 fix: was causing per-tick disk writes).
+- **Tests**: FScore_HighScorePersistsSaveLoad (save/load round-trip), FScore_HighScoreLoadMissingFile (graceful missing file), FScore_NoPerTickSaveHighScore (verifies no disk writes during gameplay). All tests clean up via IFileManager::Get().Delete().
 - **Includes added**: Misc/FileHelper.h, HAL/PlatformFilemanager.h in ScoreSubsystem.cpp
+
+## Sprint 7 Changes
+
+### SaveHighScore Fix (Task 1)
+- **Bug**: `NotifyScoreChanged()` called `SaveHighScore()` on every score update, causing disk I/O every tick.
+- **Fix**: Removed `SaveHighScore()` from `NotifyScoreChanged()`. Added calls in `HandleGameOver()` and `ReturnToTitle()`.
+- **Side effect**: Tests calling `StartNewGame()` (which calls `LoadHighScore()`) can load stale highscore.txt from prior sessions. Added `IFileManager::Get().Delete()` cleanup to HighScore and NewGame tests.
+
+### Duplicate Wave-Complete Fix (Task 2)
+- **Bug**: Both `TryFillHomeSlot()` and `HandleHopCompleted()` independently checked for wave completion. Filling the last slot triggered double state transitions, double score bonuses, and two concurrent RoundComplete timers.
+- **Fix**: Removed the wave-complete check from `HandleHopCompleted()`. `TryFillHomeSlot()` is the sole authority — it calls `OnWaveComplete()`. `HandleHopCompleted()` checks `CurrentState != EGameState::RoundComplete` to decide whether to start Spawning.
+- **Seam test**: FSeam_LastHomeSlotNoDoubleBonuses (Seam 15) — fills 4 slots, then HandleHopCompleted for the 5th, verifies exactly 5 filled and no double transition.
+
+### Cached Subsystem Pointers (Task 3)
+- **Refactor**: Added `CachedVFXManager` and `CachedAudioManager` (TObjectPtr<>) to GameMode header. Cached in BeginPlay(). Used in Tick() and TickTimer() instead of GetGameInstance()->GetSubsystem<>() per frame.
+- Forward declarations used in header; full includes remain in .cpp only.
+
+### Sprint 7 Lessons
+- **Stale disk state breaks tests**: When removing disk I/O from hot paths, tests that relied on the old write-then-read pattern may load stale files. Always clean up test artifacts at the START of tests, not just the end.
+- **Concurrent UE processes conflict**: Two UnrealEditor-Cmd instances on the same project cause signal 15 (SIGTERM) from shared memory conflicts. Teammates running tests simultaneously will kill each other's processes. Need to coordinate or serialize test runs.
+- **Test count**: Sprint 7 Phase 0 ended with 43 passing tests across GameState/Score/Seam (157+ total expected across all categories).

@@ -1,13 +1,13 @@
 # Team Working Agreements
 
 *This is a living document. Updated during retrospectives by the XP Coach.*
-*Last updated: Stakeholder directive, post-Sprint 6*
+*Last updated: Sprint 7 Retrospective*
 
 ## Day 0 Agreements
 
 These are our starting agreements. They WILL evolve through retrospectives.
 
-### 1. Collaboration Model (Updated: Stakeholder directive, post-Sprint 6)
+### 1. Collaboration Model (Updated: Sprint 7 Retrospective)
 
 - **Multiple perspectives on every task.** No agent works alone. Every task gets differing opinions at three stages: design debate before code, active navigation during implementation, and cross-domain review before commit. Solo-driver delivery (Sprints 2-6) optimized for speed but produced blind spots. We are reversing that tradeoff — the token cost of multiple opinions is worth it.
 - **One writer per file at a time.** This is a file-safety rule, not a thinking rule. Multiple drivers are OK if they touch zero overlapping files. (Updated Sprint 1.)
@@ -15,6 +15,7 @@ These are our starting agreements. They WILL evolve through retrospectives.
 - **Driver rotation**: The XP Coach assigns the driver for each task based on domain expertise.
 - **Any agent can call "Stop"** if they see a problem. The driver must pause and discuss.
 - **Active navigation is mandatory, not aspirational.** While the driver implements, at least 1 navigator actively reviews via messages — questioning design choices, flagging edge cases, suggesting alternatives. For tasks >200 lines, the driver pauses after each logical subsystem and posts a summary (what was built, what tests cover it, what comes next). (Updated from Sprint 5 review-gate rule: navigation is now continuous, not checkpoint-only.)
+- **Accept message lag as normal.** Multi-agent sessions have unreliable message ordering. When an agent reports stale state, verify before escalating. Do not send repeated "you are unblocked" messages — one clear message with verification steps is sufficient. (Added: Sprint 7 Retrospective — multiple agents operated on stale context throughout the sprint, wasting coordination tokens.)
 
 ### 2. TDD is Mandatory
 
@@ -25,6 +26,7 @@ These are our starting agreements. They WILL evolve through retrospectives.
 - **Seam tests are mandatory for interacting systems.** For every pair of systems that interact (e.g., frog + moving platform, frog + submerging turtle, pause + hazard movement), write at least one test that exercises their boundary. Isolation tests verify each system alone; seam tests verify the handshake between them. (Added: Post-Sprint 2 Hotfix Retrospective — 33% of commits were fixes at system boundaries that isolation tests missed.)
 - **Seam test coverage matrix.** Maintain a seam test matrix in `Docs/Testing/seam-matrix.md` listing all pairs of systems with runtime interactions. Each pair must have either a test case name or an explicit "deferred — low risk" acknowledgment. Review the matrix before marking a sprint complete and add tests for any new seams. (Added: Sprint 4 Retrospective — round restart bug was a missed seam between RoundComplete → OnSpawningComplete → Respawn.)
 - **Floating-point boundary testing.** When writing tests for threshold/boundary conditions, compute exact decimal values and pick test inputs with clear margin from the boundary. Never rely on mental arithmetic for floating-point comparisons (e.g., 5.0/30.0 = 0.1667 is BELOW 0.167, not above). (Added: Sprint 6 Retrospective — timer warning seam test had a boundary math error.)
+- **Tuning-resilient test design.** When writing tests for tunable values (difficulty curves, timing thresholds), read the actual parameter from the game object at test time instead of hardcoding expected values. Tests should verify the *formula* is correct, not specific magic numbers. (Added: Sprint 7 Retrospective — codifies QA Lead's Seam 16 refactor pattern.)
 
 ### 3. Communication Protocol
 
@@ -196,7 +198,7 @@ Process:
 - **M_FlatColor.uasset**: DROPPED. Runtime `GetOrCreateFlatColorMaterial()` is sufficient for all current use cases. Persistent .uasset only needed for packaged builds, which are not on the roadmap. Re-create as P0 if packaging becomes a sprint goal.
 - **Functional tests in CI**: DROPPED. 154 SIMPLE_AUTOMATION_TESTs run in NullRHI headless mode. AFunctionalTest actors require display server infrastructure for marginal gain. Revisit if visual regression testing is prioritized.
 
-### 18. Cross-Domain Review Before Commit (Updated: Stakeholder directive, post-Sprint 6)
+### 18. Cross-Domain Review Before Commit (Updated: Sprint 7 Retrospective)
 
 **Before committing, the driver must post a summary of changes and receive review from an agent in a *different* domain.** The reviewer brings a perspective the driver lacks — this is the whole point. Same-domain review catches implementation bugs; cross-domain review catches design blind spots.
 
@@ -210,6 +212,16 @@ Cross-domain pairings (reviewer ← driver):
 The reviewer has one response cycle to approve or flag issues. Self-review is a last resort only when no other agent is available — and the commit message must note "self-reviewed."
 
 **Why:** Sprint 6 shipped a seam test with incorrect floating-point boundary math. A same-domain reviewer might have missed it too. A cross-domain reviewer (Game Designer checking "does this test reflect real gameplay?") would have questioned the boundary values. (Evolved from Sprint 6's domain-expert-review rule.)
+
+**XP Coach enforcement rule:** The XP Coach must not rationalize process exceptions. If an agreement is being violated, the XP Coach flags it and enforces. Exceptions require explicit team-lead approval, not silent acceptance. (Added: Sprint 7 Retrospective — XP Coach accepted a premature tuning change that violated §5 step 8; team-lead had to overrule.)
+
+### 19. One Agent Runs Tests at a Time (Added: Sprint 7 Retrospective)
+
+**Until run-tests.sh has a lock file mechanism, only one agent may run the test suite at a time.** The pre-flight `pkill -f UnrealEditor-Cmd` in run-tests.sh kills ALL editor processes, including another agent's in-progress test run. Coordinate test runs through the XP Coach.
+
+Sprint 8 action: DevOps adds `mkdir`-based atomic lock file to run-tests.sh with `trap` cleanup on exit.
+
+**Why:** Engine Architect reported persistent signal 15 kills during Sprint 7 when multiple agents attempted concurrent test runs.
 
 ## Things We Will Figure Out Together
 
