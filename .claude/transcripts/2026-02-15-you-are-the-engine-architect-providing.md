@@ -5,8 +5,8 @@
 | Date | 2026-02-15 |
 | Session ID | `9cad10df-a2ee-4650-adec-4a8034993a77` |
 | Model | claude-sonnet-4-5-20250929 |
-| Tokens | ~319,807 input, ~107 output |
-| Duration | 14s |
+| Tokens | ~417,807 input, ~109 output |
+| Duration | 1m 12s |
 
 ---
 
@@ -57,3 +57,27 @@ I need to read the current state of the key files to provide informed technical 
 ## Assistant (17:33 UTC)
 
 Now I have enough context. Let me send my technical assessment to the team lead.
+
+- **Used SendMessage**
+
+## Assistant (17:34 UTC)
+
+I've sent my technical analysis to the team lead covering all three stakeholder issues:
+
+## Summary of My Feedback
+
+**Issue #2 (VFX/Score Pop Bugs) — Root Causes Identified:**
+
+1. **Death VFX too small:** Fixed `EndScale = 3.0f` creates only ~12% screen height from camera Z=2200. Need camera-relative scaling formula: `DesiredScale = CamDistance * tan(FOV/2 * ScreenFraction) * 2`, which yields EndScale ~10.0f for 25% visibility.
+
+2. **Score pops at wrong position:** `/Source/UnrealFrog/Private/Core/FroggerHUD.cpp:116` uses hardcoded `FVector2D(20 + textLen*10, 10)` instead of projecting the frog's world location. Need `Canvas->Project(FrogWorldLocation)` to get proper screen coordinates.
+
+3. **Home slot sparkles hardcoded:** `/Source/UnrealFrog/Private/Core/FroggerVFXManager.cpp:159` uses literal `FVector(Col*100, 14*100, 50)` instead of referencing grid constants.
+
+**Issue #1 (Difficulty Scaling Invisible):** The 15% speed increase per wave (100→115 cm/s) is mathematically correct but perceptually meaningless. Need audio/visual cues: rising-pitch SFX, screen-edge particle burst, and red-tinted wave announcements for waves >3.
+
+**Issue #3 (PlayUnreal Not Real):** Current `/Source/UnrealFrog/Tests/PlayUnrealTest.cpp` calls methods directly — it's a unit test, not E2E. Recommended **Remote Control API** (UE 5.7 built-in WebSocket plugin) over HTTP server (experimental) or PythonScriptPlugin (crashes kill harness). This gives real input simulation + state inspection with minimal custom code.
+
+**Estimated effort:** ~275 lines total, ~7.5 hours (VFX/scoring: 2h, difficulty cues: 1.5h, PlayUnreal: 4h).
+
+All three issues are fixable in a single sprint with clear technical paths forward.

@@ -5,8 +5,8 @@
 | Date | 2026-02-15 |
 | Session ID | `9cad10df-a2ee-4650-adec-4a8034993a77` |
 | Model | claude-sonnet-4-5-20250929 |
-| Tokens | ~114,248 input, ~4 output |
-| Duration | 5s |
+| Tokens | ~196,120 input, ~31 output |
+| Duration | 38s |
 
 ---
 
@@ -43,3 +43,16 @@ Keep your response to 15-25 lines. Be self-critical where warranted. Send your r
 - **Used Read** on `.team/agreements.md`
 
 - **Used Read** on `Docs/Testing/seam-matrix.md`
+
+- **Used SendMessage**
+
+## Assistant (17:34 UTC)
+
+Retrospective feedback sent to team-lead. I've identified the core QA failures:
+
+1. **Testing gap**: 162 tests verify "does the code work" but not "can a human see it"
+2. **Process failure**: I skipped mandatory play-testing (Agreement §5 step 9) for 3 consecutive sprints
+3. **Tooling blocker**: Without PlayUnreal, manual verification is high-friction and gets skipped
+4. **Proposed fix**: Visual verification checklist + PlayUnreal as P0 for Sprint 8
+
+The root cause is clear: unit tests verify implementation correctness, but visual systems need perception tests — does it look right from the player's camera? PlayUnreal would make this automatable.
