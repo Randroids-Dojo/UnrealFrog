@@ -1,7 +1,7 @@
 # Team Working Agreements
 
 *This is a living document. Updated during retrospectives by the XP Coach.*
-*Last updated: Sprint 7 Retrospective*
+*Last updated: Stakeholder Review, post-Sprint 7*
 
 ## Day 0 Agreements
 
@@ -93,7 +93,7 @@ A sprint is NOT done until:
 - QA Lead and Game Designer use PlayUnreal to validate gameplay feel
 - DevOps Engineer owns the PlayUnreal infrastructure
 
-### 9. Visual Smoke Test After Foundation (Added: Sprint 2 Retrospective)
+### 9. Visual Smoke Test After Foundation AND After Visual Systems (Updated: Stakeholder Review, post-Sprint 7)
 
 After foundation systems are in place (actors, meshes, camera, ground), **launch the game before writing integration code** and verify:
 - [ ] Can you see the ground plane?
@@ -102,9 +102,17 @@ After foundation systems are in place (actors, meshes, camera, ground), **launch
 - [ ] Does the HUD render text?
 - [ ] Is there lighting in the scene?
 
-If any fail, fix them immediately. Do NOT proceed to integration tasks with an invisible game.
+**Additionally, after ANY visual system is added or modified** (VFX effects, HUD elements, score pops, death flash, wave announcements), launch the game and verify:
+- [ ] Is the effect visible from the gameplay camera? (Not just "does the actor spawn")
+- [ ] Is it at the correct position relative to the action that triggered it?
+- [ ] Is it large enough and long enough to be noticed by a player?
+- [ ] Does it look correct at the actual camera distance (Z=2200)?
 
-**Why:** Sprint 2 built 12 tasks before launching. Three critical visual bugs (no lighting, unwired HUD, wrong camera angle) were invisible to unit tests and required a full extra debugging session.
+If any fail, fix them immediately. The unit test "does this actor exist" is not the same as "can a human see it."
+
+**Why (Sprint 2):** Sprint 2 built 12 tasks before launching. Three critical visual bugs were invisible to unit tests.
+
+**Why (Sprint 7):** Score pops were hardcoded to top-left corner instead of frog's position. Death VFX was too small to see from the gameplay camera. Both passed all unit tests but were invisible/misplaced to the player. Three sprints of VFX work went unnoticed.
 
 ### 10. Scene Requirements for New Maps (Added: Sprint 2 Retrospective)
 
@@ -222,6 +230,21 @@ The reviewer has one response cycle to approve or flag issues. Self-review is a 
 Sprint 8 action: DevOps adds `mkdir`-based atomic lock file to run-tests.sh with `trap` cleanup on exit.
 
 **Why:** Engine Architect reported persistent signal 15 kills during Sprint 7 when multiple agents attempted concurrent test runs.
+
+### 20. PlayUnreal Must Support Scripted Gameplay (Added: Stakeholder Review, post-Sprint 7)
+
+**The PlayUnreal tooling must support an agent writing a Python script that launches the game, sends hop commands, reads game state, and verifies outcomes.** The minimal API:
+- `hop(direction)` — send a hop input to the running game
+- `get_state()` — return `{score, lives, wave, frogPos, gameState}` as JSON
+- `screenshot()` — save current frame to disk
+
+Until this exists, "QA: verified" in commit messages is only valid for code-level checks, not gameplay verification. This is a **P0 for Sprint 8**.
+
+**Current state:** PlayUnrealTest.cpp calls C++ methods directly (`GM->HandleHopCompleted()`). It never sends real inputs, never reads live state from outside, never takes screenshots. PythonScriptPlugin is enabled but unused. An agent cannot programmatically play the game.
+
+**Implementation approach:** C++ HTTP server (`UPlayUnrealServer`) on localhost exposing REST endpoints + Python client library (`Tools/PlayUnreal/client.py`). Acceptance test: a Python script that hops the frog across the road, across the river, and into a home slot.
+
+**Why:** This has been deferred since Sprint 3 (5 sprints). The team has never been able to autonomously verify gameplay. Every stakeholder play-test finds bugs that 162+ automated tests missed. This is the single largest gap in the project's quality infrastructure.
 
 ## Things We Will Figure Out Together
 

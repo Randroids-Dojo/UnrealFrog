@@ -745,3 +745,75 @@ Sprint 7 was a consolidation sprint: no new mechanics, no new systems. Goal: clo
 - **Agents active:** 5 (Engine Architect, QA Lead, Game Designer, DevOps, XP Coach)
 - **Process violations caught:** 1 (premature tuning change, reverted)
 - **Cross-domain reviews completed:** 4 (Tasks 1+2 by Game Designer, Task 15 by XP Coach + Game Designer, Task 6 by Engine Architect)
+
+---
+
+## Stakeholder Review — Post Sprint 7
+
+### Context
+Stakeholder played the game after Sprint 7 landed. Three critical issues identified. This mirrors the Post-Sprint 1 and Post-Sprint 2 stakeholder reviews — gameplay verification by a human found issues that 162 automated tests missed.
+
+### Feedback
+
+#### 1. "No visible differences when playing compared to previous sprints."
+
+**Investigation:** The difficulty scaling IS wired end-to-end (confirmed: `GetSpeedMultiplier()` → `ApplyWaveDifficulty()` → `Hazard->Speed = BaseSpeed * Multiplier`). TickVFX IS called from GameMode::Tick. The systems *work* at the code level. But the player cannot *perceive* the changes because:
+- The difficulty ramp is subtle in early waves (Wave 2 = 15% faster, hard to notice without a baseline)
+- VFX feedback for wave transitions is a brief text announcement ("WAVE 2!") with no ceremony
+- No speed indicator, no visual warning that things are getting harder
+- The InputBufferWindow fix (0.1→0.08s) only affects input during the final 53% of a hop — not perceptible to a human
+
+**Root cause:** The team verified systems at the code level ("does GetSpeedMultiplier return 1.15?") but not at the perception level ("can a human feel that hazards are faster?"). 162 tests pass, but zero tests verify that changes are *noticeable to a player*.
+
+#### 2. "Long-standing bug: explosion barely visible at bottom-left, +score text barely visible at top-left."
+
+**Investigation confirmed two bugs:**
+
+**Score pops (+50, +100):** Hardcoded to screen position `FVector2D(20 + textLen*10, 10)` in `FroggerHUD.cpp:116`. This places them at the top-left corner next to the score display, not at the frog's location. Score pops should spawn at the frog's projected screen position (using `Canvas->Project(FrogWorldLocation)`) and float upward from there. This has been wrong since Sprint 5 when score pops were added.
+
+**Death VFX (explosion/puff):** Spawns at `Frog->GetActorLocation()` which IS the correct world position. But the VFX uses geometry-based spheres (scale 0.5→3.0) viewed from a camera at Z=2200. At that distance, even a 3.0-scale sphere (300cm) subtends a tiny angle. Additionally, the 0.5s duration means the effect appears and vanishes too quickly to register. The effect is technically at the right place — it's just too small and too fast to see from the camera's perspective.
+
+**Home slot celebrations:** Hardcoded to `Col * 100, 14 * 100, 50` (magic numbers in `FroggerVFXManager.cpp:159`). Should read from grid configuration.
+
+**Root cause:** VFX and HUD were built to pass unit tests ("does SpawnDeathPuff create an actor?"), not to be visible to a player. No visual smoke test was performed after VFX/HUD polish in Sprint 5. The seam matrix tracks "test exists" but not "verified visible in-game."
+
+#### 3. "PlayUnreal is not a real tool. An agent should be able to write a Python script to hop across the road and river to beat a level."
+
+**Investigation confirmed:** Current PlayUnreal is a test runner wrapper, not an automation tool. The "E2E" tests in `PlayUnrealTest.cpp` call C++ methods directly (`GM->HandleHopCompleted()`, `Scoring->LoseLife()`). They never:
+- Send actual keyboard/controller inputs to a running game
+- Read live game state from an external process
+- Take screenshots
+- Script gameplay sequences ("hop up 5 times, then hop right, then hop up 3 times")
+
+**PythonScriptPlugin** is enabled in the .uproject but completely unused — no Python scripts call into the editor API. There is no Remote Control API, no HTTP server, no WebSocket endpoint. An agent literally cannot programmatically play the game.
+
+**What it would take:** A minimal Playwright-like tool requires:
+1. **Input injection** — HTTP endpoint or Python API that calls `AFrogCharacter::RequestHop(Direction)` on a running game
+2. **State query** — Endpoint returning `{score, lives, wave, frogPos, gameState}` as JSON
+3. **Session management** — Launch/stop the game programmatically
+4. **Screenshot capture** — Save framebuffer to disk on demand
+
+The team has deferred this since Sprint 3 (5 sprints). The "PlayUnreal E2E harness" action item has been carried forward and renamed but never actually built. This is the single largest gap in the project's quality infrastructure.
+
+### Severity Assessment
+
+| Issue | Severity | Sprints Unaddressed |
+|-------|----------|---------------------|
+| VFX/HUD positioning (barely visible) | P0 — players can't see feedback | Since Sprint 5 (3 sprints) |
+| No perceptible difficulty progression | P1 — game feels static across waves | Since Sprint 1 (7 sprints) |
+| PlayUnreal not a real E2E tool | P0 — agents cannot verify gameplay | Since Sprint 3 (5 sprints) |
+
+### Agreements to Change
+
+1. **UPDATE §9 (Visual Smoke Test):** Expand scope — after ANY visual system is added (VFX, HUD elements, score pops), launch the game and verify the effect is visible from the gameplay camera. The test is not "does the actor spawn" but "can a human see it." Add a "verified-in-game" column to the seam matrix for visual systems.
+
+2. **NEW §20: PlayUnreal Must Support Scripted Gameplay.** The PlayUnreal tooling must support an agent writing a Python script that launches the game, sends hop commands, reads game state, and verifies outcomes. The minimal API: `hop(direction)`, `get_state()`, `screenshot()`. Until this exists, "QA: verified" in commit messages is only valid for code-level checks, not gameplay verification. This is a P0 for Sprint 8.
+
+### Action Items for Sprint 8
+
+- [ ] **P0: Fix score pop positioning** — Project frog's world position to screen coordinates. Score pops appear at the frog, not top-left corner. (Engine Architect)
+- [ ] **P0: Fix VFX visibility** — Scale death puff and hop dust relative to camera distance. Increase duration. Verify visible from gameplay camera. (Engine Architect)
+- [ ] **P0: Fix VFX hardcoded positions** — Home slot celebrations must read grid config, not magic numbers. (Engine Architect)
+- [ ] **P0: Build PlayUnreal Python automation** — HTTP server in C++ (`UPlayUnrealServer`) exposing `/input/hop`, `/state/game`, `/screenshot`. Python client library at `Tools/PlayUnreal/client.py`. Test: agent writes a script that hops across road, crosses river, reaches home slot. (DevOps + Engine Architect)
+- [ ] **P1: Make difficulty progression perceptible** — Add visual/audio cues when wave starts (speed lines, color shift, sound pitch increase). The player should FEEL the difficulty change without looking at numbers. (Game Designer + Engine Architect)
+- [ ] **P1: Visual smoke test for all VFX/HUD** — Launch game, trigger every VFX effect and HUD element, screenshot each one, verify visibility. (QA Lead)
