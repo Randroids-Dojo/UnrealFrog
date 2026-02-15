@@ -106,6 +106,50 @@ if [ ! -f "${PROJECT_FILE}" ]; then
     exit 2
 fi
 
+# -- Lock file: prevent concurrent test runs (Section 19) -------------------
+# mkdir is atomic on POSIX — if it fails, another run is in progress.
+
+LOCK_DIR="/tmp/.unrealFrog_test_lock"
+LOCK_PID_FILE="${LOCK_DIR}/pid"
+
+cleanup_lock() {
+    rm -rf "${LOCK_DIR}" 2>/dev/null || true
+}
+
+acquire_lock() {
+    if mkdir "${LOCK_DIR}" 2>/dev/null; then
+        echo $$ > "${LOCK_PID_FILE}"
+        trap cleanup_lock EXIT INT TERM
+        return 0
+    fi
+
+    # Lock exists — check if the owning process is still alive
+    if [ -f "${LOCK_PID_FILE}" ]; then
+        EXISTING_PID=$(cat "${LOCK_PID_FILE}" 2>/dev/null || echo "")
+        if [ -n "${EXISTING_PID}" ] && kill -0 "${EXISTING_PID}" 2>/dev/null; then
+            echo "ERROR: Another test run is in progress (PID: ${EXISTING_PID})"
+            exit 2
+        fi
+        # PID is dead — stale lock, reclaim it
+        echo "Removing stale lock from dead PID ${EXISTING_PID}..."
+        rm -rf "${LOCK_DIR}"
+        if mkdir "${LOCK_DIR}" 2>/dev/null; then
+            echo $$ > "${LOCK_PID_FILE}"
+            trap cleanup_lock EXIT INT TERM
+            return 0
+        fi
+    fi
+
+    # Lock dir exists but no PID file or couldn't reclaim — force remove
+    echo "Removing orphaned lock directory..."
+    rm -rf "${LOCK_DIR}"
+    mkdir "${LOCK_DIR}" 2>/dev/null || { echo "ERROR: Could not acquire test lock"; exit 2; }
+    echo $$ > "${LOCK_PID_FILE}"
+    trap cleanup_lock EXIT INT TERM
+}
+
+acquire_lock
+
 # -- Pre-flight: kill stale editor processes ---------------------------------
 # Old UnrealEditor-Cmd or UnrealTraceServer processes from prior runs can hold
 # stale dylibs and cause silent test failures or startup hangs.
