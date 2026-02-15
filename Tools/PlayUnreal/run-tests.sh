@@ -231,17 +231,26 @@ PASSED=0
 FAILED=0
 ERRORS=""
 
-# Find the actual log file — check project dir first, then macOS default location
+# Find the actual log file — check multiple locations since UE nests logs differently
 ACTUAL_LOG=""
 if [ -f "${TEST_LOG}" ]; then
     ACTUAL_LOG="${TEST_LOG}"
-elif [ -d "${MACOS_LOG_DIR}" ]; then
-    # UE nests the -Log path under its own log directory on macOS
-    ACTUAL_LOG=$(find "${MACOS_LOG_DIR}" -name "*.log" -newer /tmp/.unreafrog_test_start 2>/dev/null | head -1)
-    if [ -z "${ACTUAL_LOG}" ]; then
-        # Fallback: most recently modified log
-        ACTUAL_LOG=$(ls -t "${MACOS_LOG_DIR}"/*.log 2>/dev/null | head -1)
-    fi
+fi
+
+# UE on macOS nests the -Log path under its own log directory, and also writes
+# to UnrealFrog.log. Search all candidate locations for the most recent log
+# that contains test results.
+if [ -z "${ACTUAL_LOG}" ] || ! grep -q "Test Completed" "${ACTUAL_LOG}" 2>/dev/null; then
+    for CANDIDATE in \
+        "$(find "${MACOS_LOG_DIR}" -name "*.log" -newer /tmp/.unreafrog_test_start 2>/dev/null | head -1)" \
+        "${MACOS_LOG_DIR}/UnrealFrog.log" \
+        "$(ls -t "${MACOS_LOG_DIR}"/*.log 2>/dev/null | head -1)" \
+    ; do
+        if [ -n "${CANDIDATE}" ] && [ -f "${CANDIDATE}" ] && grep -q "Test Completed" "${CANDIDATE}" 2>/dev/null; then
+            ACTUAL_LOG="${CANDIDATE}"
+            break
+        fi
+    done
 fi
 
 if [ -n "${ACTUAL_LOG}" ] && [ -f "${ACTUAL_LOG}" ]; then
