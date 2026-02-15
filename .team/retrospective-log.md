@@ -321,3 +321,92 @@ After Sprint 2's retrospective, the team shipped a hotfix for 4 critical gamepla
 - [ ] Should we add a packaging step to CI to catch WITH_EDITORONLY_DATA issues early? (Carried forward)
 - [ ] How should seam tests be organized — separate test file, or integrated into existing test files by system?
 - [ ] Should AFunctionalTest actors be runnable in NullRHI mode with a mock renderer?
+
+---
+
+## Retrospective 4 — Sprint 4: Audio System, Seam Tests, PlayUnreal E2E
+
+### Context
+Sprint 4 was a "Hybrid" sprint: fix P0 tech debt (seam tests + PlayUnreal E2E), then add audio/SFX. Three agents drove implementation (Engine Architect, DevOps Engineer, Sound Engineer). All 6 participating agents provided retrospective input.
+
+### What Was Built
+| System | Files | Tests |
+|--------|-------|-------|
+| Seam tests (7 boundary tests) | SeamTest.cpp | 7 |
+| PlayUnreal E2E (5 scenarios) | PlayUnrealTest.cpp | 5 |
+| FroggerAudioManager subsystem | FroggerAudioManager.h/.cpp | 10 |
+| 9 procedural 8-bit SFX | Content/Audio/SFX/*.wav, generate_sfx.py | 0 |
+| Audio wiring (native delegates) | FrogCharacter.h/.cpp, UnrealFrogGameMode.cpp | 0 |
+| run-tests.sh improvements | run-tests.sh (category filters, breakdown) | 0 |
+| Round restart bugfix | UnrealFrogGameMode.cpp | 0 |
+| **Total** | **~22 files** | **22 new tests (123 total)** |
+
+### What Went Well
+1. **Seam tests closed a real gap** — 7 tests covering system boundaries identified in Sprint 3's retro. Team internalized the lesson. (All agents agreed)
+2. **PlayUnreal E2E gives agents autonomous testing** — P0 from Sprint 3, delivered. 5 scenarios run in NullRHI headless mode. (DevOps Engineer)
+3. **Audio system shipped complete in one session** — 9 SFX, clean FroggerAudioManager architecture, proper wiring via native delegates. (Engine Architect)
+4. **TDD discipline held** — every system tested before implementation. 123 tests, 0 failures. (XP Coach)
+5. **Test runner is production-grade** — category filters + per-category breakdown. CI-quality feedback. (DevOps Engineer)
+6. **Procedural SFX generation is deterministic and regeneratable** — no binary asset dependencies. (Sound Engineer)
+
+### What Caused Friction
+
+1. **USoundWave API burned 4 iterations.** `RawPCMData` compiles and tests pass but is editor-only. `RawData` is behind `WITH_EDITORONLY_DATA`. `DTYPE_RealTime` crashes. `DTYPE_Invalid` = silence. Only `USoundWaveProcedural` + `QueueAudio()` works for runtime audio. (Engine Architect)
+   - **Root cause:** UE 5.7's audio API is poorly documented for runtime-generated content. No compiler warning, no runtime error — just silence.
+   - **Fix:** New agreement §16: spike-test new UE APIs on Game target before full implementation.
+
+2. **Manual play-testing STILL found 2 bugs that 123 tests missed.** No sound (USoundWave approach) and round restart (frog stuck at home slot row). (QA Lead, Engine Architect)
+   - **Root cause:** Tests call methods directly, bypassing timers and the real Tick-driven state machine. The round restart bug was specifically: `OnSpawningComplete` only called `Respawn()` when `bIsDead` was true, but after a successful home slot fill the frog is alive.
+   - **Fix:** Updated §5 step 8: play-test gameplay tasks manually before marking complete.
+
+3. **E2E tests don't test the actual game loop.** The "Full Round" E2E test passed, yet the round restart was broken. Tests create synthetic method call sequences that don't match the timer-driven state machine. (QA Lead, DevOps Engineer)
+   - **Root cause:** No automated test layer exercises the real game binary with real timers and real Tick.
+   - **Recommendation:** Rename current PlayUnreal tests to "Scenario" or "Integration." True E2E = binary launch + input injection + state observation.
+
+4. **Single-commit delivery hides process metrics.** Sprint 4 shipped as 1 commit (2198 additions). Impossible to measure intermediate iterations or fix ratio. (XP Coach)
+
+5. **Sound Engineer worked in isolation.** WAV files were correct, but the Engineer didn't know about UE5's runtime audio constraints. Pairing with Engine Architect would have prevented 4 iterations. (Sound Engineer)
+
+6. **M_FlatColor.uasset deferred for 3rd sprint.** Low impact (runtime fallback exists) but becoming chronic tech debt. (XP Coach)
+
+### Agreements Changed
+1. **§2 (TDD):** Added seam test coverage matrix requirement — maintain `Docs/Testing/seam-matrix.md`
+2. **§5 (Feature Workflow):** Step 8 updated — play-test gameplay tasks before marking complete. Step 9 updated — QA Lead owns Definition of Done checklist.
+3. **§7 (Retrospectives):** Updated timing — mandatory after each sprint deliverable, not just features.
+4. **NEW §16 (UE Runtime API Validation):** Spike-test new UE APIs on Game target before full implementation.
+
+### Previous Retro Action Items — Status
+- [x] **P0: Complete PlayUnreal E2E harness** — DONE. 5 E2E scenarios in headless NullRHI mode.
+- [x] **P0: Add seam tests for system interactions** — DONE. 7 seam tests covering all identified boundaries.
+- [ ] **P1: Generate M_FlatColor.uasset** — NOT DONE (3rd deferral). Carry forward.
+- [ ] **P1: Run functional tests in CI** — NOT DONE. Carry forward.
+- [x] **P2: Add platform-hop regression test** — DONE (included in seam tests).
+
+### Action Items for Sprint 5
+- [ ] **P0: Create seam test coverage matrix** — Map all system interaction pairs, identify gaps, backfill missing tests (Engine Architect + XP Coach)
+- [ ] **P1: Generate M_FlatColor.uasset** — 3rd deferral. Must complete or explicitly drop. (DevOps Engineer)
+- [ ] **P1: Run functional tests in CI** — Investigate Xvfb/Gauntlet headless. (DevOps Engineer)
+- [ ] **P1: Document UE 5.7 audio gotchas** — Add USoundWaveProcedural discovery to shared knowledge. (Engine Architect)
+- [ ] **P2: Visual regression testing** — Screenshot comparison during play-test. (Carried forward)
+- [ ] **P2: Packaging step in CI** — Catch WITH_EDITORONLY_DATA issues early. (Carried forward)
+
+### Team Perspective on Sprint 5 Focus
+- **QA Lead + DevOps + XP Coach:** Harden test infrastructure — close the gap between "tests pass" and "game works"
+- **Game Designer:** Polish and game feel — death animations, score pops, visual feedback. "Make it feel like a 1981 arcade cabinet."
+- **Sound Engineer:** Music system + audio mixing + SFX variation
+- **Engine Architect:** Both — spike-validate APIs + fill seam test gaps
+
+### Open Questions
+- [ ] Is single-commit delivery optimal, or should we return to per-phase commits?
+- [ ] Should PlayUnreal E2E be renamed to "Scenario/Integration"?
+- [ ] Can PlayUnreal E2E replace manual play-testing, or is human play-testing still mandatory?
+- [ ] Should Sprint 5 prioritize test infrastructure or game feel polish? (Team split)
+- [ ] Should we add a "spike validation" phase to Definition of Done for tasks using new engine APIs?
+- [ ] What's the quality bar for final audio — keep 8-bit procedural or invest in higher-fidelity SFX?
+
+### Sprint 4 Stats
+- **Tests:** 101 → 123 (+22), 0 failures
+- **Defect escape rate:** 1.6% (2 bugs found via play-testing out of 123 tests)
+- **Trend:** 5% (Sprint 2) → 2% (Sprint 3) → 1.6% (Sprint 4) — improving
+- **Sessions:** 1 main + 1 fix = 2 total
+- **Agents active:** 3 drivers (Engine Architect, DevOps Engineer, Sound Engineer) + team lead

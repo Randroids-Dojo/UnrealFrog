@@ -1,7 +1,7 @@
 # Team Working Agreements
 
 *This is a living document. Updated during retrospectives by the XP Coach.*
-*Last updated: Post-Sprint 2 Hotfix Retrospective*
+*Last updated: Sprint 4 Retrospective*
 
 ## Day 0 Agreements
 
@@ -21,6 +21,7 @@ These are our starting agreements. They WILL evolve through retrospectives.
 - Refactor while tests still pass (Refactor)
 - No code merges without passing tests
 - **Seam tests are mandatory for interacting systems.** For every pair of systems that interact (e.g., frog + moving platform, frog + submerging turtle, pause + hazard movement), write at least one test that exercises their boundary. Isolation tests verify each system alone; seam tests verify the handshake between them. (Added: Post-Sprint 2 Hotfix Retrospective — 33% of commits were fixes at system boundaries that isolation tests missed.)
+- **Seam test coverage matrix.** Maintain a seam test matrix in `Docs/Testing/seam-matrix.md` listing all pairs of systems with runtime interactions. Each pair must have either a test case name or an explicit "deferred — low risk" acknowledgment. Review the matrix before marking a sprint complete and add tests for any new seams. (Added: Sprint 4 Retrospective — round restart bug was a missed seam between RoundComplete → OnSpawningComplete → Respawn.)
 
 ### 3. Communication Protocol
 
@@ -46,8 +47,9 @@ These are our starting agreements. They WILL evolve through retrospectives.
 5. All agents review
 6. **Build verification** — UBT build must succeed (Game + Editor targets)
 7. Tests pass → merge
-8. **QA Lead play-tests** using PlayUnreal automation harness (Added: Stakeholder Review)
-9. XP Coach runs retrospective
+8. **Play-test before marking gameplay tasks complete.** Run `play-game.sh` and execute the feature manually. One minute of play-testing catches bugs that 100 tests miss. (Updated: Sprint 4 Retrospective)
+9. **QA Lead play-tests** using PlayUnreal automation harness and owns the Definition of Done checklist. QA Lead signs off explicitly before a sprint exits. (Updated: Sprint 4 Retrospective)
+10. XP Coach runs retrospective
 
 ### 5a. Definition of Done (Added: Stakeholder Review)
 
@@ -69,7 +71,7 @@ A sprint is NOT done until:
 
 ### 7. Retrospectives
 
-- Mandatory after each completed feature
+- Mandatory after each completed feature or sprint deliverable (even if multiple features ship together). If a sprint delivers via a single commit, the retrospective happens immediately after that commit lands. (Updated: Sprint 4 Retrospective)
 - XP Coach facilitates using the retrospective skill
 - Produces concrete changes to THIS document and/or agent profiles
 - Changes are committed as part of the retrospective
@@ -167,6 +169,18 @@ Rules:
 - Never assume `GridPosition` is accurate while the frog is on a moving platform — the platform drifts the frog between hops
 
 **Why:** The frog teleported sideways when hopping from a moving log because `StartHop` used the stale grid position (where the frog originally landed) instead of the current position (where the log had carried it). The frog would land in empty river and die instantly.
+
+### 16. UE Runtime API Validation (Added: Sprint 4 Retrospective)
+
+When using a new Unreal Engine API (especially for content that would normally be imported as .uassets), verify the approach works in a **Game target build** before writing full implementation.
+
+Process:
+1. Write a spike test (< 50 lines) that exercises the API
+2. Build Game target and run the test
+3. If it fails, research engine source or ask for guidance
+4. Once validated, proceed with full implementation
+
+**Why:** Sprint 4 burned 4 iterations discovering that `USoundWave::RawPCMData` is editor-only in UE 5.7. Only `USoundWaveProcedural` + `QueueAudio()` works for runtime-generated audio. A 10-minute spike would have caught this immediately.
 
 ## Things We Will Figure Out Together
 
