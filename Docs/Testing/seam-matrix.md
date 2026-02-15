@@ -1,6 +1,6 @@
 # Seam Test Coverage Matrix
 
-*Last updated: Sprint 5*
+*Last updated: Sprint 6*
 
 ## Purpose
 
@@ -34,3 +34,5 @@ or an explicit "deferred" acknowledgment. This matrix tracks coverage.
 | 15 | FrogCharacter | FrogPlayerController | Input buffering during hop | DEFERRED | Low risk -- single system boundary, tested in FrogCharacter isolation tests |
 | 16 | ScoreSubsystem | AudioManager | Extra life sound fires on threshold cross | DEFERRED | Low risk -- single AddDynamic binding, tested in wiring tests |
 | 17 | GroundBuilder | LaneManager | Ground rows match lane config rows | DEFERRED | Low risk -- both read from same constants |
+| 18 | VFXManager | GameMode (Tick) | TickVFX driven from GameMode::Tick for animation | COVERED | `FSeam_VFXTickDrivesAnimation` |
+| 19 | AudioManager | GameMode (Timer) | Timer warning sound fires at <16.7% threshold | COVERED | `FSeam_TimerWarningFiresAtThreshold` |

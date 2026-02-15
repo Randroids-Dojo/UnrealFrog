@@ -101,6 +101,9 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "State")
 	bool bPendingGameOver = false;
 
+	/** True when the timer warning sound has already fired this life. */
+	bool bTimerWarningPlayed = false;
+
 	// -- Delegates --------------------------------------------------------
 
 	UPROPERTY(BlueprintAssignable, Category = "Events")

@@ -123,6 +123,15 @@ void AUnrealFrogGameMode::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 
 	TickTimer(DeltaTime);
+
+	// Drive VFX animation
+	if (UGameInstance* GI = GetGameInstance())
+	{
+		if (UFroggerVFXManager* VFX = GI->GetSubsystem<UFroggerVFXManager>())
+		{
+			VFX->TickVFX(GetWorld()->GetTimeSeconds());
+		}
+	}
 }
 
 // -- State transitions --------------------------------------------------------
@@ -138,6 +147,7 @@ void AUnrealFrogGameMode::StartGame()
 	HomeSlotsFilledCount = 0;
 	HighestRowReached = 0;
 	bPendingGameOver = false;
+	bTimerWarningPlayed = false;
 	RemainingTime = TimePerLevel;
 	ResetHomeSlots();
 
@@ -264,6 +274,20 @@ void AUnrealFrogGameMode::TickTimer(float DeltaTime)
 	}
 
 	RemainingTime -= DeltaTime;
+
+	// Timer warning sound at <16.7% remaining
+	float TimerPercent = RemainingTime / TimePerLevel;
+	if (TimerPercent < 0.167f && !bTimerWarningPlayed)
+	{
+		bTimerWarningPlayed = true;
+		if (UGameInstance* GI = GetGameInstance())
+		{
+			if (UFroggerAudioManager* Audio = GI->GetSubsystem<UFroggerAudioManager>())
+			{
+				Audio->PlayTimerWarningSound();
+			}
+		}
+	}
 
 	if (RemainingTime <= 0.0f)
 	{
@@ -485,6 +509,7 @@ void AUnrealFrogGameMode::OnRoundCompleteFinished()
 	ResetHomeSlots();
 	HighestRowReached = 0;
 	RemainingTime = TimePerLevel;
+	bTimerWarningPlayed = false;
 
 	OnWaveCompleted.Broadcast(CompletedWave, CurrentWave);
 	OnWaveCompletedBP.Broadcast(CompletedWave, CurrentWave);

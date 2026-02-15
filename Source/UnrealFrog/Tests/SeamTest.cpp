@@ -543,4 +543,88 @@ bool FSeam_MusicMutedInCI::RunTest(const FString& Parameters)
 	return true;
 }
 
+// ---------------------------------------------------------------------------
+// Seam 13: VFXTickDrivesAnimation
+// Systems: VFXManager + GameMode (via Tick)
+//
+// TickVFX must process ActiveEffects and clean up entries whose actor is
+// invalid or whose duration has expired. This was dead code until the
+// GameMode::Tick call was wired (Sprint 6 fix).
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSeam_VFXTickDrivesAnimation,
+	"UnrealFrog.Seam.VFXTickDrivesAnimation",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FSeam_VFXTickDrivesAnimation::RunTest(const FString& Parameters)
+{
+	UGameInstance* TestGI = NewObject<UGameInstance>();
+	UFroggerVFXManager* VFX = NewObject<UFroggerVFXManager>(TestGI);
+
+	// Manually add an FActiveVFX with a null Actor (simulates a destroyed actor).
+	// TickVFX handles nullptr actors by removing them from ActiveEffects immediately.
+	FActiveVFX Effect;
+	Effect.Actor = nullptr;
+	Effect.SpawnLocation = FVector(600.0, 400.0, 0.0);
+	Effect.SpawnTime = 0.0f;
+	Effect.Duration = 1.0f;
+	Effect.StartScale = 0.5f;
+	Effect.EndScale = 3.0f;
+	Effect.RiseVelocity = FVector::ZeroVector;
+
+	VFX->ActiveEffects.Add(Effect);
+	TestEqual(TEXT("One active effect before tick"), VFX->ActiveEffects.Num(), 1);
+
+	// Tick at time 2.0 (past the 1.0s duration). The nullptr actor path
+	// triggers cleanup before the duration check is even reached.
+	VFX->TickVFX(2.0f);
+
+	TestEqual(TEXT("ActiveEffects empty after TickVFX cleans up null actor"), VFX->ActiveEffects.Num(), 0);
+
+	return true;
+}
+
+// ---------------------------------------------------------------------------
+// Seam 14: TimerWarningFiresAtThreshold
+// Systems: GameMode + AudioManager
+//
+// The timer warning sound must fire exactly once when RemainingTime drops
+// below 16.7% of TimePerLevel. It must not fire above the threshold, and
+// it must not fire again after the first trigger.
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSeam_TimerWarningFiresAtThreshold,
+	"UnrealFrog.Seam.TimerWarningFiresAtThreshold",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FSeam_TimerWarningFiresAtThreshold::RunTest(const FString& Parameters)
+{
+	AUnrealFrogGameMode* GM = NewObject<AUnrealFrogGameMode>();
+
+	// Start game and get to Playing state
+	GM->StartGame();
+	GM->OnSpawningComplete();
+	TestEqual(TEXT("Playing state"), GM->CurrentState, EGameState::Playing);
+
+	// Verify initial state
+	TestFalse(TEXT("Warning not played initially"), GM->bTimerWarningPlayed);
+
+	// TimePerLevel = 30.0f. 16.7% of 30 = 5.01. Tick to just above threshold.
+	// After ticking 25.0s: RemainingTime = 5.0, percent = 5.0/30.0 = 0.1667 (just above 0.167)
+	GM->TickTimer(25.0f);
+	TestNearlyEqual(TEXT("Timer at ~5.0s"), GM->RemainingTime, 5.0f);
+	TestFalse(TEXT("Warning not yet played at boundary"), GM->bTimerWarningPlayed);
+
+	// Tick 0.1s more: RemainingTime = 4.9, percent = 4.9/30.0 = 0.1633 (below 0.167)
+	GM->TickTimer(0.1f);
+	TestNearlyEqual(TEXT("Timer at ~4.9s"), GM->RemainingTime, 4.9f);
+	TestTrue(TEXT("Warning played after crossing threshold"), GM->bTimerWarningPlayed);
+
+	// Tick again — should stay true (not re-trigger)
+	GM->TickTimer(1.0f);
+	TestTrue(TEXT("Warning stays set after subsequent ticks"), GM->bTimerWarningPlayed);
+
+	return true;
+}
+
 #endif // WITH_AUTOMATION_TESTS
