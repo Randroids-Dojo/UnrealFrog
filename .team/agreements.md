@@ -1,19 +1,20 @@
 # Team Working Agreements
 
 *This is a living document. Updated during retrospectives by the XP Coach.*
-*Last updated: Sprint 6 Retrospective*
+*Last updated: Stakeholder directive, post-Sprint 6*
 
 ## Day 0 Agreements
 
 These are our starting agreements. They WILL evolve through retrospectives.
 
-### 1. Driver Model (Updated: Sprint 6 Retrospective)
+### 1. Collaboration Model (Updated: Stakeholder directive, post-Sprint 6)
 
-- **Solo driver with review gates.** The operating model is a single domain-expert driver per task, with structured review gates. Real-time mob/navigator review is aspirational but not mandatory. (Updated Sprint 6: Sprints 2-6 consistently showed solo-driver delivery. Formalizing reality rather than pretending otherwise.)
-- **One driver per file at a time.** Multiple drivers are OK if they touch zero overlapping files. (Updated Sprint 1.)
+- **Multiple perspectives on every task.** No agent works alone. Every task gets differing opinions at three stages: design debate before code, active navigation during implementation, and cross-domain review before commit. Solo-driver delivery (Sprints 2-6) optimized for speed but produced blind spots. We are reversing that tradeoff — the token cost of multiple opinions is worth it.
+- **One writer per file at a time.** This is a file-safety rule, not a thinking rule. Multiple drivers are OK if they touch zero overlapping files. (Updated Sprint 1.)
+- **Always spawn a challenger.** For every task, at least one agent from a *different* domain than the driver must be active and providing input. The challenger's job is to question assumptions, not rubber-stamp.
 - **Driver rotation**: The XP Coach assigns the driver for each task based on domain expertise.
 - **Any agent can call "Stop"** if they see a problem. The driver must pause and discuss.
-- **Mandatory review gates for large tasks.** For any task producing more than 200 lines of new code, the driver must pause after each logical subsystem (new header/implementation pair, new test file, new tool/script) and post a summary for navigator review before proceeding. The summary must include: what was built, what tests cover it, and what comes next. If no navigator is available, the driver self-reviews by re-reading the code after a context switch. (Added: Sprint 5 Retrospective.)
+- **Active navigation is mandatory, not aspirational.** While the driver implements, at least 1 navigator actively reviews via messages — questioning design choices, flagging edge cases, suggesting alternatives. For tasks >200 lines, the driver pauses after each logical subsystem and posts a summary (what was built, what tests cover it, what comes next). (Updated from Sprint 5 review-gate rule: navigation is now continuous, not checkpoint-only.)
 
 ### 2. TDD is Mandatory
 
@@ -27,10 +28,10 @@ These are our starting agreements. They WILL evolve through retrospectives.
 
 ### 3. Communication Protocol
 
-- Before implementing, post a 3-sentence plan and wait for acknowledgment
+- **Design debate before implementation.** Before any code is written, at least 2 agents must propose approaches via mailbox. Proposals can be brief (3-5 sentences) but must present a distinct approach or tradeoff. The Team Lead synthesizes or picks the best. Disagreement is encouraged — if everyone agrees immediately, the challenger isn't doing their job. (Updated: replaces "post a 3-sentence plan and wait for acknowledgment" — that allowed solo thinking.)
 - Use the shared task list for work coordination
-- Use direct messages for design discussions
-- Disagreements are resolved by the domain expert (Engine Architect for C++, Game Designer for mechanics, etc.)
+- Use direct messages for design discussions and active navigation
+- Disagreements are resolved by the domain expert (Engine Architect for C++, Game Designer for mechanics, etc.) but the dissenting opinion must be heard and acknowledged before resolution
 
 ### 4. Commit Standards
 
@@ -44,10 +45,10 @@ These are our starting agreements. They WILL evolve through retrospectives.
 ### 5. Feature Workflow
 
 1. XP Coach breaks down the feature into tasks with dependency graph
-2. Team discusses approach (all agents)
+2. **Design debate** — At least 2 agents propose competing approaches. Team Lead synthesizes. (Updated: replaces "team discusses" — debate requires distinct proposals, not passive agreement.)
 3. **Same agent writes test AND implementation** (prevents API mismatch — learned Sprint 1)
-4. Domain expert drives implementation
-5. All agents review
+4. Domain expert drives implementation **with active navigator(s)** providing real-time input via messages
+5. **Cross-domain review** — An agent from a *different* domain than the driver reviews before commit (e.g., QA Lead reviews Engine Architect's code; Engine Architect reviews Game Designer's tuning)
 6. **Build verification** — UBT build must succeed (Game + Editor targets)
 7. Tests pass → merge
 8. **Play-test before marking gameplay tasks complete.** Run `play-game.sh` and execute the feature manually. One minute of play-testing catches bugs that 100 tests miss. (Updated: Sprint 4 Retrospective)
@@ -195,19 +196,20 @@ Process:
 - **M_FlatColor.uasset**: DROPPED. Runtime `GetOrCreateFlatColorMaterial()` is sufficient for all current use cases. Persistent .uasset only needed for packaged builds, which are not on the roadmap. Re-create as P0 if packaging becomes a sprint goal.
 - **Functional tests in CI**: DROPPED. 154 SIMPLE_AUTOMATION_TESTs run in NullRHI headless mode. AFunctionalTest actors require display server infrastructure for marginal gain. Revisit if visual regression testing is prioritized.
 
-### 18. Post-Implementation Domain Expert Review (Added: Sprint 6 Retrospective)
+### 18. Cross-Domain Review Before Commit (Updated: Stakeholder directive, post-Sprint 6)
 
-**Before committing, the driver must post a summary of changes and tag the domain expert for review.** The domain expert has one response cycle to approve or flag issues. If no domain expert is available, the driver self-reviews after a context break (re-read the diff cold).
+**Before committing, the driver must post a summary of changes and receive review from an agent in a *different* domain.** The reviewer brings a perspective the driver lacks — this is the whole point. Same-domain review catches implementation bugs; cross-domain review catches design blind spots.
 
-Domain expert assignments:
-- **Engine Architect**: C++ systems, architecture, subsystem patterns
-- **Game Designer**: Tuning values, player-facing behavior, game feel parameters
-- **QA Lead**: Test coverage, test correctness, quality gates
-- **DevOps**: Build tooling, test scripts, infrastructure
+Cross-domain pairings (reviewer ← driver):
+- **QA Lead** reviews **Engine Architect** (catches untested paths, edge cases)
+- **Engine Architect** reviews **Game Designer** (catches performance implications of tuning values)
+- **Game Designer** reviews **QA Lead** (catches tests that don't reflect real gameplay)
+- **DevOps** reviews **Engine Architect** (catches build/CI implications)
+- **Engine Architect** reviews **DevOps** (catches architectural assumptions in tooling)
 
-This is lighter than a formal PR process but ensures a second pair of domain-expert eyes sees the code before it ships. Added by unanimous vote (5-0) during Sprint 6 full-team retrospective.
+The reviewer has one response cycle to approve or flag issues. Self-review is a last resort only when no other agent is available — and the commit message must note "self-reviewed."
 
-**Why:** Sprint 6 shipped a seam test with incorrect floating-point boundary math. A reviewer with a testing mindset would have caught the error. The prior "review gate" rule (Section 1, >200 lines) did not trigger because all Sprint 6 tasks were under 200 lines.
+**Why:** Sprint 6 shipped a seam test with incorrect floating-point boundary math. A same-domain reviewer might have missed it too. A cross-domain reviewer (Game Designer checking "does this test reflect real gameplay?") would have questioned the boundary values. (Evolved from Sprint 6's domain-expert-review rule.)
 
 ## Things We Will Figure Out Together
 
@@ -215,11 +217,11 @@ This is lighter than a formal PR process but ensures a second pair of domain-exp
 - How to handle disagreements between agents
 - When to bring in a specialist agent (Art Director, Sound Engineer, Level Designer not needed for Sprint 1)
 - ~~How to balance speed vs. quality~~ → Resolved: quality gate is "playable and building" (Stakeholder Review)
-- ~~Is mob programming viable?~~ → Resolved Sprint 6: Formally adopted "solo driver with review gates" model. See Section 1.
+- ~~Is mob programming viable?~~ → Resolved Sprint 6: solo driver with review gates. → **Reversed post-Sprint 6**: Stakeholder directive — always use agent teams, always get multiple perspectives. See Section 1.
 
 ## Resolved Questions (Sprint 1)
 
-- **8 agents right?** Only 3 were needed for Sprint 1 (XP Coach, Engine Architect, DevOps Engineer). Art/Sound/Level agents are for later sprints with content.
+- **8 agents right?** Minimum 3 per task (xp-coach + domain expert + cross-domain challenger). Scale up as domains are touched. Art/Sound/Level agents join when content sprints begin.
 - **Opus for all?** Engine Architect benefits from opus. DevOps scaffolding could use sonnet for speed. Evaluate per-task.
 - **Driver rotation timing?** Per-task rotation works well. Engine Architect drove most implementation since it's all C++ systems.
 - **WIP limits?** One feature at a time is sufficient. Allow parallel non-overlapping systems within a feature.
