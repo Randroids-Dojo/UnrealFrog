@@ -52,7 +52,7 @@ public:
 	TArray<int32> HomeSlotColumns;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Difficulty")
-	float DifficultySpeedIncrement = 0.1f;
+	float DifficultySpeedIncrement = 0.15f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Difficulty")
 	int32 WavesPerGapReduction = 2;

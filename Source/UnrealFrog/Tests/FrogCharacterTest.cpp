@@ -24,7 +24,7 @@ bool FFrogCharacter_DefaultValues::RunTest(const FString& Parameters)
 	TestEqual(TEXT("HopDuration default"), Frog->HopDuration, 0.15f);
 	TestEqual(TEXT("HopArcHeight default"), Frog->HopArcHeight, 30.0f);
 	TestEqual(TEXT("GridCellSize default"), Frog->GridCellSize, 100.0f);
-	TestEqual(TEXT("InputBufferWindow default"), Frog->InputBufferWindow, 0.1f);
+	TestEqual(TEXT("InputBufferWindow default"), Frog->InputBufferWindow, 0.08f);
 	TestEqual(TEXT("BackwardHopMultiplier default"), Frog->BackwardHopMultiplier, 1.0f);
 	TestEqual(TEXT("GridColumns default"), Frog->GridColumns, 13);
 	TestEqual(TEXT("GridRows default"), Frog->GridRows, 15);
@@ -90,29 +90,55 @@ bool FFrogCharacter_HopRequest::RunTest(const FString& Parameters)
 }
 
 // ---------------------------------------------------------------------------
-// Test: Input buffering during an active hop
+// Test: Input buffering is rejected early in a hop (outside InputBufferWindow)
 // ---------------------------------------------------------------------------
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-	FFrogCharacter_InputBuffer,
-	"UnrealFrog.Character.InputBuffer",
+	FFrogCharacter_InputBufferRejectsEarly,
+	"UnrealFrog.Character.InputBufferRejectsEarly",
 	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
 
-bool FFrogCharacter_InputBuffer::RunTest(const FString& Parameters)
+bool FFrogCharacter_InputBufferRejectsEarly::RunTest(const FString& Parameters)
 {
 	AFrogCharacter* Frog = NewObject<AFrogCharacter>();
 
-	// Start a hop
+	// HopDuration=0.15, InputBufferWindow=0.1 → buffer starts at 0.05s into hop
+	// At HopElapsed=0, TimeRemaining=0.15 > InputBufferWindow=0.1 → reject
 	Frog->RequestHop(FVector(0.0f, 1.0f, 0.0f));
 	TestTrue(TEXT("First hop started"), Frog->bIsHopping);
 
-	// Request another hop while still hopping -- should be buffered
+	// Request another hop immediately (HopElapsed=0, outside buffer window)
 	Frog->RequestHop(FVector(1.0f, 0.0f, 0.0f));
 
-	// Should still be hopping from the first hop
 	TestTrue(TEXT("Still hopping"), Frog->bIsHopping);
+	TestFalse(TEXT("Input NOT buffered (too early)"), Frog->HasBufferedInput());
 
-	// The buffered direction should be stored
-	TestTrue(TEXT("Has buffered input"), Frog->HasBufferedInput());
+	return true;
+}
+
+// ---------------------------------------------------------------------------
+// Test: Input buffering accepted when inside the InputBufferWindow
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FFrogCharacter_InputBufferAcceptsInWindow,
+	"UnrealFrog.Character.InputBufferAcceptsInWindow",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FFrogCharacter_InputBufferAcceptsInWindow::RunTest(const FString& Parameters)
+{
+	AFrogCharacter* Frog = NewObject<AFrogCharacter>();
+
+	// Set InputBufferWindow to cover the entire hop duration so any point
+	// during the hop is inside the buffer window
+	Frog->InputBufferWindow = Frog->HopDuration;
+
+	Frog->RequestHop(FVector(0.0f, 1.0f, 0.0f));
+	TestTrue(TEXT("First hop started"), Frog->bIsHopping);
+
+	// At HopElapsed=0, TimeRemaining=0.15 <= InputBufferWindow=0.15 → accept
+	Frog->RequestHop(FVector(1.0f, 0.0f, 0.0f));
+
+	TestTrue(TEXT("Still hopping"), Frog->bIsHopping);
+	TestTrue(TEXT("Input buffered (inside window)"), Frog->HasBufferedInput());
 
 	return true;
 }

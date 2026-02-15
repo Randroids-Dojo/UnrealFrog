@@ -293,16 +293,16 @@ Maximum theoretical multiplier: 5x. Forward hops beyond 5 consecutive still awar
 When a round completes (all 5 homes filled), the wave number increments. Difficulty scales:
 
 ```
-SpeedMultiplier = 1.0 + (WaveNumber - 1) * 0.1
+SpeedMultiplier = 1.0 + (WaveNumber - 1) * 0.15
 GapReduction = FMath::Max(1, BaseGap - FMath::FloorToInt((WaveNumber - 1) / 2))
 ```
 
 - **Wave 1**: All hazards at base speed, base gaps
-- **Wave 2**: Speeds at 1.1x, same gaps
-- **Wave 3**: Speeds at 1.2x, gaps reduced by 1 cell
-- **Wave 4**: Speeds at 1.3x, gaps reduced by 1 cell
-- **Wave 5**: Speeds at 1.4x, gaps reduced by 2 cells
-- **Speed cap**: 2.0x (at Wave 11)
+- **Wave 2**: Speeds at 1.15x, same gaps
+- **Wave 3**: Speeds at 1.30x, gaps reduced by 1 cell
+- **Wave 4**: Speeds at 1.45x, gaps reduced by 1 cell
+- **Wave 5**: Speeds at 1.60x, gaps reduced by 2 cells
+- **Speed cap**: 2.0x (at Wave 8)
 - **Minimum gap**: 1 cell (never 0 -- the game must always be passable)
 
 ---
@@ -385,8 +385,8 @@ GapReduction = FMath::Max(1, BaseGap - FMath::FloorToInt((WaveNumber - 1) / 2))
 ### 7.8 Wave Progression
 
 - [ ] **WAVE-01**: Wave 1 uses base speeds and base gaps from Section 4.
-- [ ] **WAVE-02**: Wave 2 multiplies all hazard speeds by 1.1.
-- [ ] **WAVE-03**: Speed multiplier increases by 0.1 per wave, capping at 2.0.
+- [ ] **WAVE-02**: Wave 2 multiplies all hazard speeds by 1.15.
+- [ ] **WAVE-03**: Speed multiplier increases by 0.15 per wave, capping at 2.0.
 - [ ] **WAVE-04**: Gaps reduce by 1 cell every 2 waves, with a minimum of 1 cell.
 - [ ] **WAVE-05**: The game is always passable -- no lane configuration creates an impossible gap.
 

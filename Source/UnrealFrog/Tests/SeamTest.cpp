@@ -701,6 +701,70 @@ bool FSeam_LastHomeSlotNoDoubleBonuses::RunTest(const FString& Parameters)
 }
 
 // ---------------------------------------------------------------------------
+// Seam 15b: FilledHomeSlotCausesDeath
+// Systems: GameMode (HandleHopCompleted + TryFillHomeSlot)
+//
+// Landing on an already-filled home slot kills the frog (spec GOAL-04).
+// TryFillHomeSlot returns false for filled slots, and HandleHopCompleted
+// routes that to HandleFrogDied(Squish).
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSeam_FilledHomeSlotCausesDeath,
+	"UnrealFrog.Seam.FilledHomeSlotCausesDeath",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FSeam_FilledHomeSlotCausesDeath::RunTest(const FString& Parameters)
+{
+	AddExpectedError(TEXT("No world was found"), EAutomationExpectedErrorFlags::Contains, 0);
+
+	AUnrealFrogGameMode* GM = NewObject<AUnrealFrogGameMode>();
+	GM->StartGame();
+	GM->OnSpawningComplete();
+	TestEqual(TEXT("Playing state"), GM->CurrentState, EGameState::Playing);
+
+	// Fill home slot at column 1
+	GM->TryFillHomeSlot(1);
+	TestEqual(TEXT("1 slot filled"), GM->HomeSlotsFilledCount, 1);
+
+	// Land on the same filled slot — should trigger death
+	GM->HandleHopCompleted(FIntPoint(1, 14));
+	TestEqual(TEXT("Dying after landing on filled slot"), GM->CurrentState, EGameState::Dying);
+
+	return true;
+}
+
+// ---------------------------------------------------------------------------
+// Seam 15c: NonHomeSlotColumnCausesDeath
+// Systems: GameMode (HandleHopCompleted + TryFillHomeSlot)
+//
+// Landing on row 14 at a column that is NOT a home slot column kills the frog
+// (spec GOAL-03). TryFillHomeSlot returns false for non-slot columns.
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSeam_NonHomeSlotColumnCausesDeath,
+	"UnrealFrog.Seam.NonHomeSlotColumnCausesDeath",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FSeam_NonHomeSlotColumnCausesDeath::RunTest(const FString& Parameters)
+{
+	AddExpectedError(TEXT("No world was found"), EAutomationExpectedErrorFlags::Contains, 0);
+
+	AUnrealFrogGameMode* GM = NewObject<AUnrealFrogGameMode>();
+	GM->StartGame();
+	GM->OnSpawningComplete();
+	TestEqual(TEXT("Playing state"), GM->CurrentState, EGameState::Playing);
+
+	// HomeSlotColumns are {1, 4, 6, 8, 11} — column 3 is NOT a home slot
+	TestFalse(TEXT("Column 3 is not a home slot"), GM->IsHomeSlotColumn(3));
+
+	// Land on row 14 at non-home-slot column — should trigger death
+	GM->HandleHopCompleted(FIntPoint(3, 14));
+	TestEqual(TEXT("Dying after landing on non-home-slot column"), GM->CurrentState, EGameState::Dying);
+
+	return true;
+}
+
+// ---------------------------------------------------------------------------
 // Seam 16: WaveDifficultyFlowsToLaneConfig
 // Systems: GameMode + LaneManager
 //
@@ -724,6 +788,12 @@ bool FSeam_WaveDifficultyFlowsToLaneConfig::RunTest(const FString& Parameters)
 	LM->SetupDefaultLaneConfigs();
 	TestTrue(TEXT("Lane configs populated"), LM->LaneConfigs.Num() > 0);
 
+	// Read tuning parameters from GM so test is resilient to tuning changes.
+	// We verify the *formula* is correct, not specific magic numbers.
+	const float Increment = GM->DifficultySpeedIncrement;
+	const float MaxMult = GM->MaxSpeedMultiplier;
+	const int32 WavesPerGap = GM->WavesPerGapReduction;
+
 	// --- Wave 1: baseline (no scaling) ---
 	GM->CurrentWave = 1;
 	float Wave1Multiplier = GM->GetSpeedMultiplier();
@@ -745,14 +815,16 @@ bool FSeam_WaveDifficultyFlowsToLaneConfig::RunTest(const FString& Parameters)
 	}
 
 	// --- Wave 3: moderate scaling ---
-	// Speed: 1.0 + (3-1)*0.1 = 1.2
-	// Gap reduction: (3-1)/2 = 1
+	// Speed: 1.0 + (3-1)*Increment
+	// Gap reduction: (3-1)/WavesPerGap
 	GM->CurrentWave = 3;
 	float Wave3Multiplier = GM->GetSpeedMultiplier();
 	int32 Wave3GapReduction = GM->GetGapReduction();
 
-	TestNearlyEqual(TEXT("Wave 3 speed multiplier is 1.2"), Wave3Multiplier, 1.2f);
-	TestEqual(TEXT("Wave 3 gap reduction is 1"), Wave3GapReduction, 1);
+	float ExpectedWave3Mult = FMath::Min(MaxMult, 1.0f + 2.0f * Increment);
+	int32 ExpectedWave3Gap = 2 / WavesPerGap;
+	TestNearlyEqual(TEXT("Wave 3 speed multiplier matches formula"), Wave3Multiplier, ExpectedWave3Mult);
+	TestEqual(TEXT("Wave 3 gap reduction matches formula"), Wave3GapReduction, ExpectedWave3Gap);
 
 	// Verify scaled speeds are strictly greater than base speeds
 	for (const FLaneConfig& Config : LM->LaneConfigs)
@@ -777,17 +849,25 @@ bool FSeam_WaveDifficultyFlowsToLaneConfig::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Wave 3 reduced gaps still produce valid lanes"), LMReduced->ValidateGaps());
 
 	// --- Wave 7: heavy scaling ---
-	// Speed: 1.0 + (7-1)*0.1 = 1.6
-	// Gap reduction: (7-1)/2 = 3
+	// Speed: 1.0 + (7-1)*Increment
+	// Gap reduction: (7-1)/WavesPerGap
 	GM->CurrentWave = 7;
 	float Wave7Multiplier = GM->GetSpeedMultiplier();
 	int32 Wave7GapReduction = GM->GetGapReduction();
 
-	TestNearlyEqual(TEXT("Wave 7 speed multiplier is 1.6"), Wave7Multiplier, 1.6f);
-	TestEqual(TEXT("Wave 7 gap reduction is 3"), Wave7GapReduction, 3);
+	float ExpectedWave7Mult = FMath::Min(MaxMult, 1.0f + 6.0f * Increment);
+	int32 ExpectedWave7Gap = 6 / WavesPerGap;
+	TestNearlyEqual(TEXT("Wave 7 speed multiplier matches formula"), Wave7Multiplier, ExpectedWave7Mult);
+	TestEqual(TEXT("Wave 7 gap reduction matches formula"), Wave7GapReduction, ExpectedWave7Gap);
 
-	// Even with gap reduction of 3, all lanes must remain passable
+	// Even with heavy gap reduction, all lanes must remain passable
 	// (MinGapCells clamped to 1 minimum)
+	// NOTE: ValidateGaps checks structural passability (gap >= 1 cell exists).
+	// Temporal passability (can the frog hop through before the next hazard
+	// arrives?) is not checked here. At 2.0x speed cap with 1-cell gap, the
+	// tightest lane is motorcycle (250*2.0=500 UU/s): safe window = 100/500
+	// = 0.2s vs HopDuration 0.15s = 0.05s margin. If base speeds or
+	// HopDuration change, verify this margin stays positive.
 	ALaneManager* LMHeavy = NewObject<ALaneManager>();
 	LMHeavy->SetupDefaultLaneConfigs();
 	for (FLaneConfig& Config : LMHeavy->LaneConfigs)
@@ -796,21 +876,21 @@ bool FSeam_WaveDifficultyFlowsToLaneConfig::RunTest(const FString& Parameters)
 	}
 	TestTrue(TEXT("Wave 7 reduced gaps still produce valid lanes"), LMHeavy->ValidateGaps());
 
-	// --- Wave 11+: speed cap ---
-	// Speed capped at MaxSpeedMultiplier (2.0)
-	GM->CurrentWave = 11;
-	float Wave11Multiplier = GM->GetSpeedMultiplier();
+	// --- Speed cap: find the wave where the cap kicks in ---
+	// Cap wave: 1.0 + (W-1)*Increment >= MaxMult → W >= 1 + (MaxMult-1)/Increment
+	int32 CapWave = FMath::CeilToInt(1.0f + (MaxMult - 1.0f) / Increment);
+	GM->CurrentWave = CapWave;
+	float CapMultiplier = GM->GetSpeedMultiplier();
 
-	TestNearlyEqual(TEXT("Wave 11 speed capped at 2.0"), Wave11Multiplier, 2.0f);
+	TestNearlyEqual(TEXT("Speed capped at MaxSpeedMultiplier"), CapMultiplier, MaxMult);
 
-	// Verify the cap holds at even higher waves
-	GM->CurrentWave = 20;
-	float Wave20Multiplier = GM->GetSpeedMultiplier();
-	TestNearlyEqual(TEXT("Wave 20 speed still capped at 2.0"), Wave20Multiplier, 2.0f);
+	// Verify the cap holds well beyond the cap wave
+	GM->CurrentWave = CapWave + 10;
+	float LateMult = GM->GetSpeedMultiplier();
+	TestNearlyEqual(TEXT("Speed still capped at high wave"), LateMult, MaxMult);
 
 	// --- Concrete example: Row 3 car lane at wave 7 ---
-	// Base speed 200, multiplier 1.6 → scaled speed 320
-	// Base gap 2, reduction 3 → clamped gap 1
+	// Verifies the formula end-to-end with a specific lane config
 	const FLaneConfig* Row3 = nullptr;
 	for (const FLaneConfig& Config : LM->LaneConfigs)
 	{
@@ -824,10 +904,12 @@ bool FSeam_WaveDifficultyFlowsToLaneConfig::RunTest(const FString& Parameters)
 	if (Row3)
 	{
 		float Row3ScaledSpeed = Row3->Speed * Wave7Multiplier;
-		TestNearlyEqual(TEXT("Row 3 wave 7 speed = 320"), Row3ScaledSpeed, 320.0f);
+		float ExpectedRow3Speed = Row3->Speed * ExpectedWave7Mult;
+		TestNearlyEqual(TEXT("Row 3 wave 7 speed matches formula"), Row3ScaledSpeed, ExpectedRow3Speed);
 
 		int32 Row3AdjustedGap = FMath::Max(1, Row3->MinGapCells - Wave7GapReduction);
-		TestEqual(TEXT("Row 3 wave 7 gap clamped to 1"), Row3AdjustedGap, 1);
+		int32 ExpectedRow3Gap = FMath::Max(1, Row3->MinGapCells - ExpectedWave7Gap);
+		TestEqual(TEXT("Row 3 wave 7 gap matches formula"), Row3AdjustedGap, ExpectedRow3Gap);
 	}
 
 	return true;

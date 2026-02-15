@@ -127,9 +127,13 @@ void AFrogCharacter::RequestHop(FVector Direction)
 
 	if (bIsHopping)
 	{
-		// Buffer the input if we are mid-hop
-		bHasBufferedInput = true;
-		BufferedDirection = Direction;
+		// Only buffer input during the final InputBufferWindow seconds of the hop
+		float TimeRemaining = CurrentHopDuration - HopElapsed;
+		if (TimeRemaining <= InputBufferWindow)
+		{
+			bHasBufferedInput = true;
+			BufferedDirection = Direction;
+		}
 		return;
 	}
 

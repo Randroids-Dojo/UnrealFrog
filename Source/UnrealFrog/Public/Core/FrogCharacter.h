@@ -40,7 +40,7 @@ public:
 	float GridCellSize = 100.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
-	float InputBufferWindow = 0.1f;
+	float InputBufferWindow = 0.08f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
 	float BackwardHopMultiplier = 1.0f;

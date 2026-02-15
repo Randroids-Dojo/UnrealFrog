@@ -32,6 +32,8 @@ or an explicit "deferred" acknowledgment. This matrix tracks coverage.
 | 13 | GameMode | ScoreSubsystem | StartGame resets score/lives via StartNewGame | DEFERRED | Low risk -- direct call, tested in isolation |
 | 14 | GameMode | LaneManager | Wave difficulty applies speed multiplier + gap reduction to lane configs | COVERED | `FSeam_WaveDifficultyFlowsToLaneConfig` |
 | 15 | FrogCharacter | FrogPlayerController | Input buffering during hop | DEFERRED | Low risk -- single system boundary, tested in FrogCharacter isolation tests |
+| 15b | GameMode | HomeSlots | Landing on already-filled home slot kills frog (GOAL-04) | COVERED | `FSeam_FilledHomeSlotCausesDeath` |
+| 15c | GameMode | HomeSlots | Landing on non-home-slot column at goal row kills frog (GOAL-03) | COVERED | `FSeam_NonHomeSlotColumnCausesDeath` |
 | 16 | ScoreSubsystem | AudioManager | Extra life sound fires on threshold cross | DEFERRED | Low risk -- single AddDynamic binding, tested in wiring tests |
 | 17 | GroundBuilder | LaneManager | Ground rows match lane config rows | DEFERRED | Low risk -- both read from same constants |
 | 18 | VFXManager | GameMode (Tick) | TickVFX driven from GameMode::Tick for animation | COVERED | `FSeam_VFXTickDrivesAnimation` |

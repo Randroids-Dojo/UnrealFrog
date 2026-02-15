@@ -389,33 +389,30 @@ bool FGameState_DifficultyScaling::RunTest(const FString& Parameters)
 	TestNearlyEqual(TEXT("Wave 1 speed multiplier"), GM->GetSpeedMultiplier(), 1.0f);
 	TestEqual(TEXT("Wave 1 gap reduction"), GM->GetGapReduction(), 0);
 
-	// Wave 2: speed 1.1, gap reduction 0
+	// Wave 2: speed 1.15 (1.0 + 1*0.15), gap reduction 0
 	GM->CurrentWave = 2;
-	TestNearlyEqual(TEXT("Wave 2 speed multiplier"), GM->GetSpeedMultiplier(), 1.1f);
+	TestNearlyEqual(TEXT("Wave 2 speed multiplier"), GM->GetSpeedMultiplier(), 1.15f);
 	TestEqual(TEXT("Wave 2 gap reduction"), GM->GetGapReduction(), 0);
 
-	// Wave 4: speed 1.3, gap reduction 1
+	// Wave 4: speed 1.45 (1.0 + 3*0.15), gap reduction 1
 	GM->CurrentWave = 4;
-	TestNearlyEqual(TEXT("Wave 4 speed multiplier"), GM->GetSpeedMultiplier(), 1.3f);
+	TestNearlyEqual(TEXT("Wave 4 speed multiplier"), GM->GetSpeedMultiplier(), 1.45f);
 	TestEqual(TEXT("Wave 4 gap reduction"), GM->GetGapReduction(), 1);
 
-	// Wave 7: speed 1.6, gap reduction 3 ((7-1)/2=3)
+	// Wave 7: speed 1.90 (1.0 + 6*0.15), gap reduction 3 ((7-1)/2=3)
 	GM->CurrentWave = 7;
-	TestNearlyEqual(TEXT("Wave 7 speed multiplier"), GM->GetSpeedMultiplier(), 1.6f);
+	TestNearlyEqual(TEXT("Wave 7 speed multiplier"), GM->GetSpeedMultiplier(), 1.9f);
 	TestEqual(TEXT("Wave 7 gap reduction"), GM->GetGapReduction(), 3);
 
-	// Wave 10: speed 1.9, gap reduction 4 ((10-1)/2=4)
+	// Wave 8: speed 2.0 (raw = 1.0 + 7*0.15 = 2.05, capped at MaxSpeedMultiplier)
+	GM->CurrentWave = 8;
+	TestNearlyEqual(TEXT("Wave 8 speed capped at 2.0"), GM->GetSpeedMultiplier(), 2.0f);
+	TestEqual(TEXT("Wave 8 gap reduction"), GM->GetGapReduction(), 3);
+
+	// Wave 10: speed still 2.0 (raw = 1.0 + 9*0.15 = 2.35, capped)
 	GM->CurrentWave = 10;
-	TestNearlyEqual(TEXT("Wave 10 speed multiplier"), GM->GetSpeedMultiplier(), 1.9f);
+	TestNearlyEqual(TEXT("Wave 10 speed still capped at 2.0"), GM->GetSpeedMultiplier(), 2.0f);
 	TestEqual(TEXT("Wave 10 gap reduction"), GM->GetGapReduction(), 4);
-
-	// Wave 11: speed is 2.0 (raw = 1.0 + 10*0.1 = 2.0, capped at MaxSpeedMultiplier)
-	GM->CurrentWave = 11;
-	TestNearlyEqual(TEXT("Wave 11 speed capped at 2.0"), GM->GetSpeedMultiplier(), 2.0f);
-
-	// Wave 15: speed still 2.0 (raw = 1.0 + 14*0.1 = 2.4, capped)
-	GM->CurrentWave = 15;
-	TestNearlyEqual(TEXT("Wave 15 speed still capped at 2.0"), GM->GetSpeedMultiplier(), 2.0f);
 
 	return true;
 }
