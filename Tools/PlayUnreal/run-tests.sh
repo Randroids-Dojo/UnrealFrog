@@ -106,6 +106,19 @@ if [ ! -f "${PROJECT_FILE}" ]; then
     exit 2
 fi
 
+# -- Pre-flight: kill stale editor processes ---------------------------------
+# Old UnrealEditor-Cmd or UnrealTraceServer processes from prior runs can hold
+# stale dylibs and cause silent test failures or startup hangs.
+
+STALE_PIDS=$(pgrep -f "UnrealEditor-Cmd|UnrealTraceServer" 2>/dev/null || true)
+if [ -n "${STALE_PIDS}" ]; then
+    echo "Cleaning up stale editor processes..."
+    pkill -f "UnrealTraceServer" 2>/dev/null || true
+    pkill -f "UnrealEditor-Cmd" 2>/dev/null || true
+    sleep 2
+    echo "Done."
+fi
+
 # -- List mode ---------------------------------------------------------------
 
 if [ "${LIST_MODE}" = true ]; then

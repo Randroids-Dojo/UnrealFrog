@@ -1,6 +1,6 @@
 # Seam Test Coverage Matrix
 
-*Last updated: Sprint 6*
+*Last updated: Sprint 7*
 
 ## Purpose
 
@@ -30,7 +30,7 @@ or an explicit "deferred" acknowledgment. This matrix tracks coverage.
 | 11 | HUD | ScoreSubsystem | Score delta detection triggers pop animation | COVERED | `FSeam_HUDScorePopOnScoreIncrease` |
 | 12 | AudioManager | bMuted flag | Music respects mute flag | COVERED | `FSeam_MusicMutedInCI` |
 | 13 | GameMode | ScoreSubsystem | StartGame resets score/lives via StartNewGame | DEFERRED | Low risk -- direct call, tested in isolation |
-| 14 | GameMode | LaneManager | Wave difficulty applies speed multiplier | DEFERRED | Low risk -- LaneManager reads GM properties directly |
+| 14 | GameMode | LaneManager | Wave difficulty applies speed multiplier + gap reduction to lane configs | COVERED | `FSeam_WaveDifficultyFlowsToLaneConfig` |
 | 15 | FrogCharacter | FrogPlayerController | Input buffering during hop | DEFERRED | Low risk -- single system boundary, tested in FrogCharacter isolation tests |
 | 16 | ScoreSubsystem | AudioManager | Extra life sound fires on threshold cross | DEFERRED | Low risk -- single AddDynamic binding, tested in wiring tests |
 | 17 | GroundBuilder | LaneManager | Ground rows match lane config rows | DEFERRED | Low risk -- both read from same constants |

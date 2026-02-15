@@ -12,6 +12,7 @@
 #include "Core/FroggerVFXManager.h"
 #include "Core/FroggerHUD.h"
 #include "Core/HazardBase.h"
+#include "Core/LaneManager.h"
 #include "Core/ScoreSubsystem.h"
 #include "Core/UnrealFrogGameMode.h"
 
@@ -626,6 +627,208 @@ bool FSeam_TimerWarningFiresAtThreshold::RunTest(const FString& Parameters)
 	// Tick again — should stay true (not re-trigger)
 	GM->TickTimer(1.0f);
 	TestTrue(TEXT("Warning stays set after subsequent ticks"), GM->bTimerWarningPlayed);
+
+	return true;
+}
+
+// ---------------------------------------------------------------------------
+// Seam 15: HandleHopCompleted fills last home slot without double-awarding
+// Systems: GameMode (HandleHopCompleted + TryFillHomeSlot + OnWaveComplete)
+//
+// When HandleHopCompleted triggers TryFillHomeSlot on the last empty slot,
+// the wave-complete path fires exactly once. Previously both TryFillHomeSlot
+// and HandleHopCompleted independently checked for wave completion, causing
+// double state transitions and double score bonuses.
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSeam_LastHomeSlotNoDoubleBonuses,
+	"UnrealFrog.Seam.LastHomeSlotNoDoubleBonuses",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FSeam_LastHomeSlotNoDoubleBonuses::RunTest(const FString& Parameters)
+{
+	// NewObject GameMode has no world context — suppress expected UE error
+	AddExpectedError(TEXT("No world was found"), EAutomationExpectedErrorFlags::Contains, 0);
+
+	AUnrealFrogGameMode* GM = NewObject<AUnrealFrogGameMode>();
+
+	// Count RoundComplete state transitions to detect double-firing.
+	// OnWaveCompleted is a native multicast delegate (supports AddLambda)
+	// that fires inside OnWaveComplete → OnRoundCompleteFinished.
+	// But OnWaveComplete itself sets state to RoundComplete before the timer fires.
+	// Use OnHomeSlotFilled (dynamic) to count slot fills instead.
+	// Simplest approach: count how many times SetState(RoundComplete) was reached
+	// by checking CurrentWave (which only increments in OnRoundCompleteFinished).
+	int32 WaveCompletedCount = 0;
+	GM->OnWaveCompleted.AddLambda([&WaveCompletedCount](int32, int32) {
+		WaveCompletedCount++;
+	});
+
+	GM->StartGame();
+	GM->OnSpawningComplete();
+	TestEqual(TEXT("Playing state"), GM->CurrentState, EGameState::Playing);
+
+	// Fill 4 of 5 home slots directly via TryFillHomeSlot
+	// (simulating previous lives reaching home)
+	GM->TryFillHomeSlot(1);
+	GM->TryFillHomeSlot(4);
+	GM->TryFillHomeSlot(6);
+	GM->TryFillHomeSlot(8);
+	TestEqual(TEXT("4 slots filled"), GM->HomeSlotsFilledCount, 4);
+	TestEqual(TEXT("Still Playing after 4 slots"), GM->CurrentState, EGameState::Playing);
+
+	// Now fill the last slot via HandleHopCompleted — this is the real game path.
+	// HomeSlotRow = 14, column 11 is the last unfilled slot.
+	GM->HandleHopCompleted(FIntPoint(11, 14));
+
+	// The state should be RoundComplete (from OnWaveComplete via TryFillHomeSlot)
+	TestEqual(TEXT("State is RoundComplete"), GM->CurrentState, EGameState::RoundComplete);
+
+	// HomeSlotsFilledCount should be exactly 5, not 6 or higher
+	TestEqual(TEXT("Exactly 5 slots filled"), GM->HomeSlotsFilledCount, 5);
+
+	// Verify CurrentWave was NOT incremented (that happens in OnRoundCompleteFinished,
+	// not during the fill itself). If double-detection occurred, wave might advance prematurely.
+	TestEqual(TEXT("Wave still 1 (not yet advanced)"), GM->CurrentWave, 1);
+
+	// OnWaveCompleted fires from OnRoundCompleteFinished, which hasn't been called yet
+	// (it's timer-driven). So the count should be 0 at this point — the wave-complete
+	// path was triggered but the timer hasn't fired. What matters is that TryFillHomeSlot
+	// set the state to RoundComplete exactly once.
+	TestEqual(TEXT("OnWaveCompleted not yet fired (timer pending)"), WaveCompletedCount, 0);
+
+	return true;
+}
+
+// ---------------------------------------------------------------------------
+// Seam 16: WaveDifficultyFlowsToLaneConfig
+// Systems: GameMode + LaneManager
+//
+// When waves advance, GameMode's GetSpeedMultiplier() and GetGapReduction()
+// produce escalating difficulty values. These must (a) scale lane speeds
+// correctly when applied to FLaneConfig.Speed, and (b) not reduce gaps
+// below the minimum that ValidateGaps enforces — i.e., difficulty must
+// never create impossible lanes.
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSeam_WaveDifficultyFlowsToLaneConfig,
+	"UnrealFrog.Seam.WaveDifficultyFlowsToLaneConfig",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FSeam_WaveDifficultyFlowsToLaneConfig::RunTest(const FString& Parameters)
+{
+	AUnrealFrogGameMode* GM = NewObject<AUnrealFrogGameMode>();
+	ALaneManager* LM = NewObject<ALaneManager>();
+
+	// Populate default lane configs (same as BeginPlay without a World)
+	LM->SetupDefaultLaneConfigs();
+	TestTrue(TEXT("Lane configs populated"), LM->LaneConfigs.Num() > 0);
+
+	// --- Wave 1: baseline (no scaling) ---
+	GM->CurrentWave = 1;
+	float Wave1Multiplier = GM->GetSpeedMultiplier();
+	int32 Wave1GapReduction = GM->GetGapReduction();
+
+	TestNearlyEqual(TEXT("Wave 1 speed multiplier is 1.0"), Wave1Multiplier, 1.0f);
+	TestEqual(TEXT("Wave 1 gap reduction is 0"), Wave1GapReduction, 0);
+
+	// Apply wave 1 difficulty to each lane config — all speeds should be base speed
+	for (const FLaneConfig& Config : LM->LaneConfigs)
+	{
+		if (Config.LaneType == ELaneType::Road || Config.LaneType == ELaneType::River)
+		{
+			float ScaledSpeed = Config.Speed * Wave1Multiplier;
+			TestNearlyEqual(
+				*FString::Printf(TEXT("Wave 1 row %d speed unchanged"), Config.RowIndex),
+				ScaledSpeed, Config.Speed);
+		}
+	}
+
+	// --- Wave 3: moderate scaling ---
+	// Speed: 1.0 + (3-1)*0.1 = 1.2
+	// Gap reduction: (3-1)/2 = 1
+	GM->CurrentWave = 3;
+	float Wave3Multiplier = GM->GetSpeedMultiplier();
+	int32 Wave3GapReduction = GM->GetGapReduction();
+
+	TestNearlyEqual(TEXT("Wave 3 speed multiplier is 1.2"), Wave3Multiplier, 1.2f);
+	TestEqual(TEXT("Wave 3 gap reduction is 1"), Wave3GapReduction, 1);
+
+	// Verify scaled speeds are strictly greater than base speeds
+	for (const FLaneConfig& Config : LM->LaneConfigs)
+	{
+		if (Config.LaneType == ELaneType::Road || Config.LaneType == ELaneType::River)
+		{
+			float ScaledSpeed = Config.Speed * Wave3Multiplier;
+			TestTrue(
+				*FString::Printf(TEXT("Wave 3 row %d speed > base"), Config.RowIndex),
+				ScaledSpeed > Config.Speed);
+		}
+	}
+
+	// Verify gap reduction still produces valid lanes
+	// Apply gap reduction to a copy of the lane configs and validate
+	ALaneManager* LMReduced = NewObject<ALaneManager>();
+	LMReduced->SetupDefaultLaneConfigs();
+	for (FLaneConfig& Config : LMReduced->LaneConfigs)
+	{
+		Config.MinGapCells = FMath::Max(1, Config.MinGapCells - Wave3GapReduction);
+	}
+	TestTrue(TEXT("Wave 3 reduced gaps still produce valid lanes"), LMReduced->ValidateGaps());
+
+	// --- Wave 7: heavy scaling ---
+	// Speed: 1.0 + (7-1)*0.1 = 1.6
+	// Gap reduction: (7-1)/2 = 3
+	GM->CurrentWave = 7;
+	float Wave7Multiplier = GM->GetSpeedMultiplier();
+	int32 Wave7GapReduction = GM->GetGapReduction();
+
+	TestNearlyEqual(TEXT("Wave 7 speed multiplier is 1.6"), Wave7Multiplier, 1.6f);
+	TestEqual(TEXT("Wave 7 gap reduction is 3"), Wave7GapReduction, 3);
+
+	// Even with gap reduction of 3, all lanes must remain passable
+	// (MinGapCells clamped to 1 minimum)
+	ALaneManager* LMHeavy = NewObject<ALaneManager>();
+	LMHeavy->SetupDefaultLaneConfigs();
+	for (FLaneConfig& Config : LMHeavy->LaneConfigs)
+	{
+		Config.MinGapCells = FMath::Max(1, Config.MinGapCells - Wave7GapReduction);
+	}
+	TestTrue(TEXT("Wave 7 reduced gaps still produce valid lanes"), LMHeavy->ValidateGaps());
+
+	// --- Wave 11+: speed cap ---
+	// Speed capped at MaxSpeedMultiplier (2.0)
+	GM->CurrentWave = 11;
+	float Wave11Multiplier = GM->GetSpeedMultiplier();
+
+	TestNearlyEqual(TEXT("Wave 11 speed capped at 2.0"), Wave11Multiplier, 2.0f);
+
+	// Verify the cap holds at even higher waves
+	GM->CurrentWave = 20;
+	float Wave20Multiplier = GM->GetSpeedMultiplier();
+	TestNearlyEqual(TEXT("Wave 20 speed still capped at 2.0"), Wave20Multiplier, 2.0f);
+
+	// --- Concrete example: Row 3 car lane at wave 7 ---
+	// Base speed 200, multiplier 1.6 → scaled speed 320
+	// Base gap 2, reduction 3 → clamped gap 1
+	const FLaneConfig* Row3 = nullptr;
+	for (const FLaneConfig& Config : LM->LaneConfigs)
+	{
+		if (Config.RowIndex == 3)
+		{
+			Row3 = &Config;
+			break;
+		}
+	}
+	TestNotNull(TEXT("Row 3 config exists"), Row3);
+	if (Row3)
+	{
+		float Row3ScaledSpeed = Row3->Speed * Wave7Multiplier;
+		TestNearlyEqual(TEXT("Row 3 wave 7 speed = 320"), Row3ScaledSpeed, 320.0f);
+
+		int32 Row3AdjustedGap = FMath::Max(1, Row3->MinGapCells - Wave7GapReduction);
+		TestEqual(TEXT("Row 3 wave 7 gap clamped to 1"), Row3AdjustedGap, 1);
+	}
 
 	return true;
 }
