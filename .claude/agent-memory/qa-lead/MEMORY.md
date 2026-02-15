@@ -2,12 +2,40 @@
 
 *Persistent knowledge accumulated across sessions. First 200 lines loaded automatically.*
 
-## Sprint 6 State (current)
-- 24 test files, 154 total tests (153 pass, 1 fail) across 17 categories
-- New tests this sprint: 2 Score (high score persistence), 2 HUD (death flash), 2 Seam (VFXTick + TimerWarning)
+## Sprint 7 Plan (current)
+- **Sprint 7 goal**: Play-test + tuning + quick fixes. NO new features until play-test complete.
+- **Play-test is a BLOCKING dependency** -- all feature tasks blocked until play-test resolves
+- **Scope**: Option (a) -- play-test + tuning + quick fixes only. Stretch goal for feel features only if play-test is clean.
+- **GameCoordinator refactor**: DEFERRED to Sprint 8 (too risky to combine with 2-sprint play-test backlog)
+- **Section 18 added**: Domain-expert post-implementation review. QA Lead reviews tests, Engine Architect reviews C++, Game Designer reviews gameplay.
+- **Test count**: 154 passing (0 failures after boundary math fix)
+- **M_FlatColor.uasset + functional-tests-in-CI**: DROPPED per Section 17. M_FlatColor moved to "packaging prerequisites" checklist.
+
+### Sprint 7 Play-Test Checklist (QA Lead owns this)
+1. Hop in all 4 directions -- responsive (< 100ms)
+2. Death + respawn cycle (road hazard, river, timer)
+3. Score updates on HUD match scoring subsystem
+4. High score persists across game-over -> new game
+5. VFX: hop dust visible, death puff visible, scale animation runs
+6. Death flash: red overlay appears and fades
+7. Music: title track plays, switches to gameplay on start, LOOPS
+8. Timer bar visible and counts down, warning sound at < 16.7%
+9. Title screen: "PRESS START" visible, high score shows if > 0
+10. Wave transition: "WAVE 2!" announcement appears
+11. Game over -> title -> restart cycle works
+
+### Sprint 7 Test Priorities
+- P1: Seam 14 (GameMode -> LaneManager wave difficulty) -- promote from DEFERRED to COVERED
+- P1: Boundary test comments with exact arithmetic (new standard)
+- P2: Input-to-movement pipeline seam test
+- P2: "Visually verified" column in seam matrix
+
+## Sprint 6 State (completed)
+- 24 test files, 154 total tests, 0 failures (after boundary math fix)
+- 5 commits for 4 subsystems -- first sprint with proper per-subsystem commits
 - Sprint goal: Polish fixes -- TickVFX wiring, score pop positioning, high score persistence, death flash, timer warning sound
-- **1 TEST FAILURE**: `FSeam_TimerWarningFiresAtThreshold` -- test boundary math bug, NOT game bug
 - Visual launch verified: no crashes, lane system initialized, clean shutdown
+- Full gameplay play-test NOT completed (2nd consecutive sprint)
 
 ## Sprint 6 Findings
 
