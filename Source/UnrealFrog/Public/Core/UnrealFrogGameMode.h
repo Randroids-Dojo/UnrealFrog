@@ -146,6 +146,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "GameState")
 	void HandleGameOver();
 
+	// -- PlayUnreal -------------------------------------------------------
+
+	/** Returns combined game state as JSON for PlayUnreal automation. */
+	UFUNCTION(BlueprintCallable, Category = "PlayUnreal")
+	FString GetGameStateJSON() const;
+
 	// -- Home slots -------------------------------------------------------
 
 	/** Attempt to fill a home slot at the given column. Returns true on success. */

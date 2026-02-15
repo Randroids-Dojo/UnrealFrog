@@ -139,6 +139,45 @@ void AUnrealFrogGameMode::Tick(float DeltaTime)
 	}
 }
 
+// -- PlayUnreal ---------------------------------------------------------------
+
+FString AUnrealFrogGameMode::GetGameStateJSON() const
+{
+	// Frog position
+	double FrogX = 0.0;
+	double FrogY = 0.0;
+	if (const AFrogCharacter* Frog = Cast<AFrogCharacter>(
+			UGameplayStatics::GetPlayerPawn(const_cast<AUnrealFrogGameMode*>(this), 0)))
+	{
+		FrogX = static_cast<double>(Frog->GridPosition.X);
+		FrogY = static_cast<double>(Frog->GridPosition.Y);
+	}
+
+	// Score and lives
+	int32 Score = 0;
+	int32 Lives = 0;
+	if (const UGameInstance* GI = GetGameInstance())
+	{
+		if (const UScoreSubsystem* Scoring = GI->GetSubsystem<UScoreSubsystem>())
+		{
+			Score = Scoring->Score;
+			Lives = Scoring->Lives;
+		}
+	}
+
+	// State name — strip enum class prefix (e.g. "EGameState::Playing" → "Playing")
+	FString StateName = UEnum::GetValueAsString(CurrentState);
+	int32 ColonIndex = INDEX_NONE;
+	if (StateName.FindLastChar(TEXT(':'), ColonIndex))
+	{
+		StateName = StateName.Mid(ColonIndex + 1);
+	}
+
+	return FString::Printf(
+		TEXT("{\"score\":%d,\"lives\":%d,\"wave\":%d,\"frogPos\":[%.0f,%.0f],\"gameState\":\"%s\",\"timeRemaining\":%.1f,\"homeSlotsFilledCount\":%d}"),
+		Score, Lives, CurrentWave, FrogX, FrogY, *StateName, RemainingTime, HomeSlotsFilledCount);
+}
+
 // -- State transitions --------------------------------------------------------
 
 void AUnrealFrogGameMode::StartGame()

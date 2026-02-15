@@ -335,4 +335,51 @@ bool FPlayUnreal_FullRound::RunTest(const FString& Parameters)
 	return true;
 }
 
+// ===========================================================================
+// Scenario 6: GetGameStateJSON
+// Verify the JSON helper returns valid, parseable state.
+// ===========================================================================
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FPlayUnreal_GetGameStateJSON,
+	"UnrealFrog.PlayUnreal.Scenario6_GetGameStateJSON",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FPlayUnreal_GetGameStateJSON::RunTest(const FString& Parameters)
+{
+	AUnrealFrogGameMode* GM = NewObject<AUnrealFrogGameMode>();
+
+	UE_LOG(LogTemp, Display, TEXT("[PlayUnreal] === Scenario 6: GetGameStateJSON ==="));
+
+	// Title state — no player pawn or scoring subsystem in test context
+	FString JSON = GM->GetGameStateJSON();
+	UE_LOG(LogTemp, Display, TEXT("[PlayUnreal] JSON=%s"), *JSON);
+
+	// Verify JSON contains all required fields
+	TestTrue(TEXT("Has score field"), JSON.Contains(TEXT("\"score\":")));
+	TestTrue(TEXT("Has lives field"), JSON.Contains(TEXT("\"lives\":")));
+	TestTrue(TEXT("Has wave field"), JSON.Contains(TEXT("\"wave\":")));
+	TestTrue(TEXT("Has frogPos field"), JSON.Contains(TEXT("\"frogPos\":")));
+	TestTrue(TEXT("Has gameState field"), JSON.Contains(TEXT("\"gameState\":")));
+	TestTrue(TEXT("Has timeRemaining field"), JSON.Contains(TEXT("\"timeRemaining\":")));
+	TestTrue(TEXT("Has homeSlotsFilledCount field"), JSON.Contains(TEXT("\"homeSlotsFilledCount\":")));
+
+	// Verify state name is correct for Title
+	TestTrue(TEXT("State is Title"), JSON.Contains(TEXT("\"gameState\":\"Title\"")));
+
+	// Start game and verify state transitions reflect in JSON
+	GM->StartGame();
+	GM->OnSpawningComplete();
+	FString PlayingJSON = GM->GetGameStateJSON();
+	TestTrue(TEXT("State is Playing after start"), PlayingJSON.Contains(TEXT("\"gameState\":\"Playing\"")));
+
+	// Verify wave and home slots
+	TestTrue(TEXT("Wave is 1"), PlayingJSON.Contains(TEXT("\"wave\":1")));
+	TestTrue(TEXT("HomeSlotsFilledCount is 0"), PlayingJSON.Contains(TEXT("\"homeSlotsFilledCount\":0")));
+
+	UE_LOG(LogTemp, Display, TEXT("[PlayUnreal] PlayingJSON=%s"), *PlayingJSON);
+	UE_LOG(LogTemp, Display, TEXT("[PlayUnreal] === Scenario 6: PASSED ==="));
+
+	return true;
+}
+
 #endif // WITH_AUTOMATION_TESTS
