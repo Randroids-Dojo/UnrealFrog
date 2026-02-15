@@ -2,33 +2,44 @@
 
 *Persistent knowledge accumulated across sessions. First 200 lines loaded automatically.*
 
-## Sprint 7 Plan (current)
-- **Sprint 7 goal**: Play-test + tuning + quick fixes. NO new features until play-test complete.
-- **Play-test is a BLOCKING dependency** -- all feature tasks blocked until play-test resolves
-- **Scope**: Option (a) -- play-test + tuning + quick fixes only. Stretch goal for feel features only if play-test is clean.
-- **GameCoordinator refactor**: DEFERRED to Sprint 8 (too risky to combine with 2-sprint play-test backlog)
-- **Section 18 added**: Domain-expert post-implementation review. QA Lead reviews tests, Engine Architect reviews C++, Game Designer reviews gameplay.
-- **Test count**: 154 passing (0 failures after boundary math fix)
-- **M_FlatColor.uasset + functional-tests-in-CI**: DROPPED per Section 17. M_FlatColor moved to "packaging prerequisites" checklist.
+## Sprint 8 Plan (current)
+- **Sprint 8 goal**: PlayUnreal automation (P0), VFX/HUD visibility fixes, visual verification
+- **Test count at sprint start**: 162 passing (0 failures)
+- **Seam matrix**: 19 entries (14 COVERED, 5 DEFERRED)
 
-### Sprint 7 Play-Test Checklist (QA Lead owns this)
-1. Hop in all 4 directions -- responsive (< 100ms)
-2. Death + respawn cycle (road hazard, river, timer)
-3. Score updates on HUD match scoring subsystem
-4. High score persists across game-over -> new game
-5. VFX: hop dust visible, death puff visible, scale animation runs
-6. Death flash: red overlay appears and fades
-7. Music: title track plays, switches to gameplay on start, LOOPS
-8. Timer bar visible and counts down, warning sound at < 16.7%
-9. Title screen: "PRESS START" visible, high score shows if > 0
-10. Wave transition: "WAVE 2!" announcement appears
-11. Game over -> title -> restart cycle works
+### Sprint 8 QA Deliverables
+1. **P0: Temporal passability invariant test** -- No dependencies, write immediately
+2. **P0: Score pop position verification test** -- Blocked on Engine Architect fix
+3. **P0: Death VFX scale verification test** -- Blocked on Engine Architect fix
+4. **P0: Visual play-test of Sprint 7 tuning** -- Blocked on PlayUnreal OR manual launch
+5. **P1: Difficulty perception threshold test** -- No dependencies, write immediately
+6. **P1: Home slot VFX position test** -- Blocked on Engine Architect fix
+7. **P1: PlayUnreal state roundtrip tests** -- Blocked on PlayUnreal landing
+8. **P1: Visual smoke test script** -- Blocked on PlayUnreal landing
+9. **Seam matrix update** -- 6 new entries (seams 20-25)
 
-### Sprint 7 Test Priorities
-- P1: Seam 14 (GameMode -> LaneManager wave difficulty) -- promote from DEFERRED to COVERED
-- P1: Boundary test comments with exact arithmetic (new standard)
-- P2: Input-to-movement pipeline seam test
-- P2: "Visually verified" column in seam matrix
+### Sprint 8 Key Decisions
+- PlayUnreal does NOT block all work, but DOES block QA sign-off
+- VFX/HUD fixes (~60 LOC) parallel with PlayUnreal development
+- Time-box PlayUnreal to 2 sessions; if not working by session 3, ship with "QA: visual pending"
+- PythonScriptPlugin needs spike-test in -game mode (may be editor-only)
+- Lock file for run-tests.sh must be commit #1 (section 19 bottleneck)
+
+### VFX Visibility Acceptance Criteria (Quantitative)
+- Death VFX: >= 5% of visible screen width at Z=2200/FOV50 (~103 UU diameter)
+- Score pops: within 200px of frog projected screen position, >= 24pt font, >= 0.8s duration
+- Home celebration: at correct world position from HomeSlotColumns, >= 4 sparkle actors, >= 1.0s
+- Wave announcement: centered on screen (within 10%), >= 36pt, >= 1.5s
+
+## Sprint 7 State (completed)
+- 162 total tests, 0 failures across 17 categories
+- 5 commits for 5 subsystems (per-subsystem compliance)
+- Sprint goal: Consolidation -- play-test, tune, fix. No new mechanics.
+- QA: code-level verified. Visual play-test PENDING (carried to Sprint 8 P0).
+- Tuning changes: DifficultySpeedIncrement 0.1->0.15, InputBufferWindow 0.1->0.08
+- Dead code fixed: difficulty wiring (GetSpeedMultiplier consumed), InputBufferWindow enforced
+- SaveHighScore: now only at game over / title transition
+- Duplicate wave-complete: consolidated to TryFillHomeSlot as single authority
 
 ## Sprint 6 State (completed)
 - 24 test files, 154 total tests, 0 failures (after boundary math fix)

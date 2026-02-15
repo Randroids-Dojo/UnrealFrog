@@ -2,7 +2,38 @@
 
 *Persistent knowledge accumulated across sessions. First 200 lines loaded automatically.*
 
-## Sprint 7 Retrospective (2026-02-15) -- LATEST
+## Sprint 8 IPM (2026-02-15) -- LATEST
+
+### Plan Location
+`/Users/randroid/Documents/Dev/Unreal/UnrealFrog/Docs/Planning/sprint8-plan.md`
+
+### Sprint 8 Goal
+"Build the PlayUnreal automation harness and fix all visual/perception bugs -- so agents can autonomously verify gameplay and players can see the game's feedback systems."
+
+### Key Decisions
+- **PlayUnreal approach:** Remote Control API plugin (localhost:30010) + Python client. Spike required first (Section 16). Fallback: custom C++ HTTP server (~200 LOC).
+- **GetGameStateJSON():** Added as UFUNCTION on GameMode (Engine Architect's proposal), NOT a separate UPlayUnrealHelpers class. Simpler, approach-agnostic.
+- **VFX fixes use TDD:** QA writes Red tests (quantitative: >= 5% screen width), Engine Architect writes Green implementation.
+- **Difficulty perception:** 3 signals (audio pitch +3%/wave, wave fanfare ceremony, ground color temperature). Game Designer drives. "5-second test" acceptance criterion.
+- **GameCoordinator deferred to Sprint 9:** Conflicts with GameMode changes this sprint.
+- **Section 17:** DROP visual regression (6th deferral), packaging (6th), rename E2E (7th).
+- **Gap reduction:** Stretch P1 via "tighten wrap" approach (40 LOC). First to cut.
+
+### Task Distribution
+- Engine Architect: 6 tasks (passability test, GetGameStateJSON, 3 VFX/HUD fixes, gap reduction stretch)
+- DevOps: 4 tasks (lock file, spike, Python client, launch script + acceptance test)
+- QA Lead: 5 tasks (Red tests, visual verification, smoke test, seam matrix)
+- Game Designer: 3 tasks (audio pitch, wave fanfare, ground color)
+- XP Coach: 1 task (Section 17 + retro prep)
+
+### IPM Process Lessons
+- 5-agent IPM produced high-quality plan with competing proposals synthesized
+- DevOps pivoted mid-IPM from PythonScriptPlugin to Remote Control API -- good adaptation
+- Engine Architect's message arrived after plan was written (message lag) -- was incorporated via plan update rather than rewrite
+- All agents agreed on priority ordering: PlayUnreal P0 > VFX fixes P0 > difficulty perception P1
+- Quantitative acceptance criteria (>= 5% screen width, "5-second test") replace subjective criteria
+
+## Sprint 7 Retrospective (2026-02-15)
 
 ### Key Findings
 - First sprint using full multi-perspective workflow (post-Sprint 6 stakeholder directive). 5 agents active.

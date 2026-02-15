@@ -23,13 +23,28 @@
 - Build.cs public deps: Core, CoreUObject, Engine, InputCore, EnhancedInput, UMG
 - Build.cs private deps: Slate, SlateCore
 
-## Sprint 6 State (Current)
-- 154 tests passing, 0 failures, 17 categories
-- run-tests.sh supports: --all, --seam, --audio, --e2e, --integration, --wiring, --vfx, --list, --report, --functional
+## Sprint 8 State (Current)
+- 162 tests passing, 0 failures, 17 categories (as of Sprint 7 end)
+- run-tests.sh: --all, --seam, --audio, --e2e, --integration, --wiring, --vfx, --list, --report, --functional
+- run-tests.sh now has mkdir-based lock file (/tmp/.unrealFrog_test_lock) to prevent concurrent runs (Section 19)
+- RemoteControl plugin enabled in .uproject (Sprint 8 Task 2)
 - Binary assets in git: Content/Audio/Music/*.wav (~4.4 MB), Content/Audio/SFX/*.wav
-- Seam matrix at Docs/Testing/seam-matrix.md: 14 COVERED, 5 DEFERRED (19 total)
-- 5 commits in Sprint 6 (per-subsystem commits restored)
-- Sprint 6 added: TickVFX wiring, death flash, high score persistence, timer warning seam
+- Seam matrix at Docs/Testing/seam-matrix.md
+
+## Remote Control API (Sprint 8 Spike Findings)
+- Plugin: Engine/Plugins/VirtualProduction/RemoteControl/
+- WebRemoteControl module: Type=Runtime, PlatformAllowList: Mac, Win64, Linux
+- Default HTTP port: 30010 (URemoteControlSettings::RemoteControlHttpServerPort)
+- In -game mode: REQUIRES `-RCWebControlEnable` flag (disabled by default outside editor)
+- bAutoStartWebServer defaults true; with -RCWebControlEnable the server auto-starts
+- Alternative startup: CVar `WebControl.EnableServerOnStartup=1` or console cmd `WebControl.StartServer`
+- SearchActor/SearchObject routes: 501 Not Implemented in UE 5.7
+- Object resolution: StaticFindObject() by exact UE object path
+- Functions: must be UFUNCTION(BlueprintCallable) for /remote/object/call
+- CDO path: /Script/UnrealFrog.Default__UnrealFrogGameMode
+- Live instance path: /Game/Maps/<MapName>.<MapName>:PersistentLevel.<ClassName>_0
+- NullRHI blocks RC API entirely (FApp::CanEverRender() check)
+- Launch cmd: UnrealEditor.app ... -game -windowed -RCWebControlEnable -ExecCmds="WebControl.EnableServerOnStartup 1"
 
 ## Sprint 6 Retro Decisions
 - M_FlatColor.uasset: DROPPED (Section 17 applied). Runtime fallback sufficient. Re-create if packaging becomes a goal.
