@@ -2,34 +2,70 @@
 
 *Persistent knowledge accumulated across sessions. First 200 lines loaded automatically.*
 
+## Sprint 7 Retrospective (2026-02-15) -- LATEST
+
+### Key Findings
+- First sprint using full multi-perspective workflow (post-Sprint 6 stakeholder directive). 5 agents active.
+- Consolidation sprint: no new features, all play-test + tune + fix. Theme respected.
+- Cross-domain reviews produced real value (temporal passability analysis, dead code discovery, turtle CurrentWave check).
+- 5 commits for 5 subsystems -- Section 4 compliance maintained (Sprints 6+7 both good).
+- QA play-test finally happened after 2 sprints of being pending. P0 resolved.
+- 162 tests, 0 failures. Defect escape rate: 0% test-level.
+
+### Friction Points Identified
+1. **Agent communication lag**: Agents cache file reads and don't re-read when working tree changes. QA Lead sent 6+ "blocked" messages after blocker was committed. Accept message lag as normal.
+2. **XP Coach rationalized a process exception**: Accepted premature tuning change before play-test. Team-lead correctly overruled. XP Coach must hold the line, not rationalize shortcuts.
+3. **Test runner collision**: `pkill -f UnrealEditor-Cmd` in run-tests.sh kills all editor processes including another agent's test run. Sprint 8 P0: add lock file mechanism.
+4. **Incomplete first implementation pass**: Task 15 had data layer but missed GameMode wiring. For cross-system features, create a touch-point checklist before implementation.
+
+### Agreements Changed
+1. Section 1: Accept message lag as normal in multi-agent sessions. One clear message, not repeated escalations.
+2. Section 2: Tuning-resilient test design -- read parameters at runtime, don't hardcode magic numbers.
+3. NEW: One agent runs tests at a time (until lock file mechanism exists).
+4. Section 18: XP Coach does not rationalize process exceptions. Exceptions require team-lead approval.
+
+### Sprint 8 P0 Action Items
+- Lock file mechanism for run-tests.sh (DevOps)
+- Visual play-test of Sprint 7 tuning changes (QA)
+- Temporal passability assertion (Engine Architect)
+
+### Sprint 8 P1+
+- UFroggerGameCoordinator extraction (god object refactor)
+- Gap reduction implementation
+- Stretch: HUD multiplier display, death freeze frame
+- P2: Apply Section 17 to chronic carry-forwards (visual regression 5th deferral, packaging 5th deferral, rename PlayUnreal 6th deferral)
+
+### Process Patterns Confirmed
+- Changes the driver can self-enforce (commit granularity, test coverage) stick reliably.
+- Changes requiring second-agent action (QA play-test, cross-domain review) need structural enforcement from team-lead.
+- Multi-perspective workflow is valuable but adds coordination overhead. Net positive when 3+ agents are active.
+- Consolidation sprints are healthy -- Sprint 7 caught 2 bugs (dead difficulty code, InputBufferWindow not enforced) that shipped unnoticed in prior sprints.
+
+## Trend Data (Updated Sprint 7)
+
+| Metric | S1 | S2 | S3 | S4 | S5 | S6 | S7 |
+|--------|----|----|----|----|----|----|-----|
+| Tests | 38 | 81 | 101 | 123 | 148 | 154 | 162 |
+| Commits | - | 16 | ~6 | 1 | 1 | 5 | 5 |
+| Defect escape | - | 5% | 2% | 1.6% | unknown | 0.65%* | 0% |
+| Agents active | 3 | 3 | 3 | 3 | 2 | 3 | 5 |
+
+*Sprint 6 defect rate is test-only bugs, no gameplay verification performed.
+
 ## Sprint 6 Retrospective Input (2026-02-14)
 
 ### Key Findings
 - Sprint 6 delivered 5 commits for 4 subsystems -- commit granularity agreement (Section 4) worked
 - Section 17 exercised: M_FlatColor.uasset and functional-tests-in-CI DROPPED with rationale
 - TickVFX dead code (Sprint 5 P0) was fixed immediately -- good tech debt discipline
-- QA play-test still incomplete after 2 sprints -- most serious process failure
+- QA play-test still incomplete after 2 sprints -- most serious process failure (RESOLVED in Sprint 7)
 - Section 1 renamed from "Mob Programming" to "Driver Model" -- formalizing reality
 - Defect escape rate 0.65% but unreliable (no gameplay verification)
-
-### Agreements Proposed for Sprint 7
-- QA tag required in commit messages ("QA: verified" or "QA: blocked")
-- Post-implementation code review by second agent before retro (replaces navigator review)
-- Sprint scope limit: 2-3 independent deliverables max
-- Apply Section 17 to P2 carry-forwards (visual regression, packaging CI, rename PlayUnreal)
 
 ### Process Pattern Discovered
 Changes that the driver can self-enforce (commit granularity, test coverage) stick.
 Changes that require a second agent to act (QA play-test) do NOT stick.
 Bottleneck is coordination, not discipline.
-
-### Sprint 7 P0 (Non-Negotiable)
-Full gameplay play-test covering everything from Sprint 5 forward BEFORE any new features.
-
-### Chronic P2 Carry-Forwards (Sprint 7 Section 17 candidates)
-- Visual regression testing (carried since Sprint 3)
-- Packaging step in CI (carried since Sprint 3)
-- Rename PlayUnreal E2E to "Scenario" (carried since Sprint 4)
 
 ## Sprint 5 Retrospective (2026-02-14)
 
@@ -39,23 +75,12 @@ Full gameplay play-test covering everything from Sprint 5 forward BEFORE any new
 - Second consecutive monolithic commit (2005 lines, 18 files) -- Sprint 4 was the same pattern
 - QA play-test did not happen before commit -- Sprint 5 Definition of Done is incomplete
 - Seam matrix P0 completed (17 pairs cataloged)
-- Test count: 148 (0 failures, 17 categories)
 
 ### Agreements Changed in Sprint 5 Retro
 - Section 1: Mandatory review gates for tasks > 200 lines
 - Section 4: Per-subsystem commit rule (no monolithic sprint commits)
 - Section 5 Step 9: QA play-test BEFORE commit, not after
 - NEW Section 17: P1 items deferred 3x must be completed or dropped next sprint
-
-### Trend Data
-| Metric | S1 | S2 | S3 | S4 | S5 | S6 |
-|--------|----|----|----|----|----|----|
-| Tests | 38 | 81 | 101 | 123 | 148 | 154 |
-| Commits | - | 16 | ~6 | 1 | 1 | 5 |
-| Defect escape | - | 5% | 2% | 1.6% | unknown | 0.65%* |
-| Agents active | 3 | 3 | 3 | 3 | 2 | 3 |
-
-*Sprint 6 defect rate is test-only bugs, no gameplay verification performed.
 
 ## Sprint 2 Planning (2026-02-12)
 
@@ -64,18 +89,6 @@ Full gameplay play-test covering everything from Sprint 5 forward BEFORE any new
 
 ### Plan Location
 `/Users/randroid/Documents/Dev/Unreal/UnrealFrog/Docs/Planning/sprint2-plan.md`
-
-### Key Decisions
-- Phase 0 (spec alignment) must complete before any integration work
-- 10 spec-vs-implementation mismatches identified and documented
-- Engine Architect is primary driver for most C++ tasks
-- Map creation (Task 9) requires the Unreal Editor -- may need human assistance
-- Enhanced Input assets also require editor -- C++ fallback planned
-- 13 tasks across 4 phases (0-3)
-- 18-item QA acceptance checklist defined
-
-### Critical Path
-Phase 0 -> Task 3 (meshes) -> Task 6 (collision) -> Task 7 (orchestration) -> Task 8 (HUD) -> Task 9 (map) -> Task 12 (play-test)
 
 ### Sprint 1 Stats
 - 38 unit tests across 5 test files
