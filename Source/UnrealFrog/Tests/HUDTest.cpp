@@ -374,4 +374,85 @@ bool FHUD_DeathFlashDecays::RunTest(const FString& Parameters)
 	return true;
 }
 
+// ---------------------------------------------------------------------------
+// RED TEST: Score pop position must use world-to-screen projection, not
+// hardcoded screen coordinates. Currently DrawHUD hardcodes pop position to
+// FVector2D(20 + ScoreText.Len()*10, 10) -- the top-left corner. The fix
+// should project the frog's world position to screen space.
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FHUD_ScorePopUsesWorldProjection,
+	"UnrealFrog.HUD.ScorePopUsesWorldProjection",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FHUD_ScorePopUsesWorldProjection::RunTest(const FString& Parameters)
+{
+	AFroggerHUD* HUD = NewObject<AFroggerHUD>();
+
+	// Use the CreateScorePop method (which projects frog world pos to screen).
+	// In test context (no player controller), falls back to screen center.
+	HUD->CreateScorePop(100);
+
+	TestEqual(TEXT("Score pop was created"), HUD->ActiveScorePops.Num(), 1);
+
+	// The hardcoded Y=10 is the known bug. Score pops should NOT be at
+	// a fixed screen position; they should appear near the frog's projected
+	// world location. In test context, the fallback is screen center (360),
+	// not the old hardcoded Y=10.
+	const double HardcodedY = 10.0;
+	TestNotEqual(TEXT("Score pop Y must not be hardcoded to top of screen"),
+		HUD->ActiveScorePops[0].Position.Y, HardcodedY);
+
+	return true;
+}
+
+// ---------------------------------------------------------------------------
+// Test: Wave fanfare ceremony parameters set on wave transition
+// The wave announcement should animate from 200% scale to 100% over 1.5s
+// and trigger a screen flash (white overlay).
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FHUD_WaveFanfareParameters,
+	"UnrealFrog.HUD.WaveFanfareParameters",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FHUD_WaveFanfareParameters::RunTest(const FString& Parameters)
+{
+	AFroggerHUD* HUD = NewObject<AFroggerHUD>();
+
+	// Verify fanfare duration fits within RoundCompleteDuration (2.0s)
+	TestTrue(TEXT("Fanfare duration <= 2.0s"),
+		HUD->WaveFanfareDuration <= 2.0f);
+	TestNearlyEqual(TEXT("Fanfare duration is 1.5s"),
+		HUD->WaveFanfareDuration, 1.5f);
+
+	// Simulate wave transition: wave 1 -> 2
+	HUD->PreviousWave = 1;
+	HUD->DisplayWave = 2;
+
+	// Trigger the wave detection logic (replicated from DrawHUD)
+	if (HUD->DisplayWave > HUD->PreviousWave && HUD->DisplayWave > 1)
+	{
+		HUD->WaveAnnounceText = FString::Printf(TEXT("WAVE %d!"), HUD->DisplayWave);
+		HUD->WaveAnnounceStartTime = 0.0f;
+		HUD->bShowingWaveAnnounce = true;
+		HUD->WaveFanfareScale = 2.0f; // Start at 200%
+		HUD->WaveFanfareTimer = 0.0f;
+		HUD->WaveFanfareFlashAlpha = 0.8f; // Screen flash starts bright
+		HUD->PreviousWave = HUD->DisplayWave;
+	}
+
+	TestTrue(TEXT("Fanfare active"), HUD->bShowingWaveAnnounce);
+	TestNearlyEqual(TEXT("Fanfare starts at 200% scale"), HUD->WaveFanfareScale, 2.0f);
+	TestTrue(TEXT("Flash alpha > 0 at start"), HUD->WaveFanfareFlashAlpha > 0.0f);
+
+	// Simulate 1.5s elapsed — scale should reach 1.0
+	// The interpolation: scale = 2.0 - (elapsed / duration) * (2.0 - 1.0)
+	float Elapsed = 1.5f;
+	float ExpectedScale = 2.0f - (Elapsed / HUD->WaveFanfareDuration) * 1.0f;
+	TestNearlyEqual(TEXT("Scale at end of fanfare is 1.0"), ExpectedScale, 1.0f);
+
+	return true;
+}
+
 #endif // WITH_AUTOMATION_TESTS

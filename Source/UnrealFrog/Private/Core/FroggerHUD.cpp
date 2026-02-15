@@ -1,9 +1,11 @@
 // Copyright UnrealFrog Team. All Rights Reserved.
 
 #include "Core/FroggerHUD.h"
+#include "Core/FrogCharacter.h"
 #include "Core/ScoreSubsystem.h"
 #include "Engine/Canvas.h"
 #include "Engine/Font.h"
+#include "Kismet/GameplayStatics.h"
 
 AFroggerHUD::AFroggerHUD()
 {
@@ -46,6 +48,44 @@ void AFroggerHUD::UpdateTimer(float TimeRemaining, float MaxTime)
 void AFroggerHUD::UpdateGameState(EGameState NewState)
 {
 	DisplayState = NewState;
+}
+
+void AFroggerHUD::CreateScorePop(int32 Delta)
+{
+	FScorePop Pop;
+	Pop.Text = FString::Printf(TEXT("+%d"), Delta);
+	Pop.SpawnTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
+	Pop.Duration = 1.5f;
+	Pop.Color = (Delta > 100) ? FColor::White : FColor::Yellow;
+
+	// Project the frog's world position to screen space
+	FVector2D ScreenPos(0.0, 0.0);
+	bool bProjected = false;
+
+	if (APlayerController* PC = GetOwningPlayerController())
+	{
+		if (APawn* Pawn = PC->GetPawn())
+		{
+			bProjected = PC->ProjectWorldLocationToScreen(
+				Pawn->GetActorLocation(), ScreenPos, false);
+		}
+	}
+
+	if (!bProjected)
+	{
+		// Fallback: center of screen (better than top-left corner)
+		if (Canvas)
+		{
+			ScreenPos = FVector2D(Canvas->SizeX * 0.5, Canvas->SizeY * 0.5);
+		}
+		else
+		{
+			ScreenPos = FVector2D(640.0, 360.0);
+		}
+	}
+
+	Pop.Position = ScreenPos;
+	ActiveScorePops.Add(Pop);
 }
 
 FString AFroggerHUD::GetOverlayText() const
@@ -108,17 +148,7 @@ void AFroggerHUD::DrawHUD()
 	if (DisplayScore > PreviousScore)
 	{
 		int32 Delta = DisplayScore - PreviousScore;
-
-		FScorePop Pop;
-		Pop.Text = FString::Printf(TEXT("+%d"), Delta);
-		// Position proportionally after the score text
-		FString ScoreText = FString::Printf(TEXT("SCORE: %05d"), DisplayScore);
-		Pop.Position = FVector2D(20.0f + ScoreText.Len() * 10.0f, 10.0f);
-		Pop.SpawnTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
-		Pop.Duration = 1.5f;
-		Pop.Color = (Delta > 100) ? FColor::White : FColor::Yellow;
-		ActiveScorePops.Add(Pop);
-
+		CreateScorePop(Delta);
 		PreviousScore = DisplayScore;
 	}
 	else if (DisplayScore < PreviousScore)
@@ -133,6 +163,9 @@ void AFroggerHUD::DrawHUD()
 		WaveAnnounceText = FString::Printf(TEXT("WAVE %d!"), DisplayWave);
 		WaveAnnounceStartTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
 		bShowingWaveAnnounce = true;
+		WaveFanfareScale = 2.0f;
+		WaveFanfareTimer = 0.0f;
+		WaveFanfareFlashAlpha = 0.8f;
 		PreviousWave = DisplayWave;
 	}
 	else if (DisplayWave < PreviousWave)
@@ -285,29 +318,51 @@ void AFroggerHUD::DrawWaveAnnouncement()
 		return;
 	}
 
+	float DeltaTime = GetWorld() ? GetWorld()->GetDeltaSeconds() : 0.016f;
 	float CurrentTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
 	float Elapsed = CurrentTime - WaveAnnounceStartTime;
-	float TotalDuration = 2.0f; // 0.3s fade in + 1.0s hold + 0.7s fade out
+	float TotalDuration = 2.0f; // Full announcement duration
 
 	if (Elapsed >= TotalDuration)
 	{
 		bShowingWaveAnnounce = false;
+		WaveFanfareFlashAlpha = 0.0f;
 		return;
 	}
 
-	// Calculate alpha: fade in 0.3s, hold 1.0s, fade out 0.7s
-	float TextAlpha;
-	if (Elapsed < 0.3f)
+	// Update fanfare scale: animate from 2.0 to 1.0 over WaveFanfareDuration
+	WaveFanfareTimer += DeltaTime;
+	float FanfareProgress = FMath::Clamp(WaveFanfareTimer / WaveFanfareDuration, 0.0f, 1.0f);
+	WaveFanfareScale = 2.0f - FanfareProgress * 1.0f; // 2.0 -> 1.0
+
+	// Decay flash alpha
+	if (WaveFanfareFlashAlpha > 0.0f)
 	{
-		TextAlpha = Elapsed / 0.3f;
+		WaveFanfareFlashAlpha = FMath::Max(0.0f, WaveFanfareFlashAlpha - DeltaTime * 1.6f);
+
+		// Draw white screen flash overlay
+		uint8 FlashAlpha = static_cast<uint8>(WaveFanfareFlashAlpha * 255.0f);
+		FCanvasTileItem FlashTile(
+			FVector2D(0.0f, 0.0f),
+			FVector2D(Canvas->SizeX, Canvas->SizeY),
+			FColor(255, 255, 255, FlashAlpha));
+		FlashTile.BlendMode = SE_BLEND_Translucent;
+		Canvas->DrawItem(FlashTile);
 	}
-	else if (Elapsed < 1.3f)
+
+	// Calculate text alpha: fade in 0.2s, hold, fade out 0.5s
+	float TextAlpha;
+	if (Elapsed < 0.2f)
+	{
+		TextAlpha = Elapsed / 0.2f;
+	}
+	else if (Elapsed < 1.5f)
 	{
 		TextAlpha = 1.0f;
 	}
 	else
 	{
-		TextAlpha = 1.0f - (Elapsed - 1.3f) / 0.7f;
+		TextAlpha = 1.0f - (Elapsed - 1.5f) / 0.5f;
 	}
 
 	uint8 AlphaByte = static_cast<uint8>(FMath::Clamp(TextAlpha, 0.0f, 1.0f) * 255.0f);
@@ -316,13 +371,18 @@ void AFroggerHUD::DrawWaveAnnouncement()
 	float ScreenH = Canvas->SizeY;
 	UFont* Font = GEngine->GetLargeFont();
 
+	// Measure text at base size, then offset to draw centered at scale
 	float TextW = 0.0f;
 	float TextH = 0.0f;
 	Canvas->TextSize(Font, WaveAnnounceText, TextW, TextH);
 
+	float ScaledW = TextW * WaveFanfareScale;
+	float ScaledH = TextH * WaveFanfareScale;
+	float DrawX = (ScreenW - ScaledW) * 0.5f;
+	float DrawY = ScreenH * 0.3f - (ScaledH - TextH) * 0.5f;
+
 	Canvas->SetDrawColor(FColor(255, 255, 0, AlphaByte));
-	Canvas->DrawText(Font, WaveAnnounceText,
-		(ScreenW - TextW) * 0.5f, ScreenH * 0.3f);
+	Canvas->DrawText(Font, WaveAnnounceText, DrawX, DrawY, WaveFanfareScale, WaveFanfareScale);
 }
 
 void AFroggerHUD::DrawTitleScreen()

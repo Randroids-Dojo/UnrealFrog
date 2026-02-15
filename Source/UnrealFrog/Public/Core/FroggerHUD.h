@@ -68,6 +68,10 @@ public:
 	TArray<FScorePop> ActiveScorePops;
 	int32 PreviousScore = 0;
 
+	/** Create a score pop at the frog's projected screen position.
+	 *  Falls back to screen center if no player controller available. */
+	void CreateScorePop(int32 Delta);
+
 	// -- Timer pulse state (public for test access) -----------------------
 
 	float TimerPulseAlpha = 0.0f;
@@ -79,6 +83,21 @@ public:
 	float WaveAnnounceStartTime = 0.0f;
 	bool bShowingWaveAnnounce = false;
 	int32 PreviousWave = 1;
+
+	// -- Wave fanfare ceremony state (public for test access) -------------
+
+	/** Current scale of the wave fanfare text (2.0 = 200%, animates to 1.0). */
+	float WaveFanfareScale = 1.0f;
+
+	/** Timer tracking elapsed fanfare time. */
+	float WaveFanfareTimer = 0.0f;
+
+	/** Duration of the fanfare scale animation. Must fit within RoundCompleteDuration. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "HUD|Fanfare")
+	float WaveFanfareDuration = 1.5f;
+
+	/** Screen flash alpha for wave fanfare (white overlay that fades). */
+	float WaveFanfareFlashAlpha = 0.0f;
 
 	// -- Death flash state (public for test access) -------------------------
 
