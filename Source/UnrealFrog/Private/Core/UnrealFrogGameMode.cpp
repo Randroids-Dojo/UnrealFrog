@@ -9,6 +9,7 @@
 #include "Core/LaneManager.h"
 #include "Core/ScoreSubsystem.h"
 #include "Core/FroggerAudioManager.h"
+#include "Core/FroggerVFXManager.h"
 #include "Components/LightComponent.h"
 #include "Engine/DirectionalLight.h"
 #include "Kismet/GameplayStatics.h"
@@ -66,6 +67,7 @@ void AUnrealFrogGameMode::BeginPlay()
 		if (UFroggerAudioManager* Audio = GI->GetSubsystem<UFroggerAudioManager>())
 		{
 			Audio->LoadSoundWaves();
+			Audio->LoadMusicTracks();
 
 			// Frog events
 			if (Frog)
@@ -81,12 +83,37 @@ void AUnrealFrogGameMode::BeginPlay()
 				Audio->PlayRoundCompleteSound();
 			});
 
+			// Music: switch tracks on state transitions
+			OnGameStateChanged.AddDynamic(Audio, &UFroggerAudioManager::HandleGameStateChanged);
+			Audio->PlayMusic(TEXT("Title"));
+
 			// Extra life from ScoreSubsystem
 			if (UScoreSubsystem* Scoring = GI->GetSubsystem<UScoreSubsystem>())
 			{
 				Scoring->OnExtraLife.AddDynamic(Audio, &UFroggerAudioManager::HandleExtraLife);
 				Scoring->OnGameOver.AddDynamic(Audio, &UFroggerAudioManager::HandleGameOver);
 			}
+		}
+
+		// Wire VFXManager to game events
+		if (UFroggerVFXManager* VFX = GI->GetSubsystem<UFroggerVFXManager>())
+		{
+			if (Frog)
+			{
+				Frog->OnHopStartedNative.AddLambda([VFX, Frog]() {
+					VFX->SpawnHopDust(Frog->GetActorLocation());
+				});
+
+				Frog->OnFrogDiedNative.AddLambda([VFX, Frog](EDeathType DeathType) {
+					VFX->SpawnDeathPuff(Frog->GetActorLocation(), DeathType);
+				});
+			}
+
+			OnHomeSlotFilled.AddDynamic(VFX, &UFroggerVFXManager::HandleHomeSlotFilled);
+
+			OnWaveCompleted.AddLambda([VFX](int32, int32) {
+				VFX->SpawnRoundCompleteCelebration();
+			});
 		}
 	}
 }

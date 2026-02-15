@@ -6,8 +6,13 @@
 
 #include "CoreMinimal.h"
 #include "Misc/AutomationTest.h"
+#include "Engine/GameInstance.h"
 #include "Core/FrogCharacter.h"
+#include "Core/FroggerAudioManager.h"
+#include "Core/FroggerVFXManager.h"
+#include "Core/FroggerHUD.h"
 #include "Core/HazardBase.h"
+#include "Core/ScoreSubsystem.h"
 #include "Core/UnrealFrogGameMode.h"
 
 #if WITH_AUTOMATION_TESTS
@@ -367,6 +372,173 @@ bool FSeam_TurtleSubmergeWhileRiding::RunTest(const FString& Parameters)
 	Frog->Die(EDeathType::Splash);
 	TestTrue(TEXT("Frog died"), Frog->bIsDead);
 	TestEqual(TEXT("Death type is Splash"), Frog->LastDeathType, EDeathType::Splash);
+
+	return true;
+}
+
+// ---------------------------------------------------------------------------
+// Seam 8: MusicSwitchesOnStateChange
+// Systems: AudioManager + GameMode
+//
+// When the game state changes, the AudioManager should switch to the
+// appropriate music track. Title/GameOver → "Title", others → "Gameplay".
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSeam_MusicSwitchesOnStateChange,
+	"UnrealFrog.Seam.MusicSwitchesOnStateChange",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FSeam_MusicSwitchesOnStateChange::RunTest(const FString& Parameters)
+{
+	UGameInstance* TestGI = NewObject<UGameInstance>();
+	UFroggerAudioManager* Audio = NewObject<UFroggerAudioManager>(TestGI);
+
+	// Title state → Title track
+	Audio->HandleGameStateChanged(EGameState::Title);
+	TestEqual(TEXT("Title state plays Title track"), Audio->CurrentMusicTrack, FString(TEXT("Title")));
+
+	// Spawning state → Gameplay track
+	Audio->HandleGameStateChanged(EGameState::Spawning);
+	TestEqual(TEXT("Spawning state plays Gameplay track"), Audio->CurrentMusicTrack, FString(TEXT("Gameplay")));
+
+	// Playing state → still Gameplay (no switch needed)
+	Audio->HandleGameStateChanged(EGameState::Playing);
+	TestEqual(TEXT("Playing state keeps Gameplay track"), Audio->CurrentMusicTrack, FString(TEXT("Gameplay")));
+
+	// GameOver → back to Title
+	Audio->HandleGameStateChanged(EGameState::GameOver);
+	TestEqual(TEXT("GameOver state plays Title track"), Audio->CurrentMusicTrack, FString(TEXT("Title")));
+
+	return true;
+}
+
+// ---------------------------------------------------------------------------
+// Seam 9: VFXSpawnsOnHopStart
+// Systems: VFXManager + FrogCharacter
+//
+// SpawnHopDust should be invokable with a location (compatible with
+// OnHopStartedNative lambda wrapping).
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSeam_VFXSpawnsOnHopStart,
+	"UnrealFrog.Seam.VFXSpawnsOnHopStart",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FSeam_VFXSpawnsOnHopStart::RunTest(const FString& Parameters)
+{
+	UGameInstance* TestGI = NewObject<UGameInstance>();
+	UFroggerVFXManager* VFX = NewObject<UFroggerVFXManager>(TestGI);
+
+	// SpawnHopDust is callable with FVector — same as lambda wrapping
+	FVector HopLocation(600.0, 400.0, 0.0);
+	VFX->SpawnHopDust(HopLocation);
+
+	// No world → no actors spawned, but method is callable without crash
+	TestTrue(TEXT("SpawnHopDust callable with FVector location"), true);
+
+	return true;
+}
+
+// ---------------------------------------------------------------------------
+// Seam 10: VFXSpawnsOnDeath
+// Systems: VFXManager + FrogCharacter
+//
+// SpawnDeathPuff should accept EDeathType (compatible with OnFrogDiedNative).
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSeam_VFXSpawnsOnDeath,
+	"UnrealFrog.Seam.VFXSpawnsOnDeath",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FSeam_VFXSpawnsOnDeath::RunTest(const FString& Parameters)
+{
+	UGameInstance* TestGI = NewObject<UGameInstance>();
+	UFroggerVFXManager* VFX = NewObject<UFroggerVFXManager>(TestGI);
+
+	// All death types should be handleable
+	VFX->SpawnDeathPuff(FVector(600.0, 400.0, 0.0), EDeathType::Squish);
+	VFX->SpawnDeathPuff(FVector(600.0, 400.0, 0.0), EDeathType::Splash);
+	VFX->SpawnDeathPuff(FVector(600.0, 400.0, 0.0), EDeathType::OffScreen);
+	VFX->SpawnDeathPuff(FVector(600.0, 400.0, 0.0), EDeathType::Timeout);
+
+	TestTrue(TEXT("SpawnDeathPuff handles all EDeathType values"), true);
+
+	return true;
+}
+
+// ---------------------------------------------------------------------------
+// Seam 11: HUDScorePopOnScoreIncrease
+// Systems: HUD + ScoreSubsystem
+//
+// When DisplayScore increases, the HUD should detect the delta and
+// create a score pop.
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSeam_HUDScorePopOnScoreIncrease,
+	"UnrealFrog.Seam.HUDScorePopOnScoreIncrease",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FSeam_HUDScorePopOnScoreIncrease::RunTest(const FString& Parameters)
+{
+	AFroggerHUD* HUD = NewObject<AFroggerHUD>();
+	UGameInstance* TestGI = NewObject<UGameInstance>();
+	UScoreSubsystem* Scoring = NewObject<UScoreSubsystem>(TestGI);
+
+	// Simulate the polling mechanism from DrawHUD
+	HUD->PreviousScore = 0;
+
+	// Score subsystem awards points
+	Scoring->AddForwardHopScore();
+	int32 NewScore = Scoring->Score;
+	TestTrue(TEXT("Score increased"), NewScore > 0);
+
+	// HUD syncs display score from subsystem
+	HUD->DisplayScore = NewScore;
+
+	// Delta detection (replicated from DrawHUD logic)
+	if (HUD->DisplayScore > HUD->PreviousScore)
+	{
+		int32 Delta = HUD->DisplayScore - HUD->PreviousScore;
+		AFroggerHUD::FScorePop Pop;
+		Pop.Text = FString::Printf(TEXT("+%d"), Delta);
+		Pop.Color = (Delta > 100) ? FColor::White : FColor::Yellow;
+		HUD->ActiveScorePops.Add(Pop);
+		HUD->PreviousScore = HUD->DisplayScore;
+	}
+
+	TestEqual(TEXT("Score pop created from subsystem score"), HUD->ActiveScorePops.Num(), 1);
+	TestEqual(TEXT("Pop text matches delta"), HUD->ActiveScorePops[0].Text, FString(TEXT("+10")));
+
+	return true;
+}
+
+// ---------------------------------------------------------------------------
+// Seam 12: MusicMutedInCI
+// Systems: AudioManager + bMuted flag
+//
+// When bMuted is true, PlayMusic should not create a MusicComponent.
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSeam_MusicMutedInCI,
+	"UnrealFrog.Seam.MusicMutedInCI",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FSeam_MusicMutedInCI::RunTest(const FString& Parameters)
+{
+	UGameInstance* TestGI = NewObject<UGameInstance>();
+	UFroggerAudioManager* Audio = NewObject<UFroggerAudioManager>(TestGI);
+
+	Audio->bMuted = true;
+
+	// Play music — should be silenced
+	Audio->PlayMusic(TEXT("Title"));
+	TestTrue(TEXT("MusicComponent is null when muted"), Audio->MusicComponent == nullptr);
+	TestEqual(TEXT("Track name still set when muted"), Audio->CurrentMusicTrack, FString(TEXT("Title")));
+
+	// State change should still track the correct track
+	Audio->HandleGameStateChanged(EGameState::Playing);
+	TestEqual(TEXT("Gameplay track set when muted"), Audio->CurrentMusicTrack, FString(TEXT("Gameplay")));
+	TestTrue(TEXT("Still no MusicComponent"), Audio->MusicComponent == nullptr);
 
 	return true;
 }

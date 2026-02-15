@@ -46,12 +46,13 @@ resolve_category_filter() {
         --e2e)          echo "UnrealFrog.PlayUnreal" ;;
         --integration)  echo "UnrealFrog.Integration" ;;
         --wiring)       echo "UnrealFrog.Wiring" ;;
+        --vfx)          echo "UnrealFrog.VFX" ;;
         *)              echo "" ;;
     esac
 }
 
 # Known category names for per-category reporting
-KNOWN_CATEGORIES="Character Collision Ground Input Score LaneSystem HUD Mesh Camera Orchestration GameState Wiring Integration Seam Audio PlayUnreal"
+KNOWN_CATEGORIES="Character Collision Ground Input Score LaneSystem HUD Mesh Camera Orchestration GameState Wiring Integration Seam Audio PlayUnreal VFX"
 
 # -- Parse arguments ---------------------------------------------------------
 
@@ -80,7 +81,7 @@ while [[ $# -gt 0 ]]; do
             TIMEOUT_SECONDS="$2"
             shift 2
             ;;
-        --all|--seam|--audio|--e2e|--integration|--wiring)
+        --all|--seam|--audio|--e2e|--integration|--wiring|--vfx)
             CATEGORY_NAME="$1"
             TEST_FILTER="$(resolve_category_filter "$1")"
             shift

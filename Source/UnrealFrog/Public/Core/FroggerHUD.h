@@ -54,10 +54,39 @@ public:
 	/** Returns the overlay text for the current game state. Empty when no overlay should show. */
 	FString GetOverlayText() const;
 
+	// -- Score pop animation state (public for test access) ---------------
+
+	struct FScorePop
+	{
+		FString Text;
+		FVector2D Position;
+		float SpawnTime = 0.0f;
+		float Duration = 1.5f;
+		FColor Color = FColor::Yellow;
+	};
+
+	TArray<FScorePop> ActiveScorePops;
+	int32 PreviousScore = 0;
+
+	// -- Timer pulse state (public for test access) -----------------------
+
+	float TimerPulseAlpha = 0.0f;
+	bool bTimerPulsing = false;
+
+	// -- Wave announcement state (public for test access) -----------------
+
+	FString WaveAnnounceText;
+	float WaveAnnounceStartTime = 0.0f;
+	bool bShowingWaveAnnounce = false;
+	int32 PreviousWave = 1;
+
 private:
 	// -- Drawing helpers --------------------------------------------------
 
 	void DrawScorePanel();
 	void DrawTimerBar();
 	void DrawOverlay();
+	void DrawScorePops();
+	void DrawWaveAnnouncement();
+	void DrawTitleScreen();
 };

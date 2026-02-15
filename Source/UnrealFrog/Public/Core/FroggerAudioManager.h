@@ -5,11 +5,13 @@
 #include "CoreMinimal.h"
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "Core/LaneTypes.h"
+#include "Core/UnrealFrogGameMode.h"
 #include "FroggerAudioManager.generated.h"
 
+class UAudioComponent;
 class USoundWave;
 
-/** Cached PCM data for a single sound effect. */
+/** Cached PCM data for a single sound effect or music track. */
 struct FCachedSoundData
 {
 	TArray<uint8> PCMData;
@@ -66,6 +68,26 @@ public:
 	/** Load WAV files from Content/Audio/SFX/ at runtime. */
 	void LoadSoundWaves();
 
+	// -- Music interface ---------------------------------------------------
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Audio|Settings", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float MusicVolume = 0.7f;
+
+	/** Load music tracks from Content/Audio/Music/ at runtime. */
+	void LoadMusicTracks();
+
+	/** Play a named music track (loops). TrackName: "Title" or "Gameplay". */
+	UFUNCTION(BlueprintCallable, Category = "Audio")
+	void PlayMusic(const FString& TrackName);
+
+	/** Stop the currently playing music. */
+	UFUNCTION(BlueprintCallable, Category = "Audio")
+	void StopMusic();
+
+	/** Set music volume (0.0-1.0). */
+	UFUNCTION(BlueprintCallable, Category = "Audio")
+	void SetMusicVolume(float Volume);
+
 	// -- Delegate handler adapters (UFUNCTION required for AddDynamic) -------
 
 	UFUNCTION()
@@ -76,6 +98,10 @@ public:
 
 	UFUNCTION()
 	void HandleGameOver(int32 FinalScore);
+
+	/** Switches music track based on game state. */
+	UFUNCTION()
+	void HandleGameStateChanged(EGameState NewState);
 
 	// -- Sound data references for test access -------------------------------
 
@@ -106,7 +132,18 @@ public:
 	UPROPERTY()
 	TObjectPtr<USoundWave> TimerWarningSound;
 
+	/** The persistent audio component used for music looping. */
+	UPROPERTY()
+	TObjectPtr<UAudioComponent> MusicComponent;
+
+	/** Name of the currently playing music track. */
+	FString CurrentMusicTrack;
+
 private:
+	// Cached PCM data for music tracks
+	FCachedSoundData CachedTitleMusic;
+	FCachedSoundData CachedGameplayMusic;
+
 	// Cached PCM data for each sound
 	FCachedSoundData CachedHop;
 	FCachedSoundData CachedDeathSquish;

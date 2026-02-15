@@ -104,8 +104,58 @@ void AFroggerHUD::DrawHUD()
 		}
 	}
 
+	// Score pop detection (polling approach — no new delegate wiring needed)
+	if (DisplayScore > PreviousScore)
+	{
+		int32 Delta = DisplayScore - PreviousScore;
+
+		FScorePop Pop;
+		Pop.Text = FString::Printf(TEXT("+%d"), Delta);
+		// Position near the score display, slightly offset
+		Pop.Position = FVector2D(160.0f, 10.0f);
+		Pop.SpawnTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
+		Pop.Duration = 1.5f;
+		Pop.Color = (Delta > 100) ? FColor::White : FColor::Yellow;
+		ActiveScorePops.Add(Pop);
+
+		PreviousScore = DisplayScore;
+	}
+	else if (DisplayScore < PreviousScore)
+	{
+		// Score reset (new game)
+		PreviousScore = DisplayScore;
+	}
+
+	// Wave announcement detection
+	if (DisplayWave > PreviousWave && DisplayWave > 1)
+	{
+		WaveAnnounceText = FString::Printf(TEXT("WAVE %d!"), DisplayWave);
+		WaveAnnounceStartTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
+		bShowingWaveAnnounce = true;
+		PreviousWave = DisplayWave;
+	}
+	else if (DisplayWave < PreviousWave)
+	{
+		// Wave reset (new game)
+		PreviousWave = DisplayWave;
+		bShowingWaveAnnounce = false;
+	}
+
+	// Timer pulse detection
+	bTimerPulsing = (TimerPercent < 0.167f && TimerPercent > 0.0f
+		&& DisplayState == EGameState::Playing);
+
+	// Title state gets a full title screen
+	if (DisplayState == EGameState::Title)
+	{
+		DrawTitleScreen();
+		return;
+	}
+
 	DrawScorePanel();
 	DrawTimerBar();
+	DrawScorePops();
+	DrawWaveAnnouncement();
 	DrawOverlay();
 }
 
@@ -113,23 +163,25 @@ void AFroggerHUD::DrawScorePanel()
 {
 	float ScreenW = Canvas->SizeX;
 
-	// Top-left: Score
+	// Top-left: Score (arcade green)
 	FString ScoreStr = FString::Printf(TEXT("SCORE: %05d"), DisplayScore);
-	Canvas->SetDrawColor(FColor::White);
+	Canvas->SetDrawColor(FColor(0, 255, 100, 255));
 	Canvas->DrawText(GEngine->GetMediumFont(), ScoreStr, 20.0f, 10.0f);
 
-	// Top-center: High Score
+	// Top-center: High Score (yellow)
 	FString HiStr = FString::Printf(TEXT("HI: %05d"), DisplayHighScore);
 	float HiWidth = 0.0f;
 	float HiHeight = 0.0f;
 	Canvas->TextSize(GEngine->GetMediumFont(), HiStr, HiWidth, HiHeight);
+	Canvas->SetDrawColor(FColor(255, 255, 0, 255));
 	Canvas->DrawText(GEngine->GetMediumFont(), HiStr, (ScreenW - HiWidth) * 0.5f, 10.0f);
 
-	// Top-right: Lives and Wave
+	// Top-right: Lives (red-tinted) and Wave
 	FString LivesStr = FString::Printf(TEXT("LIVES: %d  WAVE: %d"), DisplayLives, DisplayWave);
 	float LivesWidth = 0.0f;
 	float LivesHeight = 0.0f;
 	Canvas->TextSize(GEngine->GetMediumFont(), LivesStr, LivesWidth, LivesHeight);
+	Canvas->SetDrawColor(FColor(255, 100, 100, 255));
 	Canvas->DrawText(GEngine->GetMediumFont(), LivesStr, ScreenW - LivesWidth - 20.0f, 10.0f);
 }
 
@@ -142,25 +194,206 @@ void AFroggerHUD::DrawTimerBar()
 	float BarH = 8.0f;
 	float BarMaxW = ScreenW - 40.0f;
 
-	// Background (dark)
-	Canvas->SetDrawColor(FColor(40, 40, 40, 200));
-	FCanvasTileItem BgTile(FVector2D(20.0f, BarY), FVector2D(BarMaxW, BarH), FColor(40, 40, 40, 200));
+	// Timer pulse effect: oscillate bar height when pulsing
+	if (bTimerPulsing)
+	{
+		float Time = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
+		float Pulse = FMath::Abs(FMath::Sin(Time * 6.0f)); // ~1Hz oscillation
+		BarH = 8.0f + Pulse * 6.0f; // 8-14px height
+		TimerPulseAlpha = Pulse;
+	}
+	else
+	{
+		TimerPulseAlpha = 0.0f;
+	}
+
+	// Background (near-black)
+	FColor BgColor(20, 20, 20, 220);
+	FCanvasTileItem BgTile(FVector2D(20.0f, BarY), FVector2D(BarMaxW, BarH), BgColor);
 	Canvas->DrawItem(BgTile);
 
-	// Foreground (green→red based on percent)
+	// Foreground (green->red based on percent, flash red when pulsing)
 	float FilledW = BarMaxW * TimerPercent;
 	if (FilledW > 0.0f)
 	{
-		uint8 R = static_cast<uint8>((1.0f - TimerPercent) * 255.0f);
-		uint8 G = static_cast<uint8>(TimerPercent * 255.0f);
-		FColor BarColor(R, G, 0, 255);
+		FColor BarColor;
+		if (bTimerPulsing)
+		{
+			// Flash between red and dark red
+			uint8 FlashR = static_cast<uint8>(180.0f + TimerPulseAlpha * 75.0f);
+			BarColor = FColor(FlashR, 0, 0, 255);
+		}
+		else
+		{
+			uint8 R = static_cast<uint8>((1.0f - TimerPercent) * 255.0f);
+			uint8 G = static_cast<uint8>(TimerPercent * 255.0f);
+			BarColor = FColor(R, G, 0, 255);
+		}
 		FCanvasTileItem FillTile(FVector2D(20.0f, BarY), FVector2D(FilledW, BarH), BarColor);
 		Canvas->DrawItem(FillTile);
 	}
 }
 
+void AFroggerHUD::DrawScorePops()
+{
+	float CurrentTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
+
+	for (int32 i = ActiveScorePops.Num() - 1; i >= 0; --i)
+	{
+		FScorePop& Pop = ActiveScorePops[i];
+		float Elapsed = CurrentTime - Pop.SpawnTime;
+		float Alpha = FMath::Clamp(Elapsed / Pop.Duration, 0.0f, 1.0f);
+
+		if (Alpha >= 1.0f)
+		{
+			ActiveScorePops.RemoveAt(i);
+			continue;
+		}
+
+		// Rise upward 60px over duration
+		float YOffset = Alpha * 60.0f;
+		// Alpha fade
+		uint8 TextAlpha = static_cast<uint8>((1.0f - Alpha) * 255.0f);
+
+		FColor DrawColor = Pop.Color;
+		DrawColor.A = TextAlpha;
+
+		Canvas->SetDrawColor(DrawColor);
+		Canvas->DrawText(GEngine->GetMediumFont(), Pop.Text,
+			Pop.Position.X, Pop.Position.Y - YOffset);
+	}
+}
+
+void AFroggerHUD::DrawWaveAnnouncement()
+{
+	if (!bShowingWaveAnnounce)
+	{
+		return;
+	}
+
+	float CurrentTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
+	float Elapsed = CurrentTime - WaveAnnounceStartTime;
+	float TotalDuration = 2.0f; // 0.3s fade in + 1.0s hold + 0.7s fade out
+
+	if (Elapsed >= TotalDuration)
+	{
+		bShowingWaveAnnounce = false;
+		return;
+	}
+
+	// Calculate alpha: fade in 0.3s, hold 1.0s, fade out 0.7s
+	float TextAlpha;
+	if (Elapsed < 0.3f)
+	{
+		TextAlpha = Elapsed / 0.3f;
+	}
+	else if (Elapsed < 1.3f)
+	{
+		TextAlpha = 1.0f;
+	}
+	else
+	{
+		TextAlpha = 1.0f - (Elapsed - 1.3f) / 0.7f;
+	}
+
+	uint8 AlphaByte = static_cast<uint8>(FMath::Clamp(TextAlpha, 0.0f, 1.0f) * 255.0f);
+
+	float ScreenW = Canvas->SizeX;
+	float ScreenH = Canvas->SizeY;
+	UFont* Font = GEngine->GetLargeFont();
+
+	float TextW = 0.0f;
+	float TextH = 0.0f;
+	Canvas->TextSize(Font, WaveAnnounceText, TextW, TextH);
+
+	Canvas->SetDrawColor(FColor(255, 255, 0, AlphaByte));
+	Canvas->DrawText(Font, WaveAnnounceText,
+		(ScreenW - TextW) * 0.5f, ScreenH * 0.3f);
+}
+
+void AFroggerHUD::DrawTitleScreen()
+{
+	float ScreenW = Canvas->SizeX;
+	float ScreenH = Canvas->SizeY;
+	float CurrentTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
+
+	// Full-screen dark overlay background
+	FCanvasTileItem BgTile(
+		FVector2D(0.0f, 0.0f),
+		FVector2D(ScreenW, ScreenH),
+		FColor(10, 10, 20, 240));
+	Canvas->DrawItem(BgTile);
+
+	UFont* LargeFont = GEngine->GetLargeFont();
+	UFont* MediumFont = GEngine->GetMediumFont();
+
+	// 1. "UNREAL FROG" -- large, centered at ~30% height, color pulse green<->yellow
+	{
+		FString TitleText = TEXT("UNREAL FROG");
+		float TitleW = 0.0f;
+		float TitleH = 0.0f;
+		Canvas->TextSize(LargeFont, TitleText, TitleW, TitleH);
+
+		// Color pulse: green (0,255,100) <-> yellow (255,255,0) at 1.5Hz
+		float Pulse = (FMath::Sin(CurrentTime * 1.5f * 2.0f * PI) + 1.0f) * 0.5f;
+		uint8 R = static_cast<uint8>(Pulse * 255.0f);
+		uint8 G = 255;
+		uint8 B = static_cast<uint8>((1.0f - Pulse) * 100.0f);
+		Canvas->SetDrawColor(FColor(R, G, B, 255));
+		Canvas->DrawText(LargeFont, TitleText,
+			(ScreenW - TitleW) * 0.5f, ScreenH * 0.3f);
+	}
+
+	// 2. "PRESS START" -- blinks on/off at 2Hz
+	{
+		float Blink = FMath::Sin(CurrentTime * 2.0f * 2.0f * PI);
+		if (Blink > 0.0f)
+		{
+			FString StartText = TEXT("PRESS START");
+			float StartW = 0.0f;
+			float StartH = 0.0f;
+			Canvas->TextSize(MediumFont, StartText, StartW, StartH);
+
+			Canvas->SetDrawColor(FColor::White);
+			Canvas->DrawText(MediumFont, StartText,
+				(ScreenW - StartW) * 0.5f, ScreenH * 0.55f);
+		}
+	}
+
+	// 3. "HI-SCORE: {N}" -- yellow, only shown if > 0
+	if (DisplayHighScore > 0)
+	{
+		FString HiStr = FString::Printf(TEXT("HI-SCORE: %d"), DisplayHighScore);
+		float HiW = 0.0f;
+		float HiH = 0.0f;
+		Canvas->TextSize(MediumFont, HiStr, HiW, HiH);
+
+		Canvas->SetDrawColor(FColor(255, 255, 0, 255));
+		Canvas->DrawText(MediumFont, HiStr,
+			(ScreenW - HiW) * 0.5f, ScreenH * 0.45f);
+	}
+
+	// 4. Credits line -- dim gray at bottom
+	{
+		FString Credits = TEXT("A MOB PROGRAMMING PRODUCTION");
+		float CredW = 0.0f;
+		float CredH = 0.0f;
+		Canvas->TextSize(MediumFont, Credits, CredW, CredH);
+
+		Canvas->SetDrawColor(FColor(100, 100, 100, 200));
+		Canvas->DrawText(MediumFont, Credits,
+			(ScreenW - CredW) * 0.5f, ScreenH * 0.85f);
+	}
+}
+
 void AFroggerHUD::DrawOverlay()
 {
+	// Title state is handled by DrawTitleScreen, skip default overlay
+	if (DisplayState == EGameState::Title)
+	{
+		return;
+	}
+
 	FString Overlay = GetOverlayText();
 	if (Overlay.IsEmpty())
 	{

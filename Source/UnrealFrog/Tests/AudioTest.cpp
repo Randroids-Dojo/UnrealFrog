@@ -226,4 +226,120 @@ bool FAudio_VolumeDefaults::RunTest(const FString& Parameters)
 	return true;
 }
 
+// ---------------------------------------------------------------------------
+// Test: Music volume defaults
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FAudio_MusicVolumeDefaults,
+	"UnrealFrog.Audio.MusicVolumeDefaults",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FAudio_MusicVolumeDefaults::RunTest(const FString& Parameters)
+{
+	UFroggerAudioManager* Audio = CreateTestAudioManager();
+
+	TestNearlyEqual(TEXT("Default music volume is 0.7"), Audio->MusicVolume, 0.7f);
+	TestNearlyEqual(TEXT("Default SFX volume is 1.0"), Audio->SFXVolume, 1.0f);
+
+	Audio->SetMusicVolume(0.3f);
+	TestNearlyEqual(TEXT("Music volume set to 0.3"), Audio->MusicVolume, 0.3f);
+
+	// Clamp test
+	Audio->SetMusicVolume(1.5f);
+	TestNearlyEqual(TEXT("Music volume clamped to 1.0"), Audio->MusicVolume, 1.0f);
+
+	Audio->SetMusicVolume(-0.5f);
+	TestNearlyEqual(TEXT("Music volume clamped to 0.0"), Audio->MusicVolume, 0.0f);
+
+	return true;
+}
+
+// ---------------------------------------------------------------------------
+// Test: PlayMusic with no loaded tracks doesn't crash
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FAudio_PlayMusicNullSafe,
+	"UnrealFrog.Audio.PlayMusic_NullSafe",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FAudio_PlayMusicNullSafe::RunTest(const FString& Parameters)
+{
+	UFroggerAudioManager* Audio = CreateTestAudioManager();
+
+	// No tracks loaded — should not crash
+	Audio->PlayMusic(TEXT("Title"));
+	Audio->PlayMusic(TEXT("Gameplay"));
+	Audio->PlayMusic(TEXT("NonExistent"));
+
+	TestTrue(TEXT("PlayMusic survived with no loaded tracks"), true);
+
+	return true;
+}
+
+// ---------------------------------------------------------------------------
+// Test: StopMusic with no active component doesn't crash
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FAudio_StopMusicNullSafe,
+	"UnrealFrog.Audio.StopMusic_NullSafe",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FAudio_StopMusicNullSafe::RunTest(const FString& Parameters)
+{
+	UFroggerAudioManager* Audio = CreateTestAudioManager();
+
+	Audio->StopMusic();
+	Audio->StopMusic(); // Double stop
+
+	TestTrue(TEXT("StopMusic survived with no active music"), true);
+
+	return true;
+}
+
+// ---------------------------------------------------------------------------
+// Test: Mute flag affects music (PlayMusic is a no-op when muted)
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FAudio_MuteAffectsMusic,
+	"UnrealFrog.Audio.MuteAffectsMusic",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FAudio_MuteAffectsMusic::RunTest(const FString& Parameters)
+{
+	UFroggerAudioManager* Audio = CreateTestAudioManager();
+	Audio->bMuted = true;
+
+	// PlayMusic should set track name but not create component
+	Audio->PlayMusic(TEXT("Title"));
+	TestTrue(TEXT("MusicComponent is null when muted"), Audio->MusicComponent == nullptr);
+
+	return true;
+}
+
+// ---------------------------------------------------------------------------
+// Test: HandleGameStateChanged doesn't crash with no loaded tracks
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FAudio_HandleGameStateChangedNullSafe,
+	"UnrealFrog.Audio.HandleGameStateChanged_NullSafe",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FAudio_HandleGameStateChangedNullSafe::RunTest(const FString& Parameters)
+{
+	UFroggerAudioManager* Audio = CreateTestAudioManager();
+
+	// All state transitions should be safe with no tracks loaded
+	Audio->HandleGameStateChanged(EGameState::Title);
+	Audio->HandleGameStateChanged(EGameState::Spawning);
+	Audio->HandleGameStateChanged(EGameState::Playing);
+	Audio->HandleGameStateChanged(EGameState::Paused);
+	Audio->HandleGameStateChanged(EGameState::Dying);
+	Audio->HandleGameStateChanged(EGameState::RoundComplete);
+	Audio->HandleGameStateChanged(EGameState::GameOver);
+
+	TestTrue(TEXT("HandleGameStateChanged survived all states"), true);
+
+	return true;
+}
+
 #endif // WITH_AUTOMATION_TESTS

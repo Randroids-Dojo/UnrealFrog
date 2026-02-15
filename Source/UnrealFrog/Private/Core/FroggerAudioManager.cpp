@@ -1,6 +1,7 @@
 // Copyright UnrealFrog Team. All Rights Reserved.
 
 #include "Core/FroggerAudioManager.h"
+#include "Components/AudioComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
@@ -172,6 +173,117 @@ bool UFroggerAudioManager::LoadWavFromFile(const FString& FilePath, FCachedSound
 		*FilePath, OutData.SampleRate, OutData.NumChannels, BitsPerSample, OutData.Duration, DataSize);
 
 	return true;
+}
+
+// -- Music playback -----------------------------------------------------------
+
+void UFroggerAudioManager::LoadMusicTracks()
+{
+	FString MusicDir = FPaths::ProjectContentDir() / TEXT("Audio/Music");
+
+	LoadWavFromFile(MusicDir / TEXT("Music_Title.wav"), CachedTitleMusic);
+	LoadWavFromFile(MusicDir / TEXT("Music_Gameplay.wav"), CachedGameplayMusic);
+
+	int32 Loaded = 0;
+	if (CachedTitleMusic.bValid) Loaded++;
+	if (CachedGameplayMusic.bValid) Loaded++;
+
+	UE_LOG(LogFroggerAudio, Log, TEXT("LoadMusicTracks: loaded %d/2 tracks from %s"), Loaded, *MusicDir);
+}
+
+void UFroggerAudioManager::PlayMusic(const FString& TrackName)
+{
+	if (bMuted)
+	{
+		CurrentMusicTrack = TrackName;
+		return;
+	}
+
+	FCachedSoundData* TrackData = nullptr;
+	if (TrackName == TEXT("Title"))
+	{
+		TrackData = &CachedTitleMusic;
+	}
+	else if (TrackName == TEXT("Gameplay"))
+	{
+		TrackData = &CachedGameplayMusic;
+	}
+
+	if (!TrackData || !TrackData->bValid || TrackData->PCMData.Num() == 0)
+	{
+		CurrentMusicTrack = TrackName;
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		CurrentMusicTrack = TrackName;
+		return;
+	}
+
+	// Stop current music if playing
+	StopMusic();
+
+	// Create a procedural sound wave with the music data
+	USoundWaveProcedural* ProceduralWave = NewObject<USoundWaveProcedural>(this);
+	ProceduralWave->SetSampleRate(TrackData->SampleRate);
+	ProceduralWave->NumChannels = TrackData->NumChannels;
+	ProceduralWave->Duration = TrackData->Duration;
+	ProceduralWave->SoundGroup = SOUNDGROUP_Music;
+	ProceduralWave->bLooping = true;
+
+	ProceduralWave->QueueAudio(TrackData->PCMData.GetData(), TrackData->PCMData.Num());
+
+	// Create a persistent audio component for looping
+	MusicComponent = UGameplayStatics::SpawnSound2D(World, ProceduralWave, MusicVolume);
+	CurrentMusicTrack = TrackName;
+
+	UE_LOG(LogFroggerAudio, Log, TEXT("PlayMusic: playing '%s' (%.1fs)"), *TrackName, TrackData->Duration);
+}
+
+void UFroggerAudioManager::StopMusic()
+{
+	if (MusicComponent)
+	{
+		MusicComponent->Stop();
+		MusicComponent->DestroyComponent();
+		MusicComponent = nullptr;
+	}
+	CurrentMusicTrack = TEXT("");
+}
+
+void UFroggerAudioManager::SetMusicVolume(float Volume)
+{
+	MusicVolume = FMath::Clamp(Volume, 0.0f, 1.0f);
+	if (MusicComponent)
+	{
+		MusicComponent->SetVolumeMultiplier(MusicVolume);
+	}
+}
+
+void UFroggerAudioManager::HandleGameStateChanged(EGameState NewState)
+{
+	switch (NewState)
+	{
+	case EGameState::Title:
+	case EGameState::GameOver:
+		if (CurrentMusicTrack != TEXT("Title"))
+		{
+			PlayMusic(TEXT("Title"));
+		}
+		break;
+	case EGameState::Spawning:
+	case EGameState::Playing:
+	case EGameState::Paused:
+	case EGameState::Dying:
+	case EGameState::RoundComplete:
+		if (CurrentMusicTrack != TEXT("Gameplay"))
+		{
+			PlayMusic(TEXT("Gameplay"));
+		}
+		break;
+	}
 }
 
 // -- Internal -----------------------------------------------------------------

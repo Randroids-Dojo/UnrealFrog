@@ -4,6 +4,7 @@
 #include "Misc/AutomationTest.h"
 #include "Engine/GameInstance.h"
 #include "Core/FrogCharacter.h"
+#include "Core/FroggerAudioManager.h"
 #include "Core/ScoreSubsystem.h"
 #include "Core/UnrealFrogGameMode.h"
 
@@ -297,6 +298,35 @@ bool FWiring_OnLivesChangedFires::RunTest(const FString& Parameters)
 	Scoring->LoseLife();
 
 	TestEqual(TEXT("Lives decremented to 2"), Scoring->Lives, 2);
+
+	return true;
+}
+
+// ---------------------------------------------------------------------------
+// Test: Music wiring — HandleGameStateChanged can be bound to OnGameStateChanged
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FWiring_MusicWiringExists,
+	"UnrealFrog.Wiring.MusicWiring_Exists",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FWiring_MusicWiringExists::RunTest(const FString& Parameters)
+{
+	AUnrealFrogGameMode* GM = NewObject<AUnrealFrogGameMode>();
+	UGameInstance* TestGI = NewObject<UGameInstance>();
+	UFroggerAudioManager* Audio = NewObject<UFroggerAudioManager>(TestGI);
+
+	// Bind HandleGameStateChanged to OnGameStateChanged
+	GM->OnGameStateChanged.AddDynamic(Audio, &UFroggerAudioManager::HandleGameStateChanged);
+
+	// Verify binding exists
+	TestTrue(TEXT("OnGameStateChanged has binding"), GM->OnGameStateChanged.IsBound());
+
+	// Fire the delegate — shouldn't crash (no tracks loaded, no world)
+	GM->OnGameStateChanged.Broadcast(EGameState::Playing);
+	GM->OnGameStateChanged.Broadcast(EGameState::Title);
+
+	TestTrue(TEXT("HandleGameStateChanged survived broadcast"), true);
 
 	return true;
 }
