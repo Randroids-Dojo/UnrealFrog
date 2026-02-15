@@ -119,6 +119,60 @@ void AGroundBuilder::SpawnRowPlane(int32 Row, const FLinearColor& Color)
 	if (DynMat)
 	{
 		DynMat->SetVectorParameterValue(TEXT("Color"), Color);
+
+		// Track safe zone materials for wave color temperature updates
+		if (Row == 0 || Row == 6)
+		{
+			SafeZoneMaterials.Add(DynMat);
+		}
+	}
+}
+
+FLinearColor AGroundBuilder::GetWaveColor(int32 WaveNumber) const
+{
+	// Color temperature progression: cool -> warm -> hot
+	// Wave 1-2: green/blue (cool)
+	// Wave 3-4: yellow (warm)
+	// Wave 5-6: orange
+	// Wave 7+:  red (hot)
+
+	if (WaveNumber <= 2)
+	{
+		// Cool: green/blue tint
+		return FLinearColor(0.15f, 0.75f, 0.5f);
+	}
+	else if (WaveNumber <= 4)
+	{
+		// Warm: yellow tint - lerp from cool to warm
+		float T = static_cast<float>(WaveNumber - 2) / 2.0f;
+		FLinearColor Cool(0.15f, 0.75f, 0.5f);
+		FLinearColor Warm(0.8f, 0.75f, 0.15f);
+		return FLinearColor::LerpUsingHSV(Cool, Warm, T);
+	}
+	else if (WaveNumber <= 6)
+	{
+		// Orange: lerp from warm to orange
+		float T = static_cast<float>(WaveNumber - 4) / 2.0f;
+		FLinearColor Warm(0.8f, 0.75f, 0.15f);
+		FLinearColor Orange(0.9f, 0.45f, 0.1f);
+		return FLinearColor::LerpUsingHSV(Warm, Orange, T);
+	}
+	else
+	{
+		// Hot: red
+		return FLinearColor(0.9f, 0.2f, 0.1f);
+	}
+}
+
+void AGroundBuilder::UpdateWaveColor(int32 WaveNumber)
+{
+	FLinearColor WaveColor = GetWaveColor(WaveNumber);
+	for (UMaterialInstanceDynamic* DynMat : SafeZoneMaterials)
+	{
+		if (DynMat)
+		{
+			DynMat->SetVectorParameterValue(TEXT("Color"), WaveColor);
+		}
 	}
 }
 

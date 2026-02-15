@@ -88,6 +88,14 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Audio")
 	void SetMusicVolume(float Volume);
 
+	/** Set music pitch multiplier (1.0 = normal, higher = faster/higher pitch). */
+	UFUNCTION(BlueprintCallable, Category = "Audio")
+	void SetMusicPitchMultiplier(float Multiplier);
+
+	/** Current music pitch multiplier. Public for test access. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Audio|Settings")
+	float MusicPitchMultiplier = 1.0f;
+
 	// -- Delegate handler adapters (UFUNCTION required for AddDynamic) -------
 
 	UFUNCTION()

@@ -262,6 +262,15 @@ void UFroggerAudioManager::SetMusicVolume(float Volume)
 	}
 }
 
+void UFroggerAudioManager::SetMusicPitchMultiplier(float Multiplier)
+{
+	MusicPitchMultiplier = FMath::Max(0.1f, Multiplier);
+	if (MusicComponent)
+	{
+		MusicComponent->SetPitchMultiplier(MusicPitchMultiplier);
+	}
+}
+
 void UFroggerAudioManager::HandleGameStateChanged(EGameState NewState)
 {
 	switch (NewState)

@@ -574,6 +574,21 @@ void AUnrealFrogGameMode::OnRoundCompleteFinished()
 		CachedLaneManager->ApplyWaveDifficulty(GetSpeedMultiplier(), CurrentWave);
 	}
 
+	// Music pitch increases with wave for perceived urgency
+	if (CachedAudioManager)
+	{
+		CachedAudioManager->SetMusicPitchMultiplier(1.0f + static_cast<float>(CurrentWave - 1) * 0.03f);
+	}
+
+	// Ground color temperature shifts with wave
+	if (UWorld* World = GetWorld())
+	{
+		for (TActorIterator<AGroundBuilder> It(World); It; ++It)
+		{
+			It->UpdateWaveColor(CurrentWave);
+		}
+	}
+
 	OnWaveCompleted.Broadcast(CompletedWave, CurrentWave);
 	OnWaveCompletedBP.Broadcast(CompletedWave, CurrentWave);
 

@@ -75,6 +75,20 @@ public:
 	UPROPERTY()
 	TObjectPtr<UStaticMesh> CubeMesh;
 
+	/** Returns the color temperature tint for a given wave number.
+	 *  Wave 1-2: cool (green/blue), Wave 3-4: warm (yellow),
+	 *  Wave 5-6: orange, Wave 7+: hot (red). */
+	UFUNCTION(BlueprintPure, Category = "Ground")
+	FLinearColor GetWaveColor(int32 WaveNumber) const;
+
+	/** Apply wave color temperature to safe zone rows (start + median). */
+	UFUNCTION(BlueprintCallable, Category = "Ground")
+	void UpdateWaveColor(int32 WaveNumber);
+
+	/** Dynamic material instances for safe zone rows (rows 0 and 6). Set in BeginPlay. */
+	UPROPERTY()
+	TArray<TObjectPtr<UMaterialInstanceDynamic>> SafeZoneMaterials;
+
 private:
 	/** Spawn a single row plane at the given row index with the given color. */
 	void SpawnRowPlane(int32 Row, const FLinearColor& Color);
