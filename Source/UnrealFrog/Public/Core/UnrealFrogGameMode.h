@@ -28,6 +28,9 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnHomeSlotFilled, int32, SlotIndex
 DECLARE_MULTICAST_DELEGATE(FOnTimerExpiredNative);
 DECLARE_MULTICAST_DELEGATE_TwoParams(FOnWaveCompletedNative, int32 /*CompletedWave*/, int32 /*NextWave*/);
 
+class UFroggerVFXManager;
+class UFroggerAudioManager;
+
 UCLASS()
 class UNREALFROG_API AUnrealFrogGameMode : public AGameModeBase
 {
@@ -201,6 +204,14 @@ private:
 
 	/** Set state and broadcast delegate. */
 	void SetState(EGameState NewState);
+
+	// -- Cached subsystem pointers (set in BeginPlay) --------------------
+
+	UPROPERTY()
+	TObjectPtr<UFroggerVFXManager> CachedVFXManager = nullptr;
+
+	UPROPERTY()
+	TObjectPtr<UFroggerAudioManager> CachedAudioManager = nullptr;
 
 	// -- Timer handles for timed state transitions ------------------------
 

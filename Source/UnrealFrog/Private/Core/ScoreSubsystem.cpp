@@ -87,7 +87,6 @@ void UScoreSubsystem::NotifyScoreChanged()
 	if (Score > HighScore)
 	{
 		HighScore = Score;
-		SaveHighScore();
 	}
 
 	OnScoreChanged.Broadcast(Score);

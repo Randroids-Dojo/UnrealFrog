@@ -61,6 +61,13 @@ void AUnrealFrogGameMode::BeginPlay()
 		Frog->OnFrogDied.AddDynamic(this, &AUnrealFrogGameMode::HandleFrogDied);
 	}
 
+	// Cache subsystem pointers for use in Tick/TickTimer
+	if (UGameInstance* GI = GetGameInstance())
+	{
+		CachedAudioManager = GI->GetSubsystem<UFroggerAudioManager>();
+		CachedVFXManager = GI->GetSubsystem<UFroggerVFXManager>();
+	}
+
 	// Wire AudioManager to game events
 	if (UGameInstance* GI = GetGameInstance())
 	{
@@ -125,12 +132,9 @@ void AUnrealFrogGameMode::Tick(float DeltaTime)
 	TickTimer(DeltaTime);
 
 	// Drive VFX animation
-	if (UGameInstance* GI = GetGameInstance())
+	if (CachedVFXManager)
 	{
-		if (UFroggerVFXManager* VFX = GI->GetSubsystem<UFroggerVFXManager>())
-		{
-			VFX->TickVFX(GetWorld()->GetTimeSeconds());
-		}
+		CachedVFXManager->TickVFX(GetWorld()->GetTimeSeconds());
 	}
 }
 
@@ -198,6 +202,15 @@ void AUnrealFrogGameMode::ReturnToTitle()
 		return;
 	}
 
+	// Persist high score to disk when leaving game over screen
+	if (UGameInstance* GI = GetGameInstance())
+	{
+		if (UScoreSubsystem* Scoring = GI->GetSubsystem<UScoreSubsystem>())
+		{
+			Scoring->SaveHighScore();
+		}
+	}
+
 	CurrentWave = 1;
 	HomeSlotsFilledCount = 0;
 	RemainingTime = TimePerLevel;
@@ -210,6 +223,15 @@ void AUnrealFrogGameMode::HandleGameOver()
 	if (CurrentState != EGameState::Playing && CurrentState != EGameState::Paused)
 	{
 		return;
+	}
+
+	// Persist high score to disk at game over
+	if (UGameInstance* GI = GetGameInstance())
+	{
+		if (UScoreSubsystem* Scoring = GI->GetSubsystem<UScoreSubsystem>())
+		{
+			Scoring->SaveHighScore();
+		}
 	}
 
 	SetState(EGameState::GameOver);
@@ -280,12 +302,9 @@ void AUnrealFrogGameMode::TickTimer(float DeltaTime)
 	if (TimerPercent < 0.167f && !bTimerWarningPlayed)
 	{
 		bTimerWarningPlayed = true;
-		if (UGameInstance* GI = GetGameInstance())
+		if (CachedAudioManager)
 		{
-			if (UFroggerAudioManager* Audio = GI->GetSubsystem<UFroggerAudioManager>())
-			{
-				Audio->PlayTimerWarningSound();
-			}
+			CachedAudioManager->PlayTimerWarningSound();
 		}
 	}
 
@@ -417,20 +436,11 @@ void AUnrealFrogGameMode::HandleHopCompleted(FIntPoint NewGridPosition)
 				}
 			}
 
-			// Check if all home slots are filled → round complete
-			if (HomeSlotsFilledCount >= HomeSlotColumns.Num())
-			{
-				SetState(EGameState::RoundComplete);
-
-				if (UWorld* World = GetWorld())
-				{
-					World->GetTimerManager().SetTimer(
-						RoundCompleteTimerHandle, this,
-						&AUnrealFrogGameMode::OnRoundCompleteFinished,
-						RoundCompleteDuration, false);
-				}
-			}
-			else
+			// TryFillHomeSlot calls OnWaveComplete() when the last slot
+			// is filled, which transitions to RoundComplete and starts
+			// the round-complete timer. Only start the Spawning sequence
+			// if the wave is NOT complete (more slots remain).
+			if (CurrentState != EGameState::RoundComplete)
 			{
 				// Slot filled but more to go — respawn frog at start
 				SetState(EGameState::Spawning);
@@ -479,6 +489,13 @@ void AUnrealFrogGameMode::OnDyingComplete()
 
 	if (bPendingGameOver)
 	{
+		if (UGameInstance* GI = GetGameInstance())
+		{
+			if (UScoreSubsystem* Scoring = GI->GetSubsystem<UScoreSubsystem>())
+			{
+				Scoring->SaveHighScore();
+			}
+		}
 		SetState(EGameState::GameOver);
 	}
 	else

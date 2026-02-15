@@ -249,6 +249,10 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FScoreSubsystem_NewGame::RunTest(const FString& Parameters)
 {
+	// Remove any stale highscore file from prior runs to isolate this test
+	FString FilePath = FPaths::ProjectSavedDir() / TEXT("highscore.txt");
+	IFileManager::Get().Delete(*FilePath);
+
 	UScoreSubsystem* Scoring = CreateTestScoreSubsystem();
 
 	// Accumulate some score
@@ -278,6 +282,10 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FScoreSubsystem_HighScore::RunTest(const FString& Parameters)
 {
+	// Remove any stale highscore file from prior runs to isolate this test
+	FString FilePath = FPaths::ProjectSavedDir() / TEXT("highscore.txt");
+	IFileManager::Get().Delete(*FilePath);
+
 	UScoreSubsystem* Scoring = CreateTestScoreSubsystem();
 
 	TestEqual(TEXT("High score starts at 0"), Scoring->HighScore, 0);
@@ -422,6 +430,40 @@ bool FScore_HighScoreLoadMissingFile::RunTest(const FString& Parameters)
 	Scoring->LoadHighScore();
 
 	TestEqual(TEXT("High score remains 0 when file missing"), Scoring->HighScore, 0);
+
+	return true;
+}
+
+// ---------------------------------------------------------------------------
+// Test: Scoring points does NOT write high score to disk (no per-tick I/O)
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FScore_NoPerTickSaveHighScore,
+	"UnrealFrog.Score.NoPerTickSaveHighScore",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FScore_NoPerTickSaveHighScore::RunTest(const FString& Parameters)
+{
+	FString FilePath = FPaths::ProjectSavedDir() / TEXT("highscore.txt");
+
+	// Ensure no leftover file
+	IFileManager::Get().Delete(*FilePath);
+
+	UScoreSubsystem* Scoring = CreateTestScoreSubsystem();
+
+	// Score several hops — each triggers NotifyScoreChanged internally
+	Scoring->AddForwardHopScore();
+	Scoring->AddForwardHopScore();
+	Scoring->AddForwardHopScore();
+	TestTrue(TEXT("Score is positive"), Scoring->Score > 0);
+	TestTrue(TEXT("HighScore updated in memory"), Scoring->HighScore > 0);
+
+	// The file should NOT exist — NotifyScoreChanged must not write to disk
+	TestFalse(TEXT("High score file not written during gameplay"),
+		IFileManager::Get().FileExists(*FilePath));
+
+	// Cleanup
+	IFileManager::Get().Delete(*FilePath);
 
 	return true;
 }
