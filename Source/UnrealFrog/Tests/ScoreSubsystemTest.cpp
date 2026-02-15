@@ -373,4 +373,57 @@ bool FScoreSubsystem_HomeSlotScore::RunTest(const FString& Parameters)
 	return true;
 }
 
+// ---------------------------------------------------------------------------
+// Test: High score persists across save/load via file I/O
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FScore_HighScorePersistsSaveLoad,
+	"UnrealFrog.Score.HighScorePersistsSaveLoad",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FScore_HighScorePersistsSaveLoad::RunTest(const FString& Parameters)
+{
+	FString FilePath = FPaths::ProjectSavedDir() / TEXT("highscore.txt");
+
+	// Arrange: save a high score from one subsystem instance
+	UScoreSubsystem* Scoring1 = CreateTestScoreSubsystem();
+	Scoring1->HighScore = 5000;
+	Scoring1->SaveHighScore();
+
+	// Act: create a fresh subsystem and load
+	UScoreSubsystem* Scoring2 = CreateTestScoreSubsystem();
+	TestEqual(TEXT("New subsystem starts at 0"), Scoring2->HighScore, 0);
+
+	Scoring2->LoadHighScore();
+	TestEqual(TEXT("Loaded high score matches saved value"), Scoring2->HighScore, 5000);
+
+	// Cleanup
+	IFileManager::Get().Delete(*FilePath);
+
+	return true;
+}
+
+// ---------------------------------------------------------------------------
+// Test: Loading when file is missing leaves high score at 0
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FScore_HighScoreLoadMissingFile,
+	"UnrealFrog.Score.HighScoreLoadMissingFile",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FScore_HighScoreLoadMissingFile::RunTest(const FString& Parameters)
+{
+	FString FilePath = FPaths::ProjectSavedDir() / TEXT("highscore.txt");
+
+	// Ensure file does not exist
+	IFileManager::Get().Delete(*FilePath);
+
+	UScoreSubsystem* Scoring = CreateTestScoreSubsystem();
+	Scoring->LoadHighScore();
+
+	TestEqual(TEXT("High score remains 0 when file missing"), Scoring->HighScore, 0);
+
+	return true;
+}
+
 #endif // WITH_AUTOMATION_TESTS

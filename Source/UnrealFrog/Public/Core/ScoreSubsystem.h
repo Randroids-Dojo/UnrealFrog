@@ -110,6 +110,14 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Scoring")
 	bool IsGameOver() const;
 
+	/** Load high score from Saved/highscore.txt. Returns 0 if file missing. */
+	UFUNCTION(BlueprintCallable, Category = "Scoring")
+	void LoadHighScore();
+
+	/** Save current high score to Saved/highscore.txt. */
+	UFUNCTION(BlueprintCallable, Category = "Scoring")
+	void SaveHighScore();
+
 private:
 	/** Track the last extra-life threshold that was crossed to avoid double-awarding. */
 	int32 LastExtraLifeThreshold = 0;

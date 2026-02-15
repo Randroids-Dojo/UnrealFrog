@@ -1,6 +1,8 @@
 // Copyright UnrealFrog Team. All Rights Reserved.
 
 #include "Core/ScoreSubsystem.h"
+#include "Misc/FileHelper.h"
+#include "HAL/PlatformFilemanager.h"
 
 void UScoreSubsystem::AddForwardHopScore()
 {
@@ -65,6 +67,7 @@ void UScoreSubsystem::LoseLife()
 
 void UScoreSubsystem::StartNewGame()
 {
+	LoadHighScore();
 	Score = 0;
 	Lives = InitialLives;
 	Multiplier = 1.0f;
@@ -84,6 +87,7 @@ void UScoreSubsystem::NotifyScoreChanged()
 	if (Score > HighScore)
 	{
 		HighScore = Score;
+		SaveHighScore();
 	}
 
 	OnScoreChanged.Broadcast(Score);
@@ -108,4 +112,24 @@ void UScoreSubsystem::CheckExtraLife()
 		// Track the threshold even if lives are capped, so we don't re-award later
 		LastExtraLifeThreshold = CurrentBracket * ExtraLifeThreshold;
 	}
+}
+
+void UScoreSubsystem::LoadHighScore()
+{
+	FString FilePath = FPaths::ProjectSavedDir() / TEXT("highscore.txt");
+	FString FileContent;
+	if (FFileHelper::LoadFileToString(FileContent, *FilePath))
+	{
+		int32 LoadedScore = FCString::Atoi(*FileContent);
+		if (LoadedScore > HighScore)
+		{
+			HighScore = LoadedScore;
+		}
+	}
+}
+
+void UScoreSubsystem::SaveHighScore()
+{
+	FString FilePath = FPaths::ProjectSavedDir() / TEXT("highscore.txt");
+	FFileHelper::SaveStringToFile(FString::FromInt(HighScore), *FilePath);
 }
