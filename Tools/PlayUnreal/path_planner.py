@@ -152,15 +152,107 @@ def _frange(start, stop, step):
         val += step
 
 
+def _get_frog_pos(state):
+    """Extract (col, row) from game state."""
+    pos = state.get("frogPos", [6, 0])
+    col = int(pos[0]) if isinstance(pos, list) and len(pos) > 0 else 6
+    row = int(pos[1]) if isinstance(pos, list) and len(pos) > 1 else 0
+    return col, row
+
+
+def _get_frog_world_x(state):
+    """Get frog's actual world X position (accounts for platform drift)."""
+    world_x = state.get("frogWorldX")
+    if world_x is not None:
+        return float(world_x)
+    # Fallback: use grid position * cell size
+    col, _ = _get_frog_pos(state)
+    return col * CELL_SIZE
+
+
+def _find_current_platform(hazards, frog_row, frog_world_x):
+    """Find which platform the frog is currently riding.
+
+    Returns (speed, direction) or (0.0, 0.0) if not on a platform.
+    """
+    row_hazards = [h for h in hazards if h.get("row") == frog_row
+                   and h.get("rideable", False)]
+    for h in row_hazards:
+        half_w = h["width"] * CELL_SIZE * 0.5
+        if abs(frog_world_x - h["x"]) <= half_w + 10.0:
+            direction = 1.0 if h["movesRight"] else -1.0
+            return h["speed"], direction
+    return 0.0, 0.0
+
+
+def _find_platform_at_world_x(next_row_hazards, frog_world_x, max_wait=4.0,
+                               drift_speed=0.0, drift_dir=0.0):
+    """Find when a next-row platform will align with the frog's position.
+
+    Accounts for the frog DRIFTING with its current platform during the wait.
+    At time T, the frog will be at: frog_world_x + drift_speed * drift_dir * T.
+
+    Returns wait_time or None if no platform coming.
+    """
+    rideables = [h for h in next_row_hazards if h.get("rideable", False)]
+    if not rideables:
+        return None
+
+    for wait in _frange(0.0, max_wait, 0.02):
+        arrival = wait + HOP_DURATION
+        # Where will the FROG be at arrival time? (drifting with current platform)
+        frog_x_at_arrival = frog_world_x + drift_speed * drift_dir * arrival
+        for h in rideables:
+            hx = predict_hazard_x(h, arrival)
+            half_w = h["width"] * CELL_SIZE * 0.5
+            if abs(frog_x_at_arrival - hx) <= half_w - 20.0:
+                return wait
+    return None
+
+
+def _is_lateral_safe(hazards, frog_row, target_col):
+    """Check if a lateral hop to target_col is safe on the current row.
+
+    For road rows: check road hazards at target_col.
+    For river rows: check frog will land on a platform at target_col.
+    For safe rows: always safe.
+    """
+    if frog_row in SAFE_ROWS:
+        return True
+
+    row_hazards = [h for h in hazards if h.get("row") == frog_row]
+
+    if frog_row in ROAD_ROWS:
+        road_hazards = [h for h in row_hazards if not h.get("rideable", False)]
+        return is_column_safe_for_hop(road_hazards, target_col)
+
+    if frog_row in RIVER_ROWS:
+        # On river: must stay on a platform. Check if target_col has one.
+        rideables = [h for h in row_hazards if h.get("rideable", False)]
+        frog_x = target_col * CELL_SIZE
+        for h in rideables:
+            half_w = h["width"] * CELL_SIZE * 0.5
+            # Check at t=0 (current) and t=HOP_DURATION (arrival)
+            for t in (0.0, HOP_DURATION):
+                hx = predict_hazard_x(h, t)
+                if abs(frog_x - hx) <= half_w - 20.0:
+                    return True
+        return False  # No platform at target column
+
+    return True  # Unknown row type, allow
+
+
 def navigate_to_home_slot(pu, target_col=6, max_deaths=8):
     """Navigate frog from current position to a home slot.
 
-    Strategy:
-    - Road rows: find nearest safe column (where a gap exists NOW), move
-      there, hop forward. No waiting — go where the gap IS.
-    - River rows: find column + timing where a platform will arrive,
-      move there on the safe row, hop onto the platform.
-    - After each hop: re-query state for actual position.
+    One-hop-at-a-time strategy:
+    - Each iteration: query state, query hazards, decide ONE hop, execute,
+      re-query actual position. No multi-hop sequences with stale data.
+    - Road rows: if current column safe for next row, hop up. Otherwise,
+      take one lateral step toward a safe column (checking current row too).
+    - River rows: wait for platform, hop onto it. On a platform, hop up
+      when next row has a platform too.
+    - Always re-query actual position after each hop.
 
     Args:
         pu: PlayUnreal client instance
@@ -174,7 +266,7 @@ def navigate_to_home_slot(pu, target_col=6, max_deaths=8):
     deaths = 0
     initial_filled = None
     start = time.time()
-    max_iterations = 100  # safety limit
+    max_iterations = 200  # safety limit
 
     for _ in range(max_iterations):
         state = pu.get_state()
@@ -198,100 +290,157 @@ def navigate_to_home_slot(pu, target_col=6, max_deaths=8):
         if filled > initial_filled:
             return _result(True, total_hops, deaths, start, state)
 
-        pos = state.get("frogPos", [6, 0])
-        frog_col = int(pos[0]) if isinstance(pos, list) and len(pos) > 0 else 6
-        frog_row = int(pos[1]) if isinstance(pos, list) and len(pos) > 1 else 0
+        frog_col, frog_row = _get_frog_pos(state)
 
         if frog_row >= HOME_ROW:
             return _result(True, total_hops, deaths, start, state)
 
         next_row = frog_row + 1
+        hazards = pu.get_hazards()
 
-        # --- Safe row: align toward target, then hop forward ---
+        # --- Safe row ahead: align toward target or hop forward ---
         if next_row in SAFE_ROWS or next_row >= HOME_ROW:
-            # On safe rows, align laterally toward target
             if frog_row in SAFE_ROWS and frog_col != target_col:
+                # Align laterally on safe row (no hazards to worry about)
                 d = "right" if frog_col < target_col else "left"
                 pu.hop(d)
                 total_hops += 1
                 time.sleep(POST_HOP_WAIT)
                 continue
-
             pu.hop("up")
             total_hops += 1
             time.sleep(POST_HOP_WAIT)
             continue
 
-        # --- Road row: find safe column, move there, hop forward ---
+        # --- Road row ahead ---
         if next_row in ROAD_ROWS:
-            hazards = pu.get_hazards()
-            row_hazards = [h for h in hazards
-                           if h.get("row") == next_row and not h.get("rideable", False)]
+            next_row_hazards = [h for h in hazards
+                                if h.get("row") == next_row
+                                and not h.get("rideable", False)]
 
-            if not row_hazards:
+            # No hazards on next row — hop forward
+            if not next_row_hazards:
                 pu.hop("up")
                 total_hops += 1
                 time.sleep(POST_HOP_WAIT)
                 continue
 
-            safe_col, wait = find_safe_road_column(row_hazards, frog_col, target_col)
-
-            # Move laterally to safe column
-            while frog_col != safe_col:
-                d = "right" if frog_col < safe_col else "left"
-                pu.hop(d)
+            # Current column safe for next row? Hop forward.
+            if is_column_safe_for_hop(next_row_hazards, frog_col):
+                pu.hop("up")
                 total_hops += 1
                 time.sleep(POST_HOP_WAIT)
-                frog_col += 1 if d == "right" else -1
+                continue
 
-            if wait > 0.02:
-                time.sleep(wait)
+            # Need lateral movement — try both directions
+            # Check each neighbor: safe on current row AND closer to a
+            # column that's safe on the next row
+            best_step = None
+            for step_dir in (1, -1):
+                step_col = frog_col + step_dir
+                if step_col < 0 or step_col >= GRID_COLS:
+                    continue
+                if not _is_lateral_safe(hazards, frog_row, step_col):
+                    continue
+                # This step is safe on current row — is it useful?
+                if is_column_safe_for_hop(next_row_hazards, step_col):
+                    # Can hop up from here next iteration!
+                    best_step = step_dir
+                    break
+                # Check if it gets us closer to ANY safe column
+                if best_step is None:
+                    best_step = step_dir
 
-            pu.hop("up")
+            if best_step is None:
+                # Neither direction safe — try hopping backward to escape
+                prev_row = frog_row - 1
+                if prev_row >= 0:
+                    prev_safe = True
+                    if prev_row in ROAD_ROWS:
+                        prev_hazards = [h for h in hazards
+                                        if h.get("row") == prev_row
+                                        and not h.get("rideable", False)]
+                        prev_safe = is_column_safe_for_hop(
+                            prev_hazards, frog_col)
+                    if prev_safe:
+                        pu.hop("down")
+                        total_hops += 1
+                        time.sleep(POST_HOP_WAIT)
+                        continue
+                # Can't go anywhere — wait and retry
+                time.sleep(0.05)
+                continue
+
+            d = "right" if best_step > 0 else "left"
+            pu.hop(d)
             total_hops += 1
             time.sleep(POST_HOP_WAIT)
             continue
 
-        # --- River row: find platform column + timing ---
+        # --- River row ahead ---
         if next_row in RIVER_ROWS:
-            hazards = pu.get_hazards()
             row_hazards = [h for h in hazards if h.get("row") == next_row]
 
-            plat_col, plat_wait = find_platform_column(
-                row_hazards, frog_col, max_wait=6.0)
+            if frog_row in RIVER_ROWS:
+                # ON a log — use actual world X + drift prediction
+                frog_wx = _get_frog_world_x(state)
+                drift_spd, drift_dir = _find_current_platform(
+                    hazards, frog_row, frog_wx)
+                plat_wait = _find_platform_at_world_x(
+                    row_hazards, frog_wx, max_wait=4.0,
+                    drift_speed=drift_spd, drift_dir=drift_dir)
+                if plat_wait is None:
+                    time.sleep(0.1)
+                    continue
 
-            if plat_col is None:
-                # No platform found — try hopping anyway (will die, retry)
+                if plat_wait > 0.02:
+                    time.sleep(plat_wait)
+                    # Re-confirm with fresh state
+                    fresh_state = pu.get_state()
+                    frog_wx = _get_frog_world_x(fresh_state)
+                    hazards = pu.get_hazards()
+                    row_hazards = [h for h in hazards
+                                   if h.get("row") == next_row]
+                    drift_spd, drift_dir = _find_current_platform(
+                        hazards, frog_row, frog_wx)
+                    plat_wait = _find_platform_at_world_x(
+                        row_hazards, frog_wx, max_wait=1.0,
+                        drift_speed=drift_spd, drift_dir=drift_dir)
+                    if plat_wait is None:
+                        continue
+                    if plat_wait > 0.02:
+                        time.sleep(plat_wait)
+
                 pu.hop("up")
                 total_hops += 1
                 time.sleep(POST_HOP_WAIT)
                 continue
+            else:
+                # On a safe row — can move laterally to align
+                plat_col, plat_wait = find_platform_column(
+                    row_hazards, frog_col, max_wait=6.0)
 
-            # Move laterally to platform column (only possible on safe rows)
-            if frog_row in SAFE_ROWS:
-                while frog_col != plat_col:
-                    d = "right" if frog_col < plat_col else "left"
+                if plat_col is None:
+                    time.sleep(0.2)
+                    continue
+
+                if frog_col != plat_col:
+                    step_dir = 1 if plat_col > frog_col else -1
+                    step_col = frog_col + step_dir
+                    d = "right" if step_dir > 0 else "left"
                     pu.hop(d)
                     total_hops += 1
                     time.sleep(POST_HOP_WAIT)
-                    frog_col += 1 if d == "right" else -1
+                    continue
 
-                # Re-query hazards after lateral movement (time has passed)
-                if frog_col != int(pos[0]):
-                    hazards = pu.get_hazards()
-                    row_hazards = [h for h in hazards if h.get("row") == next_row]
-                    _, plat_wait = find_platform_column(
-                        row_hazards, frog_col, max_wait=6.0)
-                    if plat_wait is None:
-                        plat_wait = 0.0
+                # At the right column — wait for platform then hop
+                if plat_wait is not None and plat_wait > 0.02:
+                    time.sleep(plat_wait)
 
-            if plat_wait is not None and plat_wait > 0.02:
-                time.sleep(plat_wait)
-
-            pu.hop("up")
-            total_hops += 1
-            time.sleep(POST_HOP_WAIT)
-            continue
+                pu.hop("up")
+                total_hops += 1
+                time.sleep(POST_HOP_WAIT)
+                continue
 
         # Unknown row — hop forward
         pu.hop("up")
