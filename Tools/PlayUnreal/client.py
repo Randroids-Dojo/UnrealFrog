@@ -63,6 +63,7 @@ class PlayUnreal:
         self.timeout = timeout
         self._gm_path = None
         self._frog_path = None
+        self._prev_state = None
 
     # -- Public API ----------------------------------------------------------
 
@@ -78,6 +79,39 @@ class PlayUnreal:
         self._call_function(frog_path, "RequestHop", {
             "Direction": _DIRECTIONS[direction]
         })
+
+    def set_invincible(self, enabled):
+        """Enable or disable frog invincibility.
+
+        When invincible, Die() is a no-op — the frog cannot be killed
+        by hazards or drowning. Useful for acceptance testing where you
+        want to test the full path without dying.
+
+        Args:
+            enabled: True to enable invincibility, False to disable.
+        """
+        frog_path = self._get_frog_path()
+        self._call_function(frog_path, "SetInvincible", {
+            "bEnable": bool(enabled)
+        })
+
+    def get_hazards(self):
+        """Get all hazard positions and properties as a list of dicts.
+
+        Returns:
+            list of dicts, each with keys: row, x, speed, width,
+            movesRight, rideable
+        """
+        gm_path = self._get_gm_path()
+        try:
+            result = self._call_function(gm_path, "GetLaneHazardsJSON")
+            ret_val = result.get("ReturnValue", "")
+            if ret_val:
+                parsed = json.loads(ret_val)
+                return parsed.get("hazards", [])
+        except (CallError, json.JSONDecodeError):
+            pass
+        return []
 
     def get_state(self):
         """Get current game state as a dict.
@@ -122,6 +156,29 @@ class PlayUnreal:
             state["frogPos"] = [0, 0]
 
         return state
+
+    def get_state_diff(self):
+        """Get current state and a diff from the previous state.
+
+        Returns:
+            dict with keys:
+                current: full current state dict
+                changes: dict of keys that changed, each with {old, new}
+                         Empty dict on first call (no previous state).
+        """
+        current = self.get_state()
+        changes = {}
+
+        if self._prev_state is not None:
+            all_keys = set(list(current.keys()) + list(self._prev_state.keys()))
+            for key in all_keys:
+                old_val = self._prev_state.get(key)
+                new_val = current.get(key)
+                if old_val != new_val:
+                    changes[key] = {"old": old_val, "new": new_val}
+
+        self._prev_state = current
+        return {"current": current, "changes": changes}
 
     _cached_window_id = None
 
