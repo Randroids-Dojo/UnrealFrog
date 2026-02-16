@@ -2,7 +2,34 @@
 
 *Persistent knowledge accumulated across sessions. First 200 lines loaded automatically.*
 
-## Sprint 8 IPM (2026-02-15) -- LATEST
+## Sprint 8 Retrospective (2026-02-15) -- LATEST
+
+### Critical Failure
+Sprint 8 wrote 888 lines of VFX/HUD code, built PlayUnreal (698 LOC Python), 170 tests pass -- and the stakeholder confirmed the game looks identical to before the sprint. NOBODY launched the game. PlayUnreal was built but never run. Section 9 has been violated for 7 consecutive sprints.
+
+### Root Causes Identified
+1. Team conflates "writing code" with "verifying code." Implementation IS verification in their mental model.
+2. No structural gate prevents committing unverified visual changes. Sprint plans are advisory.
+3. PlayUnreal was treated as a deliverable (code to commit) not a tool (thing to use).
+4. XP Coach (me) failed to enforce Section 9. Planning the process is not executing the process.
+
+### Agreements Changed
+- Section 5a: Ordered Definition of Done (steps 1-6, each blocks the next). Visual verification is step 4, blocks QA sign-off.
+- Section 9: Rewritten from checklists to hard gate. Screenshot evidence required for visual commits.
+- Section 20: Updated to reflect PlayUnreal code exists but is UNVERIFIED.
+- NEW Section 21: Visual Commit Evidence Gate. Screenshot or PlayUnreal log required. Seam matrix entries and passing tests are NOT evidence.
+- Section 17 drops: visual regression (7th), packaging (7th), rename E2E (8th).
+
+### Sprint 9 P0
+1. Run PlayUnreal acceptance test against a live game
+2. Visually verify ALL Sprint 8 visual changes (take real screenshots)
+3. Create visual_smoke_test.py
+4. Fix anything that does not actually work
+
+### Self-Correction
+I must not write plans and assume they will be followed. I must verify execution at each phase gate. If Phase 2 (visual verification) is in the plan, I must confirm it happened before allowing Phase 3 commits. Writing an agreement is not enforcing an agreement.
+
+## Sprint 8 IPM (2026-02-15)
 
 ### Plan Location
 `/Users/randroid/Documents/Dev/Unreal/UnrealFrog/Docs/Planning/sprint8-plan.md`

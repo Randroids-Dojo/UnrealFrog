@@ -63,11 +63,26 @@
 - P2: Screenshot capture in play-game.sh
 - P2: Basic CI pipeline (GitHub Actions, compile + test on push)
 
+## PlayUnreal Tooling (Post-Sprint 8 Hotfix)
+- **client.py**: diagnose() method probes all RC API paths, returns structured dict
+- **diagnose.py**: 7-phase diagnostic (connection, GM discovery, Frog discovery, GetGameStateJSON, property reads, hop format, client cross-validation)
+- **verify_visuals.py**: 6-step visual verification (reset, start, hop 3x, timer check, directional hops, screenshots)
+- **run-playunreal.sh**: Default script is diagnose.py. --no-launch flag for already-running editor. Editor log saved to Saved/PlayUnreal/
+- Object path candidates: _0, _C_0, AuthorityGameMode sub-object. CDO as fallback.
+- FVector via RC API: {"X": 0.0, "Y": 1.0, "Z": 0.0} (dict format, not string)
+- CDO calls succeed for describe/function but state reads return defaults (not live game state)
+- GetGameStateJSON lives on GameMode, returns JSON string with score/lives/wave/frogPos/gameState/timeRemaining/homeSlotsFilledCount
+- GridCellSize is on FrogCharacter NOT GameMode — client fallback property reads must target correct object
+- After StartGame: 1.5s wait needed for Spawning->Playing transition (SpawningDuration=1.0s + margin)
+- RCConnectionError class avoids shadowing Python builtin ConnectionError
+- Full diagnostic report saved to Saved/PlayUnreal/diagnostic_report.json
+
 ## Known Issues Carrying Forward
-- Music looping: bLooping=true on USoundWaveProcedural + single QueueAudio() call. Untested in live playback. QueueAudio buffer may drain without re-fill callback. Sprint 7 play-test should verify.
+- Music looping: bLooping=true on USoundWaveProcedural + single QueueAudio() call. Untested in live playback.
 - No CI pipeline exists. Manual build/test only.
-- PlayUnreal E2E tests are scenario tests (direct method calls), NOT true E2E (binary launch + input injection). Cannot replace manual play-testing.
-- Stale process kill dance (pkill UnrealTraceServer, pkill UnrealEditor) is manual — needs to be automated in run-tests.sh.
+- PlayUnreal object paths NEVER verified against live game — diagnose.py designed to resolve this
+- Screenshot via RC API (ConsoleCommand "HighResShot") may not work — ConsoleCommand may not be BlueprintCallable on GameMode/Pawn
+- WebRemoteControl not explicitly listed as plugin (it's a module inside RemoteControl) — may need separate enable if it doesn't auto-load
 
 ## Retro Lessons (Stable Patterns)
 - Two sprints of unverified gameplay is a quality debt that compounds.

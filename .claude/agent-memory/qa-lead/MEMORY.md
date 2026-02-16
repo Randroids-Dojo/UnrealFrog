@@ -2,28 +2,25 @@
 
 *Persistent knowledge accumulated across sessions. First 200 lines loaded automatically.*
 
-## Sprint 8 Plan (current)
+## Sprint 8 Sign-Off Failure (CRITICAL LESSON)
+
+**I signed off Sprint 8 without visual verification. The stakeholder found that none of the visual changes were visible. This is the 6th sprint this happened.**
+
+### Root cause
+- Treated test-passing as verification (Section 9 exists to prevent exactly this)
+- Did not use "QA: pending" when blocked on PlayUnreal
+- Substituted process artifacts (seam matrix, docs) for actual gameplay verification
+
+### Corrective actions (MANDATORY for all future sprints)
+1. Run `qa_checklist.py` against a live game before ANY sign-off
+2. If qa_checklist.py cannot run (no game connection), commit message MUST say "QA: code-level only, visual PENDING"
+3. NEVER write "QA: verified" without either: (a) qa_checklist.py PASS, or (b) reviewed screenshots from PlayUnreal
+4. qa_checklist.py is at: `/Tools/PlayUnreal/qa_checklist.py`
+
+## Sprint 8 Plan
 - **Sprint 8 goal**: PlayUnreal automation (P0), VFX/HUD visibility fixes, visual verification
 - **Test count at sprint start**: 162 passing (0 failures)
 - **Seam matrix**: 19 entries (14 COVERED, 5 DEFERRED)
-
-### Sprint 8 QA Deliverables
-1. **P0: Temporal passability invariant test** -- No dependencies, write immediately
-2. **P0: Score pop position verification test** -- Blocked on Engine Architect fix
-3. **P0: Death VFX scale verification test** -- Blocked on Engine Architect fix
-4. **P0: Visual play-test of Sprint 7 tuning** -- Blocked on PlayUnreal OR manual launch
-5. **P1: Difficulty perception threshold test** -- No dependencies, write immediately
-6. **P1: Home slot VFX position test** -- Blocked on Engine Architect fix
-7. **P1: PlayUnreal state roundtrip tests** -- Blocked on PlayUnreal landing
-8. **P1: Visual smoke test script** -- Blocked on PlayUnreal landing
-9. **Seam matrix update** -- 6 new entries (seams 20-25)
-
-### Sprint 8 Key Decisions
-- PlayUnreal does NOT block all work, but DOES block QA sign-off
-- VFX/HUD fixes (~60 LOC) parallel with PlayUnreal development
-- Time-box PlayUnreal to 2 sessions; if not working by session 3, ship with "QA: visual pending"
-- PythonScriptPlugin needs spike-test in -game mode (may be editor-only)
-- Lock file for run-tests.sh must be commit #1 (section 19 bottleneck)
 
 ### VFX Visibility Acceptance Criteria (Quantitative)
 - Death VFX: >= 5% of visible screen width at Z=2200/FOV50 (~103 UU diameter)
