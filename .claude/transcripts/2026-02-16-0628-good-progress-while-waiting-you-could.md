@@ -5,8 +5,8 @@
 | Date | 2026-02-16 |
 | Session ID | `486a1fce-113f-4722-9497-667c8c9ccddd` |
 | Model | claude-opus-4-6 |
-| Tokens | ~814,544 input, ~15 output |
-| Duration | 20s |
+| Tokens | ~2,132,976 input, ~96 output |
+| Duration | 2m 17s |
 
 ---
 
@@ -43,3 +43,42 @@ Let me also note: the frog must be on a river row for `FindPlatformAtCurrentPosi
 ## Assistant (06:28 UTC)
 
 Now add the FindPlatform boundary tests after the existing tests.
+
+- **Used Edit** on `Source/UnrealFrog/Tests/CollisionTest.cpp`
+
+## Assistant (06:29 UTC)
+
+Good. I wrote 10 tests (the sprint plan asked for 8-10). Let me update the task status and add a retro note, then notify the team.
+
+- **Used TaskUpdate** on task 4
+
+- **Used Read** on `.team/retro-notes.md`
+
+- **Used Edit** on `.team/retro-notes.md`
+
+## Assistant (06:30 UTC)
+
+Now let me notify the team about the pre-written tests.
+
+- **Used SendMessage**
+
+- **Used SendMessage**
+
+## Assistant (06:30 UTC)
+
+All three of my assigned tasks now have code written:
+
+**Task #9** -- `/Users/randroid/Documents/Dev/Unreal/UnrealFrog/Source/UnrealFrog/Tests/GameplayTest.cpp`
+- 6 scenario tests under `UnrealFrog.Gameplay.*`
+- Ready to build now (no blocked dependencies)
+
+**Task #6** -- `/Users/randroid/Documents/Dev/Unreal/UnrealFrog/Docs/Testing/seam-matrix.md`
+- 2 new seam entries (#26, #27) added
+- Complete
+
+**Task #4** -- `/Users/randroid/Documents/Dev/Unreal/UnrealFrog/Source/UnrealFrog/Tests/CollisionTest.cpp`
+- 10 boundary tests under `UnrealFrog.Collision.FindPlatform.*`
+- Blocked on Task #3 (`PlatformLandingMargin` UPROPERTY) and `FindPlatformAtCurrentPosition` being made public
+- Code is ready -- just needs the UPROPERTY to exist
+
+Waiting for build slot and Task #3 completion.
