@@ -406,8 +406,10 @@ void AFrogCharacter::FindPlatformAtCurrentPosition()
 
 	// Direct position check — bypasses physics body sync timing issues.
 	// Check if the frog's world position falls within any rideable hazard's footprint.
+	// The frog's body (capsule) must actually be ON the platform, not just nearby.
 	FVector FrogPos = GetActorLocation();
 	float HalfCell = GridCellSize * 0.5f;
+	float FrogRadius = CollisionComponent ? CollisionComponent->GetScaledCapsuleRadius() : 34.0f;
 
 	for (TActorIterator<AHazardBase> It(GetWorld()); It; ++It)
 	{
@@ -420,8 +422,11 @@ void AFrogCharacter::FindPlatformAtCurrentPosition()
 		FVector HazardPos = Hazard->GetActorLocation();
 		float HalfWidth = static_cast<float>(Hazard->HazardWidthCells) * GridCellSize * 0.5f;
 
-		// Frog center must be within hazard footprint (width x 1 cell)
-		if (FMath::Abs(FrogPos.X - HazardPos.X) <= HalfWidth &&
+		// Frog center must be inside the platform by at least the frog's radius,
+		// so the frog's body doesn't visually hang off the edge into water.
+		float EffectiveHalfWidth = HalfWidth - FrogRadius;
+		if (EffectiveHalfWidth > 0.0f &&
+			FMath::Abs(FrogPos.X - HazardPos.X) <= EffectiveHalfWidth &&
 			FMath::Abs(FrogPos.Y - HazardPos.Y) <= HalfCell)
 		{
 			CurrentPlatform = Hazard;
