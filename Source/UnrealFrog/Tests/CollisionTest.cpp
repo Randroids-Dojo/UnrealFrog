@@ -261,4 +261,404 @@ bool FCollision_FrogSurvivesOnSurfacedTurtle::RunTest(const FString& Parameters)
 	return true;
 }
 
+// ===========================================================================
+// FindPlatformAtCurrentPosition boundary tests
+//
+// Sprint 11, Task #4
+//
+// These tests exercise the boundary conditions of the synchronous platform
+// detection in FindPlatformAtCurrentPosition(). Each test spawns a frog and
+// a hazard in a real UWorld, positions the frog at a specific offset from
+// the hazard center, and calls FindPlatformAtCurrentPosition() to verify
+// the detection result.
+//
+// The detection formula (FrogCharacter.cpp):
+//   HalfWidth = HazardWidthCells * GridCellSize * 0.5
+//   EffectiveHalfWidth = HalfWidth - PlatformLandingMargin
+//   FOUND if: abs(FrogX - HazardX) <= EffectiveHalfWidth
+//         AND abs(FrogY - HazardY) <= HalfCell
+//
+// All tests read PlatformLandingMargin from the frog at runtime
+// (tuning-resilient per Agreement Section 2).
+// ===========================================================================
+
+namespace FindPlatformTestHelper
+{
+	UWorld* CreateTestWorld()
+	{
+		UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+		check(World);
+		World->InitializeActorsForPlay(FURL());
+		return World;
+	}
+
+	void DestroyTestWorld(UWorld* World)
+	{
+		if (World)
+		{
+			World->DestroyWorld(false);
+		}
+	}
+
+	AFrogCharacter* SpawnFrogAtWorldPos(UWorld* World, FVector WorldPos, int32 RiverRow)
+	{
+		FTransform SpawnTransform(FRotator::ZeroRotator, WorldPos);
+		AFrogCharacter* Frog = World->SpawnActor<AFrogCharacter>(
+			AFrogCharacter::StaticClass(), SpawnTransform);
+		if (Frog)
+		{
+			Frog->GridPosition = FIntPoint(
+				FMath::RoundToInt(WorldPos.X / Frog->GridCellSize), RiverRow);
+		}
+		return Frog;
+	}
+
+	AHazardBase* SpawnLog(UWorld* World, FVector Pos, int32 WidthCells, float GridCellSize)
+	{
+		FTransform SpawnTransform(FRotator::ZeroRotator, Pos);
+		AHazardBase* Log = World->SpawnActor<AHazardBase>(
+			AHazardBase::StaticClass(), SpawnTransform);
+		if (Log)
+		{
+			Log->bIsRideable = true;
+			Log->HazardType = EHazardType::SmallLog;
+			Log->HazardWidthCells = WidthCells;
+			Log->Speed = 100.0f;
+			Log->BaseSpeed = 100.0f;
+			Log->bMovesRight = true;
+			Log->GridCellSize = GridCellSize;
+		}
+		return Log;
+	}
+}
+
+// Test 1: Dead center on platform -> FOUND
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FFindPlatform_DeadCenter_Found,
+	"UnrealFrog.Collision.FindPlatform.DeadCenter_Found",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FFindPlatform_DeadCenter_Found::RunTest(const FString& Parameters)
+{
+	UWorld* World = FindPlatformTestHelper::CreateTestWorld();
+	float CellSize = 100.0f;
+	int32 RiverRow = 8;
+	float LogX = 600.0f;
+	float LogY = static_cast<float>(RiverRow) * CellSize;
+
+	AHazardBase* Log = FindPlatformTestHelper::SpawnLog(World, FVector(LogX, LogY, 0.0f), 3, CellSize);
+	AFrogCharacter* Frog = FindPlatformTestHelper::SpawnFrogAtWorldPos(World, FVector(LogX, LogY, 0.0f), RiverRow);
+	TestNotNull(TEXT("Frog spawned"), Frog);
+	TestNotNull(TEXT("Log spawned"), Log);
+
+	if (Frog)
+	{
+		Frog->FindPlatformAtCurrentPosition();
+		TestTrue(TEXT("Dead center: platform FOUND"), Frog->CurrentPlatform.Get() == Log);
+	}
+
+	FindPlatformTestHelper::DestroyTestWorld(World);
+	return true;
+}
+
+// Test 2: Comfortable interior (25% offset) -> FOUND
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FFindPlatform_Interior25Pct_Found,
+	"UnrealFrog.Collision.FindPlatform.Interior25Pct_Found",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FFindPlatform_Interior25Pct_Found::RunTest(const FString& Parameters)
+{
+	UWorld* World = FindPlatformTestHelper::CreateTestWorld();
+	float CellSize = 100.0f;
+	int32 RiverRow = 8;
+	float LogX = 600.0f;
+	float LogY = static_cast<float>(RiverRow) * CellSize;
+
+	AHazardBase* Log = FindPlatformTestHelper::SpawnLog(World, FVector(LogX, LogY, 0.0f), 3, CellSize);
+	AFrogCharacter* Frog = FindPlatformTestHelper::SpawnFrogAtWorldPos(World, FVector(LogX, LogY, 0.0f), RiverRow);
+	TestNotNull(TEXT("Frog spawned"), Frog);
+
+	if (Frog && Log)
+	{
+		float Margin = Frog->PlatformLandingMargin;
+		float HalfWidth = 3.0f * CellSize * 0.5f;
+		float EffectiveHalfWidth = HalfWidth - Margin;
+		float Offset = EffectiveHalfWidth * 0.25f;
+
+		Frog->SetActorLocation(FVector(LogX + Offset, LogY, 0.0f));
+		Frog->FindPlatformAtCurrentPosition();
+		TestTrue(TEXT("25% interior: platform FOUND"), Frog->CurrentPlatform.Get() == Log);
+	}
+
+	FindPlatformTestHelper::DestroyTestWorld(World);
+	return true;
+}
+
+// Test 3: Just inside margin (EffectiveHalfWidth - 1.0) -> FOUND
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FFindPlatform_JustInsideMargin_Found,
+	"UnrealFrog.Collision.FindPlatform.JustInsideMargin_Found",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FFindPlatform_JustInsideMargin_Found::RunTest(const FString& Parameters)
+{
+	UWorld* World = FindPlatformTestHelper::CreateTestWorld();
+	float CellSize = 100.0f;
+	int32 RiverRow = 8;
+	float LogX = 600.0f;
+	float LogY = static_cast<float>(RiverRow) * CellSize;
+
+	AHazardBase* Log = FindPlatformTestHelper::SpawnLog(World, FVector(LogX, LogY, 0.0f), 3, CellSize);
+	AFrogCharacter* Frog = FindPlatformTestHelper::SpawnFrogAtWorldPos(World, FVector(LogX, LogY, 0.0f), RiverRow);
+	TestNotNull(TEXT("Frog spawned"), Frog);
+
+	if (Frog && Log)
+	{
+		float Margin = Frog->PlatformLandingMargin;
+		float HalfWidth = 3.0f * CellSize * 0.5f;
+		float EffectiveHalfWidth = HalfWidth - Margin;
+		float Offset = EffectiveHalfWidth - 1.0f;
+
+		Frog->SetActorLocation(FVector(LogX + Offset, LogY, 0.0f));
+		Frog->FindPlatformAtCurrentPosition();
+		TestTrue(TEXT("Just inside margin: platform FOUND"), Frog->CurrentPlatform.Get() == Log);
+	}
+
+	FindPlatformTestHelper::DestroyTestWorld(World);
+	return true;
+}
+
+// Test 4: Just outside margin (EffectiveHalfWidth + 1.0) -> NOT FOUND
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FFindPlatform_JustOutsideMargin_NotFound,
+	"UnrealFrog.Collision.FindPlatform.JustOutsideMargin_NotFound",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FFindPlatform_JustOutsideMargin_NotFound::RunTest(const FString& Parameters)
+{
+	UWorld* World = FindPlatformTestHelper::CreateTestWorld();
+	float CellSize = 100.0f;
+	int32 RiverRow = 8;
+	float LogX = 600.0f;
+	float LogY = static_cast<float>(RiverRow) * CellSize;
+
+	AHazardBase* Log = FindPlatformTestHelper::SpawnLog(World, FVector(LogX, LogY, 0.0f), 3, CellSize);
+	AFrogCharacter* Frog = FindPlatformTestHelper::SpawnFrogAtWorldPos(World, FVector(LogX, LogY, 0.0f), RiverRow);
+	TestNotNull(TEXT("Frog spawned"), Frog);
+
+	if (Frog && Log)
+	{
+		float Margin = Frog->PlatformLandingMargin;
+		float HalfWidth = 3.0f * CellSize * 0.5f;
+		float EffectiveHalfWidth = HalfWidth - Margin;
+		float Offset = EffectiveHalfWidth + 1.0f;
+
+		Frog->SetActorLocation(FVector(LogX + Offset, LogY, 0.0f));
+		Frog->FindPlatformAtCurrentPosition();
+		TestTrue(TEXT("Just outside margin: platform NOT found"), Frog->CurrentPlatform.Get() == nullptr);
+	}
+
+	FindPlatformTestHelper::DestroyTestWorld(World);
+	return true;
+}
+
+// Test 5: At raw platform edge (HalfWidth) -> NOT FOUND
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FFindPlatform_AtRawEdge_NotFound,
+	"UnrealFrog.Collision.FindPlatform.AtRawEdge_NotFound",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FFindPlatform_AtRawEdge_NotFound::RunTest(const FString& Parameters)
+{
+	UWorld* World = FindPlatformTestHelper::CreateTestWorld();
+	float CellSize = 100.0f;
+	int32 RiverRow = 8;
+	float LogX = 600.0f;
+	float LogY = static_cast<float>(RiverRow) * CellSize;
+
+	AHazardBase* Log = FindPlatformTestHelper::SpawnLog(World, FVector(LogX, LogY, 0.0f), 3, CellSize);
+	AFrogCharacter* Frog = FindPlatformTestHelper::SpawnFrogAtWorldPos(World, FVector(LogX, LogY, 0.0f), RiverRow);
+	TestNotNull(TEXT("Frog spawned"), Frog);
+
+	if (Frog && Log)
+	{
+		float HalfWidth = 3.0f * CellSize * 0.5f;
+		Frog->SetActorLocation(FVector(LogX + HalfWidth, LogY, 0.0f));
+		Frog->FindPlatformAtCurrentPosition();
+		TestTrue(TEXT("At raw edge: platform NOT found"), Frog->CurrentPlatform.Get() == nullptr);
+	}
+
+	FindPlatformTestHelper::DestroyTestWorld(World);
+	return true;
+}
+
+// Test 6: Wrong row (Y off by 1 cell) -> NOT FOUND
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FFindPlatform_WrongRow_NotFound,
+	"UnrealFrog.Collision.FindPlatform.WrongRow_NotFound",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FFindPlatform_WrongRow_NotFound::RunTest(const FString& Parameters)
+{
+	UWorld* World = FindPlatformTestHelper::CreateTestWorld();
+	float CellSize = 100.0f;
+	int32 RiverRow = 8;
+	float LogX = 600.0f;
+	float LogY = static_cast<float>(RiverRow) * CellSize;
+
+	AHazardBase* Log = FindPlatformTestHelper::SpawnLog(World, FVector(LogX, LogY, 0.0f), 3, CellSize);
+	int32 AdjacentRow = RiverRow + 1;
+	AFrogCharacter* Frog = FindPlatformTestHelper::SpawnFrogAtWorldPos(
+		World, FVector(LogX, LogY + CellSize, 0.0f), AdjacentRow);
+	TestNotNull(TEXT("Frog spawned"), Frog);
+
+	if (Frog && Log)
+	{
+		Frog->FindPlatformAtCurrentPosition();
+		TestTrue(TEXT("Wrong row: platform NOT found"), Frog->CurrentPlatform.Get() == nullptr);
+	}
+
+	FindPlatformTestHelper::DestroyTestWorld(World);
+	return true;
+}
+
+// Test 7: Non-rideable hazard -> NOT FOUND
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FFindPlatform_NonRideable_NotFound,
+	"UnrealFrog.Collision.FindPlatform.NonRideable_NotFound",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FFindPlatform_NonRideable_NotFound::RunTest(const FString& Parameters)
+{
+	UWorld* World = FindPlatformTestHelper::CreateTestWorld();
+	float CellSize = 100.0f;
+	int32 RiverRow = 8;
+	float HazardX = 600.0f;
+	float HazardY = static_cast<float>(RiverRow) * CellSize;
+
+	FTransform CarTransform(FRotator::ZeroRotator, FVector(HazardX, HazardY, 0.0f));
+	AHazardBase* Car = World->SpawnActor<AHazardBase>(AHazardBase::StaticClass(), CarTransform);
+	if (Car)
+	{
+		Car->bIsRideable = false;
+		Car->HazardType = EHazardType::Car;
+		Car->HazardWidthCells = 2;
+		Car->GridCellSize = CellSize;
+	}
+
+	AFrogCharacter* Frog = FindPlatformTestHelper::SpawnFrogAtWorldPos(
+		World, FVector(HazardX, HazardY, 0.0f), RiverRow);
+	TestNotNull(TEXT("Frog spawned"), Frog);
+
+	if (Frog && Car)
+	{
+		Frog->FindPlatformAtCurrentPosition();
+		TestTrue(TEXT("Non-rideable: platform NOT found"), Frog->CurrentPlatform.Get() == nullptr);
+	}
+
+	FindPlatformTestHelper::DestroyTestWorld(World);
+	return true;
+}
+
+// Test 8: Two platforms, frog on first -> FOUND (first)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FFindPlatform_TwoPlatforms_FindsCorrectOne,
+	"UnrealFrog.Collision.FindPlatform.TwoPlatforms_FindsCorrectOne",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FFindPlatform_TwoPlatforms_FindsCorrectOne::RunTest(const FString& Parameters)
+{
+	UWorld* World = FindPlatformTestHelper::CreateTestWorld();
+	float CellSize = 100.0f;
+	int32 RiverRow = 8;
+	float LogY = static_cast<float>(RiverRow) * CellSize;
+
+	AHazardBase* LogA = FindPlatformTestHelper::SpawnLog(World, FVector(400.0f, LogY, 0.0f), 3, CellSize);
+	AHazardBase* LogB = FindPlatformTestHelper::SpawnLog(World, FVector(900.0f, LogY, 0.0f), 3, CellSize);
+	AFrogCharacter* Frog = FindPlatformTestHelper::SpawnFrogAtWorldPos(World, FVector(400.0f, LogY, 0.0f), RiverRow);
+	TestNotNull(TEXT("Frog spawned"), Frog);
+	TestNotNull(TEXT("Log A spawned"), LogA);
+	TestNotNull(TEXT("Log B spawned"), LogB);
+
+	if (Frog && LogA && LogB)
+	{
+		Frog->FindPlatformAtCurrentPosition();
+		AHazardBase* FoundPlatform = Frog->CurrentPlatform.Get();
+		TestNotNull(TEXT("A platform was found"), FoundPlatform);
+		TestTrue(TEXT("Found platform is Log A"), FoundPlatform == LogA);
+	}
+
+	FindPlatformTestHelper::DestroyTestWorld(World);
+	return true;
+}
+
+// Test 9: Negative X offset just inside -> FOUND
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FFindPlatform_NegativeSideJustInside_Found,
+	"UnrealFrog.Collision.FindPlatform.NegativeSideJustInside_Found",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FFindPlatform_NegativeSideJustInside_Found::RunTest(const FString& Parameters)
+{
+	UWorld* World = FindPlatformTestHelper::CreateTestWorld();
+	float CellSize = 100.0f;
+	int32 RiverRow = 8;
+	float LogX = 600.0f;
+	float LogY = static_cast<float>(RiverRow) * CellSize;
+
+	AHazardBase* Log = FindPlatformTestHelper::SpawnLog(World, FVector(LogX, LogY, 0.0f), 3, CellSize);
+	AFrogCharacter* Frog = FindPlatformTestHelper::SpawnFrogAtWorldPos(World, FVector(LogX, LogY, 0.0f), RiverRow);
+	TestNotNull(TEXT("Frog spawned"), Frog);
+
+	if (Frog && Log)
+	{
+		float Margin = Frog->PlatformLandingMargin;
+		float HalfWidth = 3.0f * CellSize * 0.5f;
+		float EffectiveHalfWidth = HalfWidth - Margin;
+		float Offset = -(EffectiveHalfWidth - 1.0f);
+
+		Frog->SetActorLocation(FVector(LogX + Offset, LogY, 0.0f));
+		Frog->FindPlatformAtCurrentPosition();
+		TestTrue(TEXT("Negative side just inside: platform FOUND"), Frog->CurrentPlatform.Get() == Log);
+	}
+
+	FindPlatformTestHelper::DestroyTestWorld(World);
+	return true;
+}
+
+// Test 10: Submerged platform -> NOT FOUND
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FFindPlatform_SubmergedPlatform_NotFound,
+	"UnrealFrog.Collision.FindPlatform.SubmergedPlatform_NotFound",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FFindPlatform_SubmergedPlatform_NotFound::RunTest(const FString& Parameters)
+{
+	UWorld* World = FindPlatformTestHelper::CreateTestWorld();
+	float CellSize = 100.0f;
+	int32 RiverRow = 8;
+	float LogX = 600.0f;
+	float LogY = static_cast<float>(RiverRow) * CellSize;
+
+	AHazardBase* Turtle = FindPlatformTestHelper::SpawnLog(World, FVector(LogX, LogY, 0.0f), 3, CellSize);
+	if (Turtle)
+	{
+		Turtle->HazardType = EHazardType::TurtleGroup;
+		Turtle->bIsSubmerged = true;
+	}
+
+	AFrogCharacter* Frog = FindPlatformTestHelper::SpawnFrogAtWorldPos(World, FVector(LogX, LogY, 0.0f), RiverRow);
+	TestNotNull(TEXT("Frog spawned"), Frog);
+
+	if (Frog && Turtle)
+	{
+		Frog->FindPlatformAtCurrentPosition();
+		TestTrue(TEXT("Submerged platform: NOT found"), Frog->CurrentPlatform.Get() == nullptr);
+	}
+
+	FindPlatformTestHelper::DestroyTestWorld(World);
+	return true;
+}
+
 #endif // WITH_AUTOMATION_TESTS
