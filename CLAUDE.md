@@ -5,13 +5,16 @@ Unreal Engine 5.7 C++ project. 3D arcade Frogger with procedurally generated ass
 Low-poly stylized aesthetic. Mob programming workflow with agent team coordination.
 
 ## Architecture
-- /Source/UnrealFrog/ — C++ gameplay source (actors, components, subsystems)
-- /Content/ — Unreal assets (meshes, materials, maps, sounds)
-- /Config/ — Project configuration (DefaultEngine.ini, DefaultGame.ini)
-- /Tests/ — Automated test suites (Gauntlet, functional tests)
-- /.claude/agents/ — Agent team profiles
-- /.claude/skills/ — Shared knowledge skills
-- /.team/ — Team agreements, roster, retrospective log
+- `/Source/UnrealFrog/` — C++ gameplay source (actors, components, subsystems)
+- `/Content/` — Unreal assets (meshes, materials, maps, sounds)
+- `/Config/` — Project configuration (DefaultEngine.ini, DefaultGame.ini)
+- `/Source/UnrealFrog/Tests/` — Automated test suites (170+ tests)
+- `/Tools/PlayUnreal/` — Live game testing: screenshots, video, state queries, hop commands
+- `/Tools/AudioGen/` — Procedural WAV generation (SFX + music)
+- `/Docs/` — Design specs, sprint plans, QA checklists, testing docs
+- `/.claude/agents/` — Agent team profiles
+- `/.claude/skills/` — Shared knowledge skills
+- `/.team/` — Team agreements, roster, retrospective log
 
 ## Build (macOS, UE 5.7)
 - Game target: `"/Users/Shared/Epic Games/UE_5.7/Engine/Build/BatchFiles/Mac/Build.sh" UnrealFrog Mac Development "/Users/randroid/Documents/Dev/Unreal/UnrealFrog/UnrealFrog.uproject"`
@@ -78,11 +81,43 @@ After every feature/sprint: review git log → identify friction → categorize 
 - Keep build output minimal — print summaries, log details to files (prevents context pollution)
 
 ### Essential References
-- `.team/agreements.md` — Living team norms (18 sections, battle-tested over 6 sprints)
+
+**Team process** (read before any work):
+- `.team/agreements.md` — Living team norms (21 sections, battle-tested over 8 sprints)
 - `.team/roster.md` — Agent roles and file ownership boundaries
 - `.team/onboarding.md` — How to add/retire specialist agents
 - `.team/retrospective-log.md` — Full history of process improvements
 - `.claude/agents/*.md` — Individual agent profiles with expert-inspired principles
+
+**PlayUnreal — live game testing** (read before any visual/gameplay work):
+- `Tools/PlayUnreal/README.md` — Full usage guide: client API, test scripts, video capture, troubleshooting
+- `Tools/PlayUnreal/client.py` — Python client: `hop()`, `get_state()`, `screenshot()`, `record_video()`
+- `Tools/PlayUnreal/verify_visuals.py` — Visual smoke test (run after ANY visual system change)
+- `Tools/PlayUnreal/diagnose.py` — Deep RC API diagnostics (run when things are broken)
+- `Tools/PlayUnreal/qa_checklist.py` — Sprint QA gate (required before "QA: verified")
+- `Tools/PlayUnreal/run-playunreal.sh` — Launcher: handles editor lifecycle + RC API setup
+
+**Game design and specs**:
+- `Docs/Design/sprint1-gameplay-spec.md` — Grid system, lane layout, movement, scoring rules
+- `.claude/skills/frogger-design/SKILL.md` — Core loop, controls, progression, difficulty philosophy
+
+**Testing**:
+- `Docs/Testing/seam-matrix.md` — Seam test coverage matrix (all system interaction pairs)
+- `Tools/PlayUnreal/run-tests.sh` — Unit test runner (170+ tests, category filters: `--seam`, `--audio`, `--e2e`, `--all`)
+
+**Build and UE5 conventions**:
+- `.claude/skills/unreal-conventions/SKILL.md` — Naming, UPROPERTY/UFUNCTION patterns, lifecycle
+- `.claude/skills/unreal-build/SKILL.md` — Build.cs, test framework, automation patterns
+
+**Asset pipelines**:
+- `.claude/skills/asset-generation/SKILL.md` — 3D model, texture, and audio asset validation
+- `Tools/AudioGen/generate_sfx.py` — Procedural 8-bit SFX generation (9 WAVs)
+- `Tools/AudioGen/generate_music.py` — Procedural music generation (Title + Gameplay tracks)
+
+**Sprint planning and history**:
+- `Docs/Planning/sprint*-plan.md` — Sprint plans (2, 4, 7, 8)
+- `Docs/QA/sprint2-playtest-checklist.md` — QA playtest checklist template
+- `Docs/Research/editor-automation-spike.md` — PythonScriptPlugin + editor automation research
 
 ## Team
 Read `.team/agreements.md` before ANY work. Update it during retrospectives.
@@ -92,6 +127,7 @@ Read `.team/agreements.md` before ANY work. Update it during retrospectives.
 - NEVER commit broken builds — verify build (Game + Editor) before every commit
 - NEVER bypass the asset validation pipeline
 - Always run tests before marking tasks complete
+- Run `verify_visuals.py` after ANY change to visual systems (VFX, HUD, materials, camera, lighting)
 - One writer per file — but every task gets multiple opinions before, during, and after
 - Retrospect after each feature completion
 - Every sprint must leave the project in a playable, working state
