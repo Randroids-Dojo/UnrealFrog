@@ -5,8 +5,8 @@
 | Date | 2026-02-16 |
 | Session ID | `486a1fce-113f-4722-9497-667c8c9ccddd` |
 | Model | claude-opus-4-6 |
-| Tokens | ~83,579,754 input, ~49,854 output |
-| Duration | 2h 30m |
+| Tokens | ~90,866,811 input, ~50,391 output |
+| Duration | 2h 43m |
 
 ---
 
@@ -4367,3 +4367,319 @@ Let me clean up the team.
 ## Assistant (06:15 UTC)
 
 🤖️ All 5 agents confirmed shutdown and team cleaned up. The Sprint 11 plan is ready at `Docs/Planning/sprint11-plan.md`. Ready to start implementation whenever you'd like.
+
+## User (06:20 UTC)
+
+Ok, start the sprint and remind the agents to take notes as they go so we can discuss things to improve in the retro
+
+## Assistant (06:20 UTC)
+
+🤖️ Let's go. Setting up the Sprint 11 team with tasks and dependencies.
+
+- **Used TeamCreate**
+
+## Assistant (06:20 UTC)
+
+Now let me create all tasks from the sprint plan with proper dependencies.
+
+- **Used TaskCreate**: Baseline build verification
+
+- **Used TaskCreate**: GetGameConfigJSON() UFUNCTION — single source of truth
+
+- **Used TaskCreate**: PlatformLandingMargin UPROPERTY
+
+- **Used TaskCreate**: FindPlatform.EdgeDistance regression tests (8-10 parameterized)
+
+- **Used TaskCreate**: Remove hardcoded constants from Python — read from GetGameConfigJSON()
+
+- **Used TaskCreate**: Seam matrix update — 2 new entries
+
+- **Used TaskCreate**: run-tests.sh --collision and --gameplay filters + retro-notes nudge
+
+- **Used TaskCreate**: VFX material/rendering investigation
+
+- **Used TaskCreate**: [Gameplay] multi-step UWorld tests (6 scenarios)
+
+- **Used TaskCreate**: Wave logic investigation — 5 home slots not triggering wave increment
+
+- **Used TaskCreate**: SYNC annotation convention
+
+## Assistant (06:21 UTC)
+
+Now set up the dependency graph.
+
+- **Used TaskUpdate** on task 2
+
+- **Used TaskUpdate** on task 3
+
+- **Used TaskUpdate** on task 4
+
+- **Used TaskUpdate** on task 5
+
+- **Used TaskUpdate** on task 7
+
+- **Used TaskUpdate** on task 8
+
+## Assistant (06:21 UTC)
+
+Good. Now spawn the team. DevOps starts with the baseline build (Phase 1). Engine Architect and QA Lead start on independent work while waiting.
+
+- **Used Task**: DevOps: baseline build + Python sync
+
+- **Used Task**: Engine Architect: GameConfig + UPROPERTY + VFX
+
+- **Used Task**: QA Lead: collision + gameplay tests
+
+- **Used Task**: XP Coach: process oversight
+
+## Assistant (06:22 UTC)
+
+Sprint 11 is live with 4 agents:
+
+- **DevOps**: Starting with baseline build verification (Task #1)
+- **Engine Architect**: Investigating wave logic bug (Task #10) while waiting for build, then GetGameConfigJSON + PlatformLandingMargin
+- **QA Lead**: Writing Gameplay tests (Task #9) and seam matrix (Task #6) — no build dependency
+- **XP Coach**: Process oversight, retro notes enforcement, cross-domain review coordination
+
+All agents have been reminded to write to `.team/retro-notes.md` as they go. I'll monitor progress and unblock as needed.
+
+- **Used TaskList**
+
+## Assistant (06:22 UTC)
+
+Good — DevOps is building, Engine Architect is investigating wave logic, QA Lead is writing gameplay tests. All moving in parallel.
+
+## User (06:23 UTC)
+
+<teammate-message teammate_id="xp-coach" color="purple" summary="Sprint 11 process status — 3 active, retro notes empty">
+Sprint 11 process status report:
+
+**Task Board:**
+- Task #1 (Baseline build): devops-engineer, in_progress — this is the critical path blocker for Tasks 2, 3, 5, 8
+- Task #9 (Gameplay tests): qa-lead, in_progress — independent, good parallel work
+- Task #10 (Wave investigation): engine-architect, in_progress — independent, good parallel work
+- 8 tasks pending, most blocked on Task 1
+
+**Process observations:**
+1. Retro notes (.team/retro-notes.md) is empty — no agents have written observations yet. I will nudge them.
+2. Section 19 (one agent runs tests at a time): DevOps will need sole test access for baseline verification. Will monitor for conflicts.
+3. Cross-domain review readiness: When Engine Architect completes Task 3 (PlatformLandingMargin default=17.0f), I will provide the Game Designer perspective per IPM consensus — 83% landing zone is correct.
+
+**No blockers detected yet.** Will continue monitoring and nudge retro notes.
+</teammate-message>
+
+## Assistant (06:23 UTC)
+
+🤖️ Good status report from XP Coach. Everything is tracking — the retro notes nudge is the right call. Let's see how the builds and parallel work progress.
+
+- **Used TaskList**
+
+## Assistant (06:23 UTC)
+
+Three agents working in parallel — baseline build, wave investigation, and gameplay tests. Waiting for the critical path (Task #1) to unblock the main sprint work.
+
+## User (06:23 UTC)
+
+<teammate-message teammate_id="xp-coach" color="purple" summary="Retro notes reminder — document observations as you work">
+Retro notes reminder (Section 25): `.team/retro-notes.md` is currently empty. Please add observations as you work — anything noteworthy about your current task. Format: `- [your-name] observation (context)`. This makes the retrospective faster and more accurate.
+
+Examples:
+- `- [devops-engineer] Build time was 4m30s — longer than expected (baseline verification)`
+- `- [engine-architect] Wave completion state machine has 3 paths — documenting for QA (wave investigation)`
+- `- [qa-lead] UWorld test setup requires X boilerplate — noting for possible helper extraction (gameplay tests)`
+
+One line per observation is fine. Do not wait for the retro.
+</teammate-message>
+
+## Assistant (06:23 UTC)
+
+🤖️ Good nudge from XP Coach on the retro notes. Let's keep monitoring progress.
+
+- **Used TaskList**
+
+## Assistant (06:23 UTC)
+
+Still waiting on the baseline build. That's the critical path — 3 agents are doing useful parallel work in the meantime.
+
+## User (06:23 UTC)
+
+<teammate-message teammate_id="xp-coach" color="purple">
+{"type":"idle_notification","from":"xp-coach","timestamp":"2026-02-16T06:23:28.464Z","idleReason":"available"}
+</teammate-message>
+
+## Assistant (06:23 UTC)
+
+🤖️ XP Coach is idle after sending the retro notes reminder — that's expected, it'll wake up when there's process work to do. The three implementers are still working.
+
+- **Used TaskList**
+
+## Assistant (06:23 UTC)
+
+Task #1 (baseline build) is complete. Tasks #2 and #8 are now unblocked. Engine Architect should pick up Task #2 (GetGameConfigJSON) next — that's the critical path.
+
+## User (06:23 UTC)
+
+<teammate-message teammate_id="engine-architect" color="green" summary="Wave logic investigation: no code bug found">
+Task #10 (wave logic investigation) — initial code review complete.
+
+**Finding: No code-level bug in the wave state machine.**
+
+I traced the full chain: `HandleHopCompleted` -> `TryFillHomeSlot` -> `OnWaveComplete` -> `OnRoundCompleteFinished`. The logic is correct:
+- `HomeSlotsFilledCount` accumulates across individual slot fills
+- It only resets in `ResetHomeSlots()`, which is called from `OnRoundCompleteFinished` (after wave increment), `ReturnToTitle`, or `StartGame` — never during mid-wave respawns
+- The `HomeSlots[SlotIndex]` guard correctly prevents double-filling
+- The `HomeSlotsFilledCount >= TotalHomeSlots` check correctly triggers `OnWaveComplete` on the 5th fill
+- `OnWaveComplete` transitions to `RoundComplete`, timer fires `OnRoundCompleteFinished` which increments `CurrentWave`
+
+**Likely root cause of the Sprint 9 QA observation:**
+The PlayUnreal path planner was probably sending hop commands during the `Spawning` state (between home slot fills). `RequestHop()` on FrogCharacter does NOT check game state — it only checks `bIsDead` and `bIsHopping`. So hops execute during Spawning, but `HandleHopCompleted` rejects them because `CurrentState != Playing`. The frog hops forward, but the game doesn't track it. Then `OnSpawningComplete` yanks the frog back to (6,0).
+
+**Recommendation:** Mark Task #10 as "no code bug found — suspected PlayUnreal automation timing." A proper reproduction requires running PlayUnreal against a live game with logging. The wave logic code itself is sound.
+
+I also noted this in `.team/retro-notes.md` per Section 25.
+
+Ready to start Task #2 (GetGameConfigJSON) as soon as Task #1 baseline build completes.
+</teammate-message>
+
+## Assistant (06:24 UTC)
+
+🤖️ Good investigation from Engine Architect — wave logic is sound, the issue was likely PlayUnreal sending hops during Spawning state. That's useful context.
+
+Task #1 is already complete (baseline build passed), so Engine Architect is unblocked for Task #2 now.
+
+- **Used SendMessage**
+
+## Assistant (06:24 UTC)
+
+Engine Architect is moving to the critical path. Meanwhile QA Lead continues gameplay tests, and DevOps should be picking up independent work.
+
+## User (06:24 UTC)
+
+<teammate-message teammate_id="devops-engineer" color="blue" summary="Task #1 done: 183/183 tests pass, starting #11">
+Task #1 COMPLETE. Baseline build verification passed:
+- Game target: Result: Succeeded (19.9s)
+- Editor target: Result: Succeeded (7.7s)
+- Tests: 183 passed / 0 failed across 18 categories
+
+All green. Task #2 (GetGameConfigJSON) and Task #8 (VFX investigation) are now unblocked.
+
+My remaining tasks: #5 (blocked by #2), #7 (blocked by #4), #11 (independent). I'll start Task #11 (SYNC annotations) now since it's unblocked and independent.
+</teammate-message>
+
+## Assistant (06:24 UTC)
+
+🤖️ Baseline verified — 183/183 passing. Good call starting Task #11 while waiting for the critical path.
+
+## User (06:25 UTC)
+
+<teammate-message teammate_id="qa-lead" color="yellow" summary="Tasks #9 and #6 complete, ready for build">
+Task #9 status: GameplayTest.cpp written with all 6 scenario tests:
+
+1. `FGameplay_HopThroughSafeZone_Survive` — safe zone hop, verify position and survival
+2. `FGameplay_HopIntoRoadHazard_Die` — road hazard overlap -> Die(Squish)
+3. `FGameplay_HopOntoRiverPlatform_Survive` — **key test**: UWorld with TActorIterator, FindPlatformAtCurrentPosition detects log
+4. `FGameplay_HopIntoRiverNoPlatform_Die` — empty river -> Die(Splash) via FinishHop path
+5. `FGameplay_FillAllHomeSlots_WaveIncrements` — fills all 5 slots via HandleHopCompleted, verifies OnRoundCompleteFinished increments wave to 2
+6. `FGameplay_MultiHopRoadCrossing_Survive` — 3 sequential hops across road rows with offset hazards
+
+File: `/Users/randroid/Documents/Dev/Unreal/UnrealFrog/Source/UnrealFrog/Tests/GameplayTest.cpp`
+
+Design notes:
+- Scenario 3 is the highest-value test — it exercises the exact FindPlatformAtCurrentPosition -> TActorIterator path that broke in Sprint 10
+- Scenario 5 confirms engine-architect's wave logic finding (Task #10) — code path is correct, the Sprint 9 issue was likely PlayUnreal automation timing
+- All tests are tuning-resilient: read HopDuration, GridCellSize, HomeSlotColumns from game objects
+
+Task #6 also done: seam matrix updated with 2 new entries (#26 FindPlatform+FinishHop, #27 PathPlanner+FindPlatform cross-boundary).
+
+Ready for build. Task #4 (FindPlatform.EdgeDistance regression tests) is blocked by Task #3. I'll need to coordinate build access with devops-engineer to compile and run GameplayTest.cpp. Should I message devops to coordinate?
+</teammate-message>
+
+## Assistant (06:25 UTC)
+
+🤖️ Great work from QA Lead — 6 gameplay tests plus seam matrix done. Yes, coordinate the build.
+
+- **Used SendMessage**
+
+## Assistant (06:26 UTC)
+
+🤖️ Those clang diagnostics are just the IDE's language server not understanding UE's build system — they show `CoreMinimal.h` not found, `UENUM` unknown, etc. These are standard false positives in UE projects. The real test is whether UBT builds succeed, which it will. No action needed on these.
+
+Agents are progressing well — Engine Architect is writing GetGameConfigJSON, QA Lead has tests ready to compile, DevOps is working on SYNC annotations.
+
+- **Used TaskList**
+
+## Assistant (06:26 UTC)
+
+Engine Architect is working on Task #2 (just modified FrogCharacter.h to add the PlatformLandingMargin UPROPERTY likely). The IDE diagnostics are all standard UE false positives. Waiting for builds to validate.
+
+## User (06:27 UTC)
+
+<teammate-message teammate_id="qa-lead" color="yellow" summary="All available tasks done or blocked, awaiting build/unblock">
+Status summary:
+- Task #9 (GameplayTest.cpp): 6 tests WRITTEN, awaiting build verification. Messaged devops for build slot.
+- Task #6 (seam matrix): COMPLETED. Added entries #26 (FindPlatform+FinishHop) and #27 (PathPlanner+FindPlatform cross-boundary).
+- Task #4 (FindPlatform regression tests): BLOCKED by Task #3. I've analyzed the code and have all 8 test cases designed — ready to write as soon as PlatformLandingMargin UPROPERTY lands.
+- Retro notes: Added 2 entries about test design decisions.
+
+I'm idle until either: (a) devops gives me a build slot, or (b) engine-architect completes Task #3. Is there anything else I should work on while waiting?
+</teammate-message>
+
+## Assistant (06:27 UTC)
+
+🤖️ QA Lead is in good shape — all independent work done, waiting on build access and Task #3.
+
+- **Used SendMessage**
+
+## Assistant (06:27 UTC)
+
+🤖️ More IDE false positives from UE's non-standard build system — clang doesn't understand `UENUM`, `UMETA`, etc. outside of UBT. These are expected and harmless. The real validation is the UBT build which the agents will run.
+
+## User (06:28 UTC)
+
+<teammate-message teammate_id="qa-lead" color="yellow">
+{"type":"idle_notification","from":"qa-lead","timestamp":"2026-02-16T06:27:55.001Z","idleReason":"available","summary":"[to engine-architect] Waiting on Task #3, requesting cross-domain review"}
+</teammate-message>
+
+## Assistant (06:28 UTC)
+
+🤖️ QA Lead is idle after pre-writing the collision tests and messaging Engine Architect for cross-domain review. Normal flow — they'll wake up when Task #3 lands or a build slot opens.
+
+- **Used TaskList**
+
+## Assistant (06:28 UTC)
+
+Engine Architect on Task #2 is the critical path. Everything is waiting on that.
+
+## User (06:28 UTC)
+
+<teammate-message teammate_id="qa-lead" color="yellow">
+{"type":"idle_notification","from":"qa-lead","timestamp":"2026-02-16T06:28:11.480Z","idleReason":"available","summary":"[to devops-engineer] Coordinating build slot sequencing"}
+</teammate-message>
+
+## Assistant (06:28 UTC)
+
+🤖️ QA Lead coordinating with DevOps on build slots. Normal — they'll pick up when it's their turn.
+
+## User (06:28 UTC)
+
+<teammate-message teammate_id="devops-engineer" color="blue" summary="Task #11 done, blocked on UBT mutex for build">
+Task #11 (SYNC annotations) implementation is done. I've added `// SYNC:` annotations to:
+- **Python**: path_planner.py (9 constants), debug_navigation.py (7 constants)
+- **C++**: FrogCharacter.h (3 UPROPERTYs), FrogCharacter.cpp (capsule radius), UnrealFrogGameMode.h (HomeSlotRow, HomeSlotColumns)
+- **run-tests.sh**: `--check-sync` flag (voluntary, non-blocking) — validates values match between Python and C++
+- **test_crossing.py**: replaced hardcoded `13` with `GRID_COLS`
+
+Also ran `--check-sync` and confirmed 9 constants match, 0 warnings.
+
+BLOCKED: I need to build to verify the C++ changes don't break compilation, but getting ConflictingInstance (UBT mutex). Is engine-architect currently building? I'll retry in 60s.
+</teammate-message>
+
+## Assistant (06:28 UTC)
+
+🤖️ Good work on Task #11. Yes, Engine Architect is likely building for Task #2 right now. The UBT mutex means you need to wait for their build to finish.
+
+- **Used SendMessage**
+
+## Assistant (06:29 UTC)
+
+🤖️ QA Lead has written CollisionTest.cpp (the `CoreMinimal.h` diagnostic confirms it). Good — they're pre-writing Task #4 tests while waiting, exactly as suggested. All three implementers have work in flight, just sequencing on the UBT mutex.
