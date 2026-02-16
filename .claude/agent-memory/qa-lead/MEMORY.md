@@ -2,20 +2,35 @@
 
 *Persistent knowledge accumulated across sessions. First 200 lines loaded automatically.*
 
-## Sprint 8 Sign-Off Failure (CRITICAL LESSON)
+## Sprint 9 Visual Verification (3 Runs)
 
-**I signed off Sprint 8 without visual verification. The stakeholder found that none of the visual changes were visible. This is the 6th sprint this happened.**
+**On 2026-02-15, ran verify_visuals.py 3 times against live games. First automated visual verification in project history.**
 
-### Root cause
-- Treated test-passing as verification (Section 9 exists to prevent exactly this)
-- Did not use "QA: pending" when blocked on PlayUnreal
-- Substituted process artifacts (seam matrix, docs) for actual gameplay verification
+### Run 3 Results (with hazard queries + invincibility)
+- **WORKING**: Ground, frog, camera, HUD (score/timer/lives), lighting, hazards, lane zones, state text (GET READY, GAME OVER), title screen, gameplay loop, **home slot filling** (all 5 slots), score accumulation (660+), timer bar color change
+- **BROKEN (NOT VISIBLE)**: Death puff VFX, Score pops +N text, Hop dust VFX, Home celebration VFX (sparkle/flash)
+- **UNTESTED**: Wave fanfare, ground color change (wave stayed at 1 despite 5 home fills)
+- **Wave issue**: homeSlotsFilledCount increased 5 times but wave never changed from 1. Possible game logic issue — does wave only increment after a specific RoundComplete transition?
+- 22 screenshots + 4 videos in `Saved/Screenshots/smoke_test/`
 
-### Corrective actions (MANDATORY for all future sprints)
+### PlayUnreal is OPERATIONAL
+- RC API connects, live object paths: GameMode_0, FrogCharacter_0
+- hop(), get_state(), screenshot(), record_video(), set_invincible(), get_hazards() all work
+- run-playunreal.sh: editor launches in ~6-8s, 3s actor spawn wait
+- SetInvincible + hazard-query navigation = reliable full-field traversal
+
+### Key Script Patterns
+- `ensure_playing()` must invalidate `pu._frog_path = None` after reset (actor recreated)
+- `hop_to_home_slot()` uses `_wait_for_safe_moment()` with hazard queries at 20Hz
+- GameOver handling: log without `check()` to avoid failure spam; single summary check
+- After ensure_playing, wait 0.5s before first hop (frog ignores input during spawn animation)
+
+## Corrective Actions (MANDATORY for all future sprints)
 1. Run `qa_checklist.py` against a live game before ANY sign-off
-2. If qa_checklist.py cannot run (no game connection), commit message MUST say "QA: code-level only, visual PENDING"
-3. NEVER write "QA: verified" without either: (a) qa_checklist.py PASS, or (b) reviewed screenshots from PlayUnreal
+2. If qa_checklist.py cannot run, commit message MUST say "QA: code-level only, visual PENDING"
+3. NEVER write "QA: verified" without: (a) qa_checklist.py PASS, or (b) reviewed screenshots
 4. qa_checklist.py is at: `/Tools/PlayUnreal/qa_checklist.py`
+5. verify_visuals.py is at: `/Tools/PlayUnreal/verify_visuals.py` (11 steps, saves to smoke_test/)
 
 ## Sprint 8 Plan
 - **Sprint 8 goal**: PlayUnreal automation (P0), VFX/HUD visibility fixes, visual verification
