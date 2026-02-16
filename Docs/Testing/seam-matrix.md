@@ -1,6 +1,6 @@
 # Seam Test Coverage Matrix
 
-*Last updated: Sprint 8*
+*Last updated: Sprint 11*
 
 ## Purpose
 
@@ -44,3 +44,5 @@ or an explicit "deferred" acknowledgment. This matrix tracks coverage.
 | 23 | FroggerVFXManager | Camera (distance + FOV) | CalculateScaleForScreenSize computes scale from camera distance and FOV; death puff StartScale >= 5% of visible width | COVERED | `FVFX_DeathPuffScaleForCameraDistance` |
 | 24 | FroggerVFXManager | GameMode (HomeSlotColumns, HomeSlotRow) | Home slot celebration positions derived from GameMode grid config, not hardcoded magic numbers | COVERED | `FVFX_HomeSlotSparkleReadsGridConfig` |
 | 25 | Difficulty scaling | Human perception threshold | Cumulative audio pitch + ground color change >= perceptible threshold by Wave 3 (5-second test) | DEFERRED | Game Designer implementing perception signals (Tasks 13-15) -- update to COVERED when tests land |
+| 26 | FrogCharacter | PlatformLandingMargin | FindPlatformAtCurrentPosition uses PlatformLandingMargin UPROPERTY (not capsule radius) for effective detection width; 10 boundary tests at center, 25%, margin edge, outside, raw edge, wrong row, non-rideable, two platforms, negative side, submerged | COVERED | `FCollision_FindPlatform_*` (10 tests in CollisionTest.cpp) |
+| 27 | GameMode (GetGameConfigJSON) | Python constants (path_planner.py) | GetGameConfigJSON returns live UPROPERTY values; Python init_from_config() overwrites module constants; --check-sync verifies SYNC annotations match C++ defaults | COVERED | `FGameConfig_*` (3 tests) + `run-tests.sh --check-sync` |
