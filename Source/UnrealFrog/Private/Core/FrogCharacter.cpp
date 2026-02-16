@@ -445,8 +445,20 @@ void AFrogCharacter::HandleHazardOverlap(AHazardBase* Hazard)
 
 	if (Hazard->bIsRideable)
 	{
-		// River platform: mount it
-		CurrentPlatform = Hazard;
+		// River platform: only mount if frog center is within the visual platform bounds.
+		// The physics overlap fires when capsule touches collision box, which is larger
+		// than the visual mesh. Without this check, the frog "rides" a log it's not on.
+		FVector FrogPos = GetActorLocation();
+		FVector HazardPos = Hazard->GetActorLocation();
+		float HalfWidth = static_cast<float>(Hazard->HazardWidthCells) * GridCellSize * 0.5f;
+		float EffectiveHalfWidth = HalfWidth - PlatformLandingMargin;
+		float HalfCell = GridCellSize * 0.5f;
+		if (EffectiveHalfWidth > 0.0f &&
+			FMath::Abs(FrogPos.X - HazardPos.X) <= EffectiveHalfWidth &&
+			FMath::Abs(FrogPos.Y - HazardPos.Y) <= HalfCell)
+		{
+			CurrentPlatform = Hazard;
+		}
 	}
 	else
 	{

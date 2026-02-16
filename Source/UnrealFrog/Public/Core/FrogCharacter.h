@@ -62,10 +62,10 @@ public:
 	int32 RiverRowMax = 12;
 
 	/** How far inside a platform's edge the frog center must be to count as "landed."
-	  * Default 17.0 = FrogRadius * 0.5. Produces ~83% landing zone on a 2-cell log.
+	  * Default 34.0 = FrogCapsuleRadius. Frog center must be fully inside platform edge.
 	  * Exposed for tuning and Python sync via GetGameConfigJSON(). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Collision")
-	float PlatformLandingMargin = 17.0f;
+	float PlatformLandingMargin = 34.0f;
 
 	// -- Runtime state ----------------------------------------------------
 
