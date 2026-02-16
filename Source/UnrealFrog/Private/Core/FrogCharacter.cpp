@@ -138,6 +138,11 @@ void AFrogCharacter::RequestHop(FVector Direction)
 	}
 
 	FIntPoint Delta = DirectionToGridDelta(Direction);
+	if (Delta.X == 0 && Delta.Y == 0)
+	{
+		return; // Zero direction — no hop
+	}
+
 	FIntPoint TargetPos = GridPosition + Delta;
 
 	if (!IsValidGridPosition(TargetPos))
@@ -259,17 +264,23 @@ void AFrogCharacter::FinishHop()
 
 FIntPoint AFrogCharacter::DirectionToGridDelta(FVector Direction) const
 {
+	// Reject zero-length direction vectors
+	if (Direction.IsNearlyZero())
+	{
+		return FIntPoint(0, 0);
+	}
+
 	// Normalize to cardinal directions: largest absolute axis wins
 	int32 DX = 0;
 	int32 DY = 0;
 
 	if (FMath::Abs(Direction.X) >= FMath::Abs(Direction.Y))
 	{
-		DX = (Direction.X > 0.0f) ? 1 : -1;
+		DX = (Direction.X > 0.0) ? 1 : -1;
 	}
 	else
 	{
-		DY = (Direction.Y > 0.0f) ? 1 : -1;
+		DY = (Direction.Y > 0.0) ? 1 : -1;
 	}
 
 	return FIntPoint(DX, DY);
