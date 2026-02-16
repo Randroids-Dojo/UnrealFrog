@@ -49,7 +49,7 @@ public:
 	float TimePerLevel = 30.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "HomeSlots")
-	TArray<int32> HomeSlotColumns;
+	TArray<int32> HomeSlotColumns; // SYNC: Tools/PlayUnreal/path_planner.py:HOME_COLS
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Difficulty")
 	float DifficultySpeedIncrement = 0.15f;
@@ -77,7 +77,7 @@ public:
 	// -- Grid references --------------------------------------------------
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid")
-	int32 HomeSlotRow = 14;
+	int32 HomeSlotRow = 14; // SYNC: Tools/PlayUnreal/path_planner.py:HOME_ROW
 
 	// -- Runtime state ----------------------------------------------------
 
@@ -163,6 +163,12 @@ public:
 	/** Returns all hazard positions and properties as JSON for PlayUnreal navigation. */
 	UFUNCTION(BlueprintCallable, Category = "PlayUnreal")
 	FString GetLaneHazardsJSON() const;
+
+	/** Returns game constants as JSON for cross-boundary synchronization.
+	  * Single source of truth — Python tooling reads from this instead of hardcoding.
+	  * Also writes Saved/game_constants.json for offline use. */
+	UFUNCTION(BlueprintCallable, Category = "PlayUnreal")
+	FString GetGameConfigJSON() const;
 
 	// -- Home slots -------------------------------------------------------
 

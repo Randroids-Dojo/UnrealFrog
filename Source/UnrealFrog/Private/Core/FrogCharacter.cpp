@@ -16,7 +16,7 @@ AFrogCharacter::AFrogCharacter()
 	PrimaryActorTick.bCanEverTick = true;
 
 	CollisionComponent = CreateDefaultSubobject<UCapsuleComponent>(TEXT("CollisionComponent"));
-	CollisionComponent->InitCapsuleSize(34.0f, 44.0f);
+	CollisionComponent->InitCapsuleSize(34.0f, 44.0f); // SYNC: Tools/PlayUnreal/path_planner.py:FROG_CAPSULE_RADIUS (radius=34)
 	CollisionComponent->SetGenerateOverlapEvents(true);
 	CollisionComponent->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 	CollisionComponent->SetCollisionObjectType(ECC_Pawn);
@@ -406,10 +406,9 @@ void AFrogCharacter::FindPlatformAtCurrentPosition()
 
 	// Direct position check — bypasses physics body sync timing issues.
 	// Check if the frog's world position falls within any rideable hazard's footprint.
-	// The frog's body (capsule) must actually be ON the platform, not just nearby.
+	// Uses PlatformLandingMargin (tunable UPROPERTY) instead of capsule radius.
 	FVector FrogPos = GetActorLocation();
 	float HalfCell = GridCellSize * 0.5f;
-	float FrogRadius = CollisionComponent ? CollisionComponent->GetScaledCapsuleRadius() : 34.0f;
 
 	for (TActorIterator<AHazardBase> It(GetWorld()); It; ++It)
 	{
@@ -422,9 +421,9 @@ void AFrogCharacter::FindPlatformAtCurrentPosition()
 		FVector HazardPos = Hazard->GetActorLocation();
 		float HalfWidth = static_cast<float>(Hazard->HazardWidthCells) * GridCellSize * 0.5f;
 
-		// Frog center must be inside the platform by at least the frog's radius,
+		// Frog center must be inside the platform by at least PlatformLandingMargin,
 		// so the frog's body doesn't visually hang off the edge into water.
-		float EffectiveHalfWidth = HalfWidth - FrogRadius;
+		float EffectiveHalfWidth = HalfWidth - PlatformLandingMargin;
 		if (EffectiveHalfWidth > 0.0f &&
 			FMath::Abs(FrogPos.X - HazardPos.X) <= EffectiveHalfWidth &&
 			FMath::Abs(FrogPos.Y - HazardPos.Y) <= HalfCell)

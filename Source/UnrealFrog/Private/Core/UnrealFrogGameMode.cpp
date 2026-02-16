@@ -13,7 +13,9 @@
 #include "Core/FroggerVFXManager.h"
 #include "Components/LightComponent.h"
 #include "Engine/DirectionalLight.h"
+#include "Components/CapsuleComponent.h"
 #include "Kismet/GameplayStatics.h"
+#include "Misc/FileHelper.h"
 #include "TimerManager.h"
 #include "EngineUtils.h"
 
@@ -197,6 +199,48 @@ FString AUnrealFrogGameMode::GetLaneHazardsJSON() const
 	}
 
 	return FString::Printf(TEXT("{\"hazards\":[%s]}"), *HazardEntries);
+}
+
+FString AUnrealFrogGameMode::GetGameConfigJSON() const
+{
+	// Read live values from the player pawn, or fall back to CDO defaults
+	float CellSize = 100.0f;
+	float CapsuleRadius = 34.0f;
+	int32 GridCols = 13;
+	float HopDuration = 0.15f;
+	int32 GridRowCount = 15;
+	float LandingMargin = 17.0f;
+
+	const AFrogCharacter* Frog = Cast<AFrogCharacter>(
+		UGameplayStatics::GetPlayerPawn(const_cast<AUnrealFrogGameMode*>(this), 0));
+	if (!Frog)
+	{
+		Frog = GetDefault<AFrogCharacter>();
+	}
+	if (Frog)
+	{
+		CellSize = Frog->GridCellSize;
+		GridCols = Frog->GridColumns;
+		HopDuration = Frog->HopDuration;
+		GridRowCount = Frog->GridRows;
+
+		if (const UCapsuleComponent* Capsule = Frog->FindComponentByClass<UCapsuleComponent>())
+		{
+			CapsuleRadius = Capsule->GetScaledCapsuleRadius();
+		}
+
+		LandingMargin = Frog->PlatformLandingMargin;
+	}
+
+	FString JSON = FString::Printf(
+		TEXT("{\"cellSize\":%.1f,\"capsuleRadius\":%.1f,\"gridCols\":%d,\"hopDuration\":%.2f,\"platformLandingMargin\":%.1f,\"gridRowCount\":%d,\"homeRow\":%d}"),
+		CellSize, CapsuleRadius, GridCols, HopDuration, LandingMargin, GridRowCount, HomeSlotRow);
+
+	// Side effect: write to Saved/game_constants.json for offline tooling
+	FString SavePath = FPaths::ProjectSavedDir() / TEXT("game_constants.json");
+	FFileHelper::SaveStringToFile(JSON, *SavePath, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM);
+
+	return JSON;
 }
 
 FString AUnrealFrogGameMode::GetGameStateJSON() const

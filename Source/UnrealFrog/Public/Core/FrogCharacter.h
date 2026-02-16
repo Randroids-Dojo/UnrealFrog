@@ -31,13 +31,13 @@ public:
 	// -- Tunable parameters (EditAnywhere for designer iteration) ----------
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
-	float HopDuration = 0.15f;
+	float HopDuration = 0.15f; // SYNC: Tools/PlayUnreal/path_planner.py:HOP_DURATION
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
 	float HopArcHeight = 30.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid")
-	float GridCellSize = 100.0f;
+	float GridCellSize = 100.0f; // SYNC: Tools/PlayUnreal/path_planner.py:CELL_SIZE
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
 	float InputBufferWindow = 0.08f;
@@ -46,7 +46,7 @@ public:
 	float BackwardHopMultiplier = 1.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid")
-	int32 GridColumns = 13;
+	int32 GridColumns = 13; // SYNC: Tools/PlayUnreal/path_planner.py:GRID_COLS
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid")
 	int32 GridRows = 15;
@@ -60,6 +60,12 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid")
 	int32 RiverRowMax = 12;
+
+	/** How far inside a platform's edge the frog center must be to count as "landed."
+	  * Default 17.0 = FrogRadius * 0.5. Produces ~83% landing zone on a 2-cell log.
+	  * Exposed for tuning and Python sync via GetGameConfigJSON(). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Collision")
+	float PlatformLandingMargin = 17.0f;
 
 	// -- Runtime state ----------------------------------------------------
 
@@ -161,6 +167,11 @@ public:
 	/** Process end of overlap with a platform: clear CurrentPlatform if it matches. */
 	void HandlePlatformEndOverlap(AHazardBase* Hazard);
 
+	/** Synchronous platform detection at frog's current position.
+	  * Bypasses deferred overlap event timing by checking positions directly.
+	  * Public for test invocation. */
+	void FindPlatformAtCurrentPosition();
+
 protected:
 	// -- Components -------------------------------------------------------
 
@@ -203,9 +214,6 @@ private:
 	UFUNCTION()
 	void OnEndOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
 		UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
-
-	/** Synchronous overlap query to find a rideable platform at the frog's current position. */
-	void FindPlatformAtCurrentPosition();
 
 	// -- Respawn timer ----------------------------------------------------
 
