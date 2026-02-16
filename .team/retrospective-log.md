@@ -1396,3 +1396,351 @@ The path forward is not more agreements. It is better tools. Tools that make "ru
 - [ ] **P1: State-diff client** — delta tracking in client.py. (DevOps)
 - [ ] **P2: Declarative scene description** — Research spike for JSON/YAML scene format with runtime loader. (Engine Architect + Game Designer)
 - [ ] **P2: Use UE5 built-in screenshot APIs** — FScreenshotRequest, OnScreenshotCaptured instead of macOS screencapture. (Engine Architect)
+
+---
+
+## Retrospective 10 -- Sprints 8-10: PlayUnreal Operational, VFX Root Cause Fixed, Path Planner Built, Collision Mismatch Incident
+
+*Date: 2026-02-15*
+*Facilitator: XP Coach*
+*Participants: Engine Architect, QA Lead, DevOps Engineer, Game Designer*
+*Scope: 42 commits (00fe41d..aa4f904), 184 files changed, ~30K lines, Sprints 8-10*
+*Trigger: Stakeholder caught a gameplay-breaking collision mismatch; full multi-sprint retro overdue*
+
+### Context
+
+This retrospective covers the full arc since the last `[retro]` commit (`00fe41d`, post-Sprint 7 stakeholder review). Intermediate retros were written (Retro 8 at line 872, Retro 9 at lines 1073 and 1188) but never committed with the `[retro]` tag, so this is the first formal team retrospective since Sprint 7. Three sprints of work:
+
+**Sprint 8 (8 commits, 1724 lines):** PlayUnreal Python client built (client.py, acceptance_test.py, run-playunreal.sh). RC API integration. Camera-relative VFX scaling. HUD score pop projection. Difficulty perception signals. Lock file for run-tests.sh. Temporal passability seam test. **Result: All visual changes invisible. PlayUnreal built but never run against live game. Stakeholder confirmed game looks identical.**
+
+**Sprint 8 Hotfix (3 code commits + 4 docs):** VFX root component bug found and fixed -- `SpawnActor<AActor>` discards FTransform without RootComponent. All VFX had been spawning at world origin since Sprint 5 (3 sprints, 170 tests passed). PlayUnreal screencapture implemented. verify_visuals.py run for the first time -- produced first screenshots in project history. **Section 9 followed for the first time ever.**
+
+**Sprint 9 (7 code commits):** Strategic retrospective (web vs UE dev gap analysis). Spatial position assertion tests (7 tests, new `[Spatial]` category). SetInvincible and GetLaneHazardsJSON UFUNCTIONs. Predictive path planner (6+ iterations from reactive polling to column-search to incremental). First automated crossing attempt. **VFX still not fully visible despite spatial tests passing -- score pops, hop dust, home celebrations unverified.**
+
+**Sprint 10 (4 commits, 551 lines):** Drift-aware one-hop-at-a-time path planner rewrite. frogWorldX API addition. Platform detection tightening. **THE INCIDENT: C++ collision tolerance tightened but Python planner not updated. Stakeholder caught it. No cross-domain review, no PlayUnreal run, no regression test.**
+
+### What Was Built (Full Scope: Sprints 8-10)
+
+| System | Key Commits | C++ LOC | Python LOC | Tests |
+|--------|------------|---------|------------|-------|
+| PlayUnreal Python client | `419f49d`, `849ddc8`, `199dede` | 0 | 1,382 (client.py, diagnose.py, verify_visuals.py) | 0 |
+| PlayUnreal launch + test scripts | `098b53e`, various | 0 | 732 (qa_checklist.py, acceptance_test.py, run-playunreal.sh, rc_api_spike.sh) | 0 |
+| Path planner (6 iterations) | `50ff921`..`aa4f904` | 0 | 1,326 (path_planner.py, debug_navigation.py, test_crossing.py) | 0 |
+| RC API + GameState UFUNCTIONs | `5f9225c`, `2dfd607`, `fc590cb`, `44f64e8` | ~140 | 0 | 2 |
+| VFX camera-relative scaling + root fix | `701ff4c`, `902d1b8`, `8b5e7c3` | ~170 | 0 | 3 |
+| HUD score pop + wave fanfare | `b586a68` | ~120 | 0 | 2 |
+| Difficulty perception | `4bc5642` | ~80 | 0 | 0 |
+| Spatial position tests | `d69c3e8` | 362 | 0 | 7 |
+| SetInvincible + GetLaneHazards | `7fa2497`, `fc590cb` | ~50 | 0 | 0 |
+| Platform detection tightening | `15e51d1` | 9 | 0 | 0 |
+| Temporal passability test | `9e75a12` | 136 | 0 | 1 |
+| Lock file for run-tests.sh | `ae3de0d` | 0 | ~50 (bash) | 0 |
+| build-and-verify.sh | `0c1a81c` | 0 | 233 (bash) | 0 |
+| **Total** | **30 code commits** | **~1,389** | **~4,334** | **15 new (183 total)** |
+
+### What Went Well
+
+1. **PlayUnreal went from non-existent to operational.** At Sprint 7's end, PlayUnreal was a C++ test harness calling methods directly -- not a real automation tool. By Sprint 10, the team has: `client.py` (782 LOC, urllib-only), `diagnose.py` (407 LOC), `verify_visuals.py` (663 LOC), `path_planner.py` (536 LOC), `test_crossing.py` (328 LOC), `qa_checklist.py` (237 LOC), `run-playunreal.sh` (229 LOC), `build-and-verify.sh` (233 LOC). The RC API connection works. State queries work. Hop commands work. Screenshots work. Video capture works. An agent can programmatically navigate the frog across the road and river. This is the single largest infrastructure improvement in the project's history.
+
+2. **The VFX root cause was found and fixed.** The 7-sprint mystery of invisible VFX (`SpawnActor<AActor>` discards FTransform without RootComponent) was found by actually running the game -- exactly what every agreement since Sprint 2 has been asking for. 13 lines fixed what 170 tests could not diagnose. This is the canonical example of why visual verification matters.
+
+3. **The path planner achieved first automated crossing.** Six iterations (reactive -> predictive -> column-search -> incremental -> drift-aware -> margin-fixed) produced a planner that successfully navigates the frog across road + river into a home slot: 35 hops, 1 death, 19.9s. The drift-aware one-hop-at-a-time architecture is sound and reusable.
+
+4. **Spatial assertion tests closed a real gap.** 7 tests in `SpatialTest.cpp` verify actors spawn at correct positions in a real UWorld. This is the class of test that would have caught the VFX origin bug in Sprint 5 instead of Sprint 8. The `[Spatial]` test category is now part of `run-tests.sh --all`.
+
+5. **Test count grew from 162 to 183.** 15 new tests in Sprints 8-9 across 4 categories (PlayUnreal, VFX, HUD, Spatial, Seam). Sprint 10 added zero new C++ tests -- which is itself a finding.
+
+6. **Per-subsystem commit discipline held.** 30 code commits across 3 sprints, each a logical change. No monolithic commits since the Sprint 5 anti-pattern. Section 4 is ingrained.
+
+### What Went Wrong
+
+#### 1. The Sprint 10 collision/planner coupling incident.
+
+Commit `15e51d1` tightened `FindPlatformAtCurrentPosition()` to subtract `FrogRadius` (34 UU) from the platform detection zone. This changed the effective landing zone for a SmallLog from 200 UU to 132 UU (a 34% reduction). The Python path planner (`path_planner.py`) still used `half_w - 20.0` as its platform alignment check -- now MORE generous than the game's detection, causing the frog to land on positions the game considered "in water." The stakeholder caught this visually. Commit `aa4f904` (4 minutes later) fixed the planner to use `PLATFORM_INSET = 44 UU`.
+
+**Process failures at every gate:**
+- No cross-domain review (Section 18 violated -- change touched C++ AND Python, only C++ was updated)
+- No PlayUnreal verification (Section 9 violated -- `test_crossing.py` existed but was not run before the C++ commit)
+- No regression test written for the new collision boundary (Section 2 violated)
+- No QA sign-off (Section 5a step 5 violated)
+
+**Root cause:** Duplicated constants across C++/Python with no shared source of truth. `capsuleRadius = 34` existed independently in both languages. When the C++ side changed the formula, the Python side broke silently.
+
+#### 2. Visual verification remains inconsistent despite tools existing.
+
+The pattern across Sprints 8-10:
+- **Sprint 8:** Built PlayUnreal. Never ran it. All visual changes invisible.
+- **Sprint 8 Hotfix:** Ran verify_visuals.py for the first time. Found and fixed VFX root cause. Section 9 followed.
+- **Sprint 9:** Ran verify_visuals.py 3 times with 22 screenshots. Found VFX still not fully visible (score pops, hop dust, home celebrations). Improvement.
+- **Sprint 10:** Did NOT run verify_visuals.py or test_crossing.py before committing collision change. Regression.
+
+The hotfix proved the tools work. Sprint 9 proved the habit can form. Sprint 10 proved the habit doesn't stick without enforcement. The team follows Section 9 when reminded but skips it when not reminded.
+
+#### 3. The collision tightening may violate the gameplay spec.
+
+The Game Designer flagged that Section 4.2 of the gameplay spec states: *"Platform bounds are slightly larger than visual bounds (slightly generous landing)."* Subtracting the full capsule radius creates a landing zone SMALLER than visual (132/200 = 66%), violating the "generous" intent. Classic Frogger uses ~80% of visual width. The margin should be a tunable `UPROPERTY`, not derived from physics geometry.
+
+#### 4. FindPlatformAtCurrentPosition has zero dedicated test coverage.
+
+The QA Lead grepped the entire test suite: no test calls `FindPlatformAtCurrentPosition()` directly. The function that determines whether the frog lives or dies on river rows is untested at its boundary conditions. A 30-line parameterized test with edge-distance inputs would have caught the Sprint 10 breakage instantly.
+
+#### 5. Sprint 10 added zero new C++ tests.
+
+Four commits, 551 lines of code (including a collision behavior change), and not a single new test. This is the first sprint since Sprint 2 with zero test growth. The path planner work (Python) was not accompanied by C++ regression tests for the game-side behavior it depends on. The TDD cycle (Section 2) was not followed for the platform detection change.
+
+#### 6. Tools are still sometimes built as deliverables, not used as tools.
+
+This is the third occurrence of the pattern:
+- Sprint 8: PlayUnreal built, not run
+- Sprint 9: build-and-verify.sh designed, not consistently run
+- Sprint 10: test_crossing.py built in the same session, not run before the collision commit
+
+The pattern is weakening (Sprint 9 showed progress) but not eliminated.
+
+### Agent Perspectives -- Synthesis
+
+**All four agents agree on:**
+- Duplicated constants across C++/Python is the structural root cause of the Sprint 10 incident
+- A `GetGameConfigJSON()` UFUNCTION is the right fix -- Python reads constants from the running game at startup, C++ is the single source of truth
+- Cross-domain review was skipped and would have caught the bug
+- A seam test for `FindPlatformAtCurrentPosition` boundary conditions is needed
+- PlayUnreal's maturation from non-existent to operational is the biggest win across these sprints
+
+**Disagreement: How strict should platform detection be?**
+- **Engine Architect**: Full capsule radius subtraction is "geometrically honest" -- correct physics
+- **Game Designer**: Full capsule radius makes the landing zone 66% of visual width, violating the spec's "generous landing" principle. Proposes `FrogRadius * 0.5` (83% of visual width) as a `UPROPERTY`
+- **Resolution**: Game Designer is the domain expert for feel parameters (Section 3 of agreements). The landing margin should be a `UPROPERTY(EditAnywhere)` named `PlatformLandingMargin` with a default of `FrogRadius * 0.5` (~17 UU). This separates physics geometry (capsule radius) from gameplay feel (landing forgiveness). The Game Designer's comparison to classic Frogger (~80% visual width) is the right benchmark.
+
+**Disagreement: Should retro-notes.md enforcement be a hook or a nudge?**
+- **DevOps**: Post-commit reminder hook (light nudge, not a gate)
+- **QA Lead**: Part of the mandatory PlayUnreal gate for collision code
+- **Resolution**: Light nudge is correct. The retro-notes file works best when agents genuinely record surprises, not when they produce boilerplate to satisfy a gate.
+
+### Agreements to Change
+
+#### Change 1: UPDATE Section 18 -- Add Cross-Boundary Review Requirement
+
+Add to cross-domain pairings: **Any change to collision geometry, grid constants, or platform detection logic REQUIRES review from DevOps (Python tooling impact) AND Game Designer (feel/spec violations).** These parameters cross the C++/Python boundary and the systems/design boundary simultaneously.
+
+Explicitly lists affected functions: `FindPlatformAtCurrentPosition`, `CheckRiverDeath`, `HandleHazardOverlap`, `Die()`, `StartHop`, `FinishHop`.
+
+**Why:** Sprint 10's collision change affected three domains (engine, tooling, design) and was reviewed by zero agents.
+
+#### Change 2: NEW Section 24 -- Cross-Boundary Constant Synchronization
+
+Any game constant that appears in both C++ and Python MUST have a single source of truth. C++ exposes constants via `GetGameConfigJSON()`. Python reads at startup. Hardcoded duplicates prohibited in `Tools/PlayUnreal/`. `// SYNC:` annotation convention for cross-file dependencies.
+
+**Why:** Sprint 10's collision mismatch was caused by independently maintained constants.
+
+#### Change 3: NEW Section 25 -- Retro Notes Living Document
+
+Agents write observations to `.team/retro-notes.md` AS things happen during the sprint. Post-commit reminder nudge (not gate) for Source/ and Tools/PlayUnreal/ commits. XP Coach clears after each retro.
+
+**Why:** Stakeholder request. Sprint 10's retro notes (written by the stakeholder) captured the incident better than agent recollection would have.
+
+### Previous Action Items -- Status (Consolidated: Sprints 8-9-10)
+
+**From Sprint 7 Retro:**
+- [x] **P0: Lock file for run-tests.sh** -- DONE (`ae3de0d`).
+- [x] **P0: Visual play-test of Sprint 7 tuning** -- PARTIALLY DONE. PlayUnreal operational, verify_visuals.py run. Difficulty curve not perceptually verified.
+- [x] **P1: Temporal passability assertion** -- DONE (`9e75a12`, 136 LOC).
+- [ ] **P1: UFroggerGameCoordinator extraction** -- NOT DONE. Carried forward (4th deferral). Must resolve or drop per Section 17.
+- [ ] **P1: Gap reduction implementation** -- NOT DONE. Carried forward.
+- [ ] **Stretch: Multiplier visibility on HUD** -- NOT DONE.
+- [ ] **Stretch: Death freeze frame + screen shake** -- NOT DONE.
+
+**From Sprint 8 Retro:**
+- [x] **P0: Run PlayUnreal against live game** -- DONE (Sprint 8 hotfix). diagnose.py, verify_visuals.py both run successfully.
+- [~] **P0: Verify ALL Sprint 8 visual changes** -- PARTIAL. Death puff confirmed visible. Score pops, home celebrations, ground color, wave fanfare UNVERIFIED.
+- [ ] **P0: Create visual_smoke_test.py** -- NOT DONE as separate script. verify_visuals.py covers partial scope.
+- [ ] **P1: Strengthen acceptance_test.py assertions** -- NOT DONE.
+- [x] **P1: Investigate VFX invisibility** -- DONE. Root cause: SpawnActor without RootComponent. Fixed in `902d1b8`.
+
+**From Strategic Retro 9:**
+- [x] **P0: build-and-verify.sh** -- DONE (`0c1a81c`). Not consistently run.
+- [x] **P0: [Spatial] position assertion tests** -- DONE (`d69c3e8`). 7 tests, 362 LOC.
+- [x] **P0: Screenshot-in-the-loop** -- OPERATIONAL.
+- [x] **P1: Deterministic object paths** -- DONE (`fc590cb`).
+- [x] **P1: State-diff client** -- DONE (`3408e1c`).
+- [ ] **P1: Keep-alive editor + Live Coding** -- NOT DONE. Carried forward (2nd deferral).
+- [ ] **P2: Declarative scene description** -- NOT DONE. Carried forward (2nd deferral).
+
+### Action Items for Sprint 11
+
+- [ ] **P0: Add `GetGameConfigJSON()` UFUNCTION** -- Single source of truth for all game constants. Python reads at startup. Eliminates hardcoded duplicates. (Engine Architect)
+- [ ] **P0: Remove hardcoded constants from path_planner.py** -- Replace `FROG_CAPSULE_RADIUS`, `CELL_SIZE`, `GRID_COLS`, `HOP_DURATION` with values from `GetGameConfigJSON()`. Add `game_constants.json` fallback. (DevOps)
+- [ ] **P0: Write `[Collision.FindPlatform.EdgeDistance]` regression test** -- Parameterized: spawn frog + platform, place frog at various X distances, verify accepts/rejects at boundary. (QA Lead)
+- [ ] **P0: Make PlatformLandingMargin a UPROPERTY** -- Extract from capsule radius coupling. Default `FrogRadius * 0.5` (~17 UU). (Engine Architect + Game Designer)
+- [ ] **P1: Add `// SYNC:` annotation convention** -- Cross-file dependency comments. Pre-commit grep warns if synced files not co-modified. (DevOps)
+- [ ] **P1: Post-commit retro-notes reminder** -- One-line nudge after Source/ or Tools/PlayUnreal/ commits. (DevOps)
+- [ ] **P1: `[Gameplay]` test category** -- Multi-step UWorld tests simulating hop sequences with actual position-based survival/death. (QA Lead)
+- [ ] **P1: Verify remaining Sprint 8 visual changes** -- Score pops, home celebrations, ground color, wave fanfare still unverified. (QA Lead)
+- [ ] **P2: Keep-alive editor + Live Coding** -- Carried forward (2nd deferral). Drop deadline: Sprint 13.
+- [ ] **P2: Declarative scene description** -- Carried forward (2nd deferral). Drop deadline: Sprint 13.
+- [ ] **P2: UFroggerGameCoordinator extraction** -- Carried forward (4th deferral). OVERDUE per Section 17. Must resolve or drop in Sprint 11.
+
+### Open Questions
+
+- [ ] Is `FrogRadius * 0.5` (83% landing zone) the right feel, or should it be tuned via PlayUnreal A/B testing? (Game Designer)
+- [ ] Should `test_crossing.py` be mandatory for collision code commits, or is the seam unit test sufficient? (Cost: 120s editor startup vs risk of integration-level mismatch)
+- [ ] What is the quality bar for final audio -- keep 8-bit procedural or invest in higher-fidelity? (Carried forward, 5th time -- OVERDUE per Section 17. Must resolve or drop.)
+
+### Stats (Sprints 8-10 Combined)
+
+- **Tests:** 162 -> 183 (+21 tests across Sprints 8-9; 0 in Sprint 10)
+- **Code commits:** 30 (8 in S8, 5 in S8-hotfix, 13 in S9, 4 in S10)
+- **Docs commits:** 12
+- **C++ LOC delta:** +1,389 across 19 files
+- **Python/bash LOC delta:** +4,334 across 12 files (PlayUnreal ecosystem)
+- **PlayUnreal status:** Non-existent -> OPERATIONAL (4,334 LOC, 8 scripts)
+- **VFX status:** Invisible (7 sprints) -> Root cause fixed (S8-hotfix) -> Partially verified (S9)
+- **Process violations:** Section 9 violated in S8, followed in S8-hotfix and S9, violated again in S10. Section 18 violated in S10.
+- **Defects escaped to stakeholder:** S8 (all visual changes invisible), S10 (collision mismatch)
+
+### The Pattern (Updated)
+
+| Sprint | Key Change | Cross-Domain Review? | PlayUnreal Run? | Bug Escaped? |
+|--------|-----------|---------------------|-----------------|-------------|
+| 2 | Visual systems | No | N/A (didn't exist) | Yes (3 bugs) |
+| 5 | VFX, HUD | No | N/A | Yes (VFX invisible) |
+| 8 | VFX scaling, PlayUnreal | No | Built, not used | Yes (all visual changes invisible) |
+| 8-hotfix | VFX root component fix | Yes | **Yes (first time)** | **No** |
+| 9 | Spatial tests, path planner | Partial | Yes | Partial (VFX not all visible) |
+| **10** | **Platform detection** | **No** | **No** | **Yes (collision mismatch)** |
+
+**The arc:** Sprint 8-hotfix was the turning point -- the first time the team ran the game and caught a bug before the stakeholder. Sprint 9 built on that habit. Sprint 10 regressed. The tools exist and work. The habit is forming but fragile. The path forward is making verification automatic (Section 24: eliminate constant duplication, seam tests catch boundary changes) so the team cannot silently break cross-boundary contracts.
+
+### What Went Wrong
+
+#### 1. Duplicated constants across language boundaries with no shared source of truth.
+
+The platform detection formula exists in two places:
+- **C++ (`FrogCharacter.cpp:412`)**: `|FrogX - PlatformX| <= HalfWidth - GetScaledCapsuleRadius()`
+- **Python (`path_planner.py:28,35`)**: `|frog_x - hx| <= half_w - PLATFORM_INSET` where `PLATFORM_INSET = FROG_CAPSULE_RADIUS + 10.0`
+
+The constants `34.0` (capsule radius), `100.0` (cell size), `13` (grid columns) are hardcoded in both languages independently. When the C++ side changed, the Python side broke. This is the textbook case for a single source of truth.
+
+**Root cause:** No mechanism to sync game constants across the C++/Python boundary. (All four agents identified this.)
+
+#### 2. Cross-domain review was skipped entirely.
+
+The C++ change (`15e51d1`) affected platform collision geometry -- which is simultaneously:
+- An engine systems concern (Engine Architect domain)
+- A gameplay feel concern (Game Designer domain -- "generous landing" spec)
+- A tooling concern (DevOps domain -- Python planner uses the same formula)
+
+No agent from any other domain reviewed the change before commit. Section 18 explicitly requires cross-domain review. The cross-domain pairings list `QA Lead reviews Engine Architect` and `DevOps reviews Engine Architect` -- either reviewer would have flagged the Python planner dependency.
+
+#### 3. FindPlatformAtCurrentPosition has zero dedicated test coverage.
+
+The QA Lead grepped the entire test suite: no test calls `FindPlatformAtCurrentPosition()` directly. The platform detection function that determines whether the frog lives or dies on river rows is completely untested at its boundary conditions. The collision tests use `HandleHazardOverlap` (a different code path). A single parameterized test with edge-distance inputs would have caught the breakage instantly.
+
+#### 4. The collision tightening may violate the gameplay spec.
+
+The Game Designer flagged that the gameplay spec (Section 4.2) states: *"Platform bounds are slightly larger than visual bounds (slightly generous landing). The player should feel skillful, not cheated."* Subtracting the full capsule radius creates a landing zone SMALLER than the visual platform (132 UU on a 200 UU log = 66%), violating the "generous" intent. Classic Frogger uses ~80% of visual width. The margin should be a tunable `UPROPERTY`, not derived from physics geometry.
+
+#### 5. test_crossing.py exists but was not run before committing the collision change.
+
+This is the Sprint 8 pattern repeating (Sprint 8: PlayUnreal built but not used; Sprint 10: test_crossing.py built in the same session but not used to verify the collision change). Tools built as deliverables, not used as verification instruments.
+
+### Agent Perspectives — Synthesis
+
+**All four agents agree on:**
+- Duplicated constants across C++/Python is the structural root cause
+- A `GetGameConfigJSON()` / `GetCollisionConstantsJSON()` UFUNCTION is the right fix -- Python reads constants from the running game at startup, C++ is the single source of truth
+- Cross-domain review was skipped and would have caught the bug
+- A seam test for `FindPlatformAtCurrentPosition` boundary conditions is needed
+
+**Disagreement: How strict should platform detection be?**
+- **Engine Architect**: Full capsule radius subtraction is "geometrically honest" -- correct physics
+- **Game Designer**: Full capsule radius makes the landing zone 66% of visual width, violating the spec's "generous landing" principle. Proposes `FrogRadius * 0.5` (83% of visual width) as a `UPROPERTY`
+- **Resolution**: Game Designer is the domain expert for feel parameters (Section 3 of agreements). The landing margin should be a `UPROPERTY(EditAnywhere)` named `PlatformLandingMargin` with a default of `FrogRadius * 0.5` (~17 UU). This separates physics geometry (capsule radius) from gameplay feel (landing forgiveness). The Game Designer's comparison to classic Frogger (~80% visual width) is the right benchmark.
+
+**Disagreement: Should retro-notes.md enforcement be a hook or a nudge?**
+- **DevOps**: Post-commit reminder hook (light nudge, not a gate)
+- **QA Lead**: Part of the mandatory PlayUnreal gate for collision code
+- **Resolution**: Light nudge is correct. The retro-notes file works best when agents genuinely record surprises, not when they produce boilerplate to satisfy a gate. A one-line reminder after commits touching `Source/` or `Tools/PlayUnreal/` is sufficient.
+
+### Agreements to Change
+
+#### Change 1: NEW Section 24 — Cross-Boundary Constant Synchronization
+
+Any game constant that appears in both C++ and Python (or any two languages) MUST have a single source of truth. The C++ side exposes constants via a `GetGameConfigJSON()` UFUNCTION. Python reads them at startup via the RC API. Hardcoded numeric constants that duplicate C++ values are prohibited in `Tools/PlayUnreal/`.
+
+**Deliverable:** `GetGameConfigJSON()` UFUNCTION on GameMode returning `{ cellSize, capsuleRadius, gridCols, hopDuration, platformLandingMargin }`. Python reads at connection time.
+
+**Fallback for offline use:** `Tools/PlayUnreal/game_constants.json` committed and updated by `build-and-verify.sh`.
+
+**Why:** Sprint 10's collision mismatch was caused by independently maintained constants (C++ `capsuleRadius = 34`, Python `FROG_CAPSULE_RADIUS = 34` with a `- 20` inset). Two commits were needed for what is fundamentally one parameter.
+
+#### Change 2: UPDATE Section 18 — Add Cross-Boundary Review Requirement
+
+Add to cross-domain pairings: **Any change to collision geometry, grid constants, or platform detection logic REQUIRES review from the agent owning PlayUnreal tooling (currently DevOps) AND the Game Designer (feel parameters).** These parameters cross the C++/Python boundary and the systems/design boundary simultaneously.
+
+New pairings:
+- **DevOps** reviews **Engine Architect** for collision/grid/physics parameter changes (catches Python tooling impact)
+- **Game Designer** reviews **Engine Architect** for collision/landing/death changes (catches feel/spec violations)
+
+**Why:** Sprint 10's collision change affected three domains (engine, tooling, design) and was reviewed by zero agents.
+
+#### Change 3: UPDATE Section 25 — Retro Notes Living Document
+
+Agents should record observations in `.team/retro-notes.md` AS things happen during the sprint, not just at retrospective time. Format: `- [agent] observation (context)`. The XP Coach clears the file after each retrospective.
+
+A post-commit reminder will nudge agents when committing changes to `Source/` or `Tools/PlayUnreal/`:
+```
+[Reminder] Add sprint notes to .team/retro-notes.md if this change involved a surprise, workaround, or process issue.
+```
+
+**Why:** Stakeholder request. Mid-sprint observations are fresher and more accurate than post-sprint recollections. Sprint 10's retro notes (written by the stakeholder, not agents) captured the incident clearly.
+
+### Previous Strategic Retro 9 Action Items -- Status
+
+- [x] **P0: Build `build-and-verify.sh`** -- EXISTS but not run for Sprint 10 collision change.
+- [x] **P0: Write `[Spatial]` position assertion tests** -- DONE. 7 tests in SpatialTest.cpp. 183 total tests.
+- [x] **P0: Screenshot-in-the-loop** -- OPERATIONAL. verify_visuals.py produces screenshots.
+- [ ] **P1: Keep-alive editor + Live Coding** -- NOT DONE. Carried forward.
+- [x] **P1: Deterministic object paths** -- DONE. `GetObjectPath()` and `GetPawnPath()` committed.
+- [x] **P1: State-diff client** -- DONE. `get_state_diff()` in client.py.
+- [ ] **P2: Declarative scene description** -- NOT DONE. Carried forward.
+- [ ] **P2: Use UE5 built-in screenshot APIs** -- NOT DONE. Carried forward.
+
+### Action Items for Sprint 11
+
+- [ ] **P0: Add `GetGameConfigJSON()` UFUNCTION** -- Single source of truth for all game constants. Python reads at startup. Eliminates hardcoded duplicates. (Engine Architect)
+- [ ] **P0: Remove hardcoded constants from path_planner.py** -- Replace `FROG_CAPSULE_RADIUS`, `CELL_SIZE`, `GRID_COLS`, `HOP_DURATION` with values from `GetGameConfigJSON()`. Add `game_constants.json` fallback for offline use. (DevOps)
+- [ ] **P0: Write `[Collision.FindPlatform.EdgeDistance]` regression test** -- Parameterized test: spawn frog and platform, place frog at various X distances, verify `FindPlatformAtCurrentPosition()` accepts/rejects correctly at the boundary. (QA Lead)
+- [ ] **P0: Make PlatformLandingMargin a UPROPERTY** -- Extract collision margin from capsule radius coupling. `UPROPERTY(EditAnywhere)` with default `FrogRadius * 0.5` (~17 UU). Game Designer tunes; Engine Architect implements. (Engine Architect + Game Designer)
+- [ ] **P1: Add `// SYNC:` annotation convention** -- For any constant or formula shared across files/languages, add `// SYNC: <other_file>:<constant_name>` comments. Pre-commit grep warns if synced files are not co-modified. (DevOps)
+- [ ] **P1: Post-commit retro-notes reminder** -- One-line nudge after commits touching Source/ or Tools/PlayUnreal/. (DevOps)
+- [ ] **P1: `[Gameplay]` test category** -- Multi-step UWorld tests that simulate hop sequences and verify survival/death based on actual position math, not mocked overlaps. (QA Lead)
+- [ ] **P2: Keep-alive editor + Live Coding** -- Carried forward (2nd deferral). Must resolve or drop by Sprint 13 per Section 17.
+- [ ] **P2: Declarative scene description research** -- Carried forward (2nd deferral). Must resolve or drop by Sprint 13 per Section 17.
+
+### Open Questions
+
+- [ ] Is `FrogRadius * 0.5` (83% landing zone) the right feel, or should it be tuned via PlayUnreal A/B testing? (Game Designer)
+- [ ] Should `test_crossing.py` be mandatory for collision code commits (QA Lead proposal), or is the seam unit test sufficient? (Process question -- cost of 120s editor startup vs. risk of integration-level mismatch)
+- [ ] What is the quality bar for final audio -- keep 8-bit procedural or invest in higher-fidelity? (Carried forward, 5th time -- approaching Section 17 deadline)
+
+### Sprint 10 Stats
+
+- **Tests:** 183 (unchanged -- zero new C++ tests added this sprint)
+- **Code changes:** 551 lines across 4 files, 4 commits
+- **Defect escape rate:** 1 gameplay-breaking bug escaped to stakeholder (collision margin mismatch). Would have been caught by: cross-domain review, `test_crossing.py` run, or a `FindPlatformAtCurrentPosition` boundary test.
+- **Process violations:** 4 (Section 18 cross-domain review, Section 9 PlayUnreal verification, Section 2 regression test, Section 5a QA sign-off)
+- **Agents active during retro:** 4 (Engine Architect, QA Lead, DevOps, Game Designer)
+- **Time to fix after stakeholder report:** 4 minutes (fast response, slow prevention)
+
+### The Pattern (Updated)
+
+| Sprint | Key Change | Cross-Domain Review? | PlayUnreal Run? | Bug Escaped? |
+|--------|-----------|---------------------|-----------------|-------------|
+| 2 | Visual systems | No | N/A (didn't exist) | Yes (3 bugs) |
+| 5 | VFX, HUD | No | N/A | Yes (VFX invisible) |
+| 8 | VFX scaling, PlayUnreal | No | Built, not used | Yes (all visual changes invisible) |
+| 8-hotfix | VFX root component fix | Yes | Yes (first time) | No |
+| 9 | Spatial tests, path planner | Partial | Yes | Partial (VFX still not all visible) |
+| **10** | **Platform detection** | **No** | **No** | **Yes (collision mismatch)** |
+
+**The trend:** Sprint 8-hotfix proved that running the game catches bugs. Sprint 10 proves the team reverts to skipping verification when the tool is not mandatory. The hotfix was the exception, not the new norm. The path forward is making verification automatic (Section 24: constants sync, seam tests) rather than relying on process discipline.

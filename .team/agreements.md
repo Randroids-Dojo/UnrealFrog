@@ -1,7 +1,7 @@
 # Team Working Agreements
 
 *This is a living document. Updated during retrospectives by the XP Coach.*
-*Last updated: Strategic Retrospective 9*
+*Last updated: Sprint 10 Retrospective*
 
 ## Day 0 Agreements
 
@@ -212,20 +212,27 @@ Process:
 - **M_FlatColor.uasset**: DROPPED. Runtime `GetOrCreateFlatColorMaterial()` is sufficient for all current use cases. Persistent .uasset only needed for packaged builds, which are not on the roadmap. Re-create as P0 if packaging becomes a sprint goal.
 - **Functional tests in CI**: DROPPED. 154 SIMPLE_AUTOMATION_TESTs run in NullRHI headless mode. AFunctionalTest actors require display server infrastructure for marginal gain. Revisit if visual regression testing is prioritized.
 
-### 18. Cross-Domain Review Before Commit (Updated: Sprint 7 Retrospective)
+### 18. Cross-Domain Review Before Commit (Updated: Sprint 10 Retrospective)
 
 **Before committing, the driver must post a summary of changes and receive review from an agent in a *different* domain.** The reviewer brings a perspective the driver lacks — this is the whole point. Same-domain review catches implementation bugs; cross-domain review catches design blind spots.
 
-Cross-domain pairings (reviewer ← driver):
+Cross-domain pairings (reviewer <- driver):
 - **QA Lead** reviews **Engine Architect** (catches untested paths, edge cases)
 - **Engine Architect** reviews **Game Designer** (catches performance implications of tuning values)
 - **Game Designer** reviews **QA Lead** (catches tests that don't reflect real gameplay)
 - **DevOps** reviews **Engine Architect** (catches build/CI implications)
 - **Engine Architect** reviews **DevOps** (catches architectural assumptions in tooling)
 
+**Cross-boundary pairings (mandatory for parameters shared across C++/Python):**
+- **DevOps** reviews **Engine Architect** for any change to collision geometry, grid constants, platform detection, or physics parameters that are consumed by PlayUnreal tooling (catches Python tooling impact)
+- **Game Designer** reviews **Engine Architect** for any change to collision margins, landing zones, death conditions, or movement feel (catches spec/feel violations)
+
+These cross-boundary pairings are non-negotiable for changes to: `FindPlatformAtCurrentPosition`, `CheckRiverDeath`, `HandleHazardOverlap`, `Die()`, `StartHop`, `FinishHop`, or any function whose behavior is replicated or depended upon by Python tooling in `Tools/PlayUnreal/`.
+
 The reviewer has one response cycle to approve or flag issues. Self-review is a last resort only when no other agent is available — and the commit message must note "self-reviewed."
 
-**Why:** Sprint 6 shipped a seam test with incorrect floating-point boundary math. A same-domain reviewer might have missed it too. A cross-domain reviewer (Game Designer checking "does this test reflect real gameplay?") would have questioned the boundary values. (Evolved from Sprint 6's domain-expert-review rule.)
+**Why (Sprint 6):** Sprint 6 shipped a seam test with incorrect floating-point boundary math. A cross-domain reviewer would have questioned the boundary values.
+**Why (Sprint 10):** `FindPlatformAtCurrentPosition` was tightened to subtract `FrogRadius`, breaking the Python path planner which used a different margin constant. No cross-domain review was performed. The change affected three domains (engine, tooling, design) and was reviewed by zero agents. A DevOps reviewer would have flagged the `path_planner.py` constant mismatch. A Game Designer reviewer would have flagged the spec violation (landing zone reduced to 66% of visual width, violating "generous landing" principle).
 
 **XP Coach enforcement rule:** The XP Coach must not rationalize process exceptions. If an agreement is being violated, the XP Coach flags it and enforces. Exceptions require explicit team-lead approval, not silent acceptance. (Added: Sprint 7 Retrospective — XP Coach accepted a premature tuning change that violated §5 step 8; team-lead had to overrule.)
 
@@ -303,6 +310,59 @@ The auto-screenshot is the UE equivalent of "save and refresh" in web developmen
 **Deliverable:** `Tools/PlayUnreal/build-and-verify.sh` — UBT build -> unit tests -> launch game -> screenshot -> print path.
 
 **Why:** The team skipped visual verification for 7 consecutive sprints because it was expensive and optional. The Sprint 8 hotfix proved that running the game and looking at the screen catches bugs that 170 tests miss. This section makes that step automatic. The agent should be unable to avoid seeing what it built.
+
+### 24. Cross-Boundary Constant Synchronization (Added: Sprint 10 Retrospective)
+
+**Any game constant that appears in both C++ and Python (or any two languages) MUST have a single source of truth.** The C++ side is authoritative. Python reads constants from the running game via a `GetGameConfigJSON()` UFUNCTION, not from hardcoded values.
+
+**Prohibited pattern:**
+```python
+# WRONG — duplicated constant, will drift
+FROG_CAPSULE_RADIUS = 34.0
+CELL_SIZE = 100.0
+```
+
+**Required pattern:**
+```python
+# CORRECT — read from game at startup
+config = pu.get_config()  # calls GetGameConfigJSON()
+capsule_radius = config["capsuleRadius"]
+cell_size = config["cellSize"]
+```
+
+**Deliverable:** `GetGameConfigJSON()` UFUNCTION on GameMode returning `{ cellSize, capsuleRadius, gridCols, hopDuration, platformLandingMargin }`. Python `client.py` reads this once at connection time and exposes via `pu.config`.
+
+**Fallback for offline use:** `Tools/PlayUnreal/game_constants.json` is committed and updated by `build-and-verify.sh` after each successful build.
+
+**`// SYNC:` annotation convention:** For any constant or formula shared across files or languages, add a `// SYNC: <other_file>:<constant_name>` comment at the definition site. This makes cross-file dependencies grep-able. A pre-commit check can warn if a file containing `// SYNC:` annotations is modified but the referenced file is not co-modified.
+
+**Why:** Sprint 10's gameplay-breaking collision mismatch was caused by independently maintained constants: C++ `GetScaledCapsuleRadius()` (34 UU) vs Python `FROG_CAPSULE_RADIUS = 34` with `half_w - 20` inset. The C++ side changed; the Python side broke. Two commits were needed for what is fundamentally one parameter. A single source of truth eliminates this class of bug entirely.
+
+### 25. Retro Notes Living Document (Added: Sprint 10 Retrospective)
+
+**Agents should record observations in `.team/retro-notes.md` AS things happen during the sprint, not just at retrospective time.** Mid-sprint observations are fresher and more accurate than post-sprint recollections.
+
+**Format:**
+```
+- [agent-name] observation or concern (context)
+```
+
+**When to write a note:**
+- You discovered something surprising about the codebase or an API
+- You worked around a problem instead of fixing it properly
+- You noticed a process violation (yours or someone else's)
+- You had a disagreement that was resolved — record the resolution
+- A tool failed in a new way
+- You spent >15 minutes on something that should have taken 5
+
+**The XP Coach clears the file after each retrospective**, incorporating relevant notes into the retro entry.
+
+A post-commit reminder nudges agents when committing changes to `Source/` or `Tools/PlayUnreal/`:
+```
+[Reminder] Add sprint notes to .team/retro-notes.md if this change involved a surprise, workaround, or process issue.
+```
+
+**Why:** Stakeholder request (Sprint 10). The Sprint 10 retro notes — written by the stakeholder, not agents — captured the collision mismatch incident clearly. Agents should be writing these notes themselves as events happen.
 
 ## Things We Will Figure Out Together
 
