@@ -24,6 +24,10 @@ ROAD_ROWS = {1, 2, 3, 4, 5}
 RIVER_ROWS = {7, 8, 9, 10, 11, 12}
 HOME_ROW = 14
 
+# Collision geometry (from FrogCharacter.cpp / HazardBase.cpp)
+FROG_CAPSULE_RADIUS = 34.0  # UCapsuleComponent radius
+CLEARANCE_BUFFER = 20.0  # extra safety margin for timing imprecision
+
 # Execution timing — tuned for speed
 # RC API call takes ~50-100ms, so real hop-to-hop time is ~0.20-0.25s.
 # We account for this in predictions by using API_LATENCY.
@@ -35,6 +39,7 @@ def predict_hazard_x(hazard, dt, cell_size=CELL_SIZE, grid_cols=GRID_COLS):
     """Predict a hazard's X position after dt seconds.
 
     Linear extrapolation with wrapping. Matches HazardBase exactly.
+    Returns the CENTER X of the hazard (GetActorLocation().X).
     """
     x0 = hazard["x"]
     speed = hazard["speed"]
@@ -52,38 +57,57 @@ def predict_hazard_x(hazard, dt, cell_size=CELL_SIZE, grid_cols=GRID_COLS):
 
 def is_road_safe(hazards_in_row, target_x, arrival_time,
                  cell_size=CELL_SIZE, grid_cols=GRID_COLS):
-    """Check if target_x is clear of road hazards at arrival_time."""
-    frog_half = cell_size * 0.4
-    frog_left = target_x - frog_half
-    frog_right = target_x + frog_half
+    """Check if target_x is clear of road hazards at arrival_time.
+
+    Hazard x is the CENTER. Hazard extends width*cell_size/2 in each direction.
+    Frog has capsule radius 34 + clearance buffer.
+    """
+    frog_half = FROG_CAPSULE_RADIUS + CLEARANCE_BUFFER  # 54 units
 
     for h in hazards_in_row:
         hx = predict_hazard_x(h, arrival_time, cell_size, grid_cols)
-        hw = h["width"] * cell_size
-        if frog_right > hx and frog_left < hx + hw:
+        half_w = h["width"] * cell_size * 0.5
+        hazard_left = hx - half_w
+        hazard_right = hx + half_w
+        # Overlap if frog extent intersects hazard extent
+        if (target_x + frog_half > hazard_left and
+                target_x - frog_half < hazard_right):
             return False
     return True
 
 
 def is_river_safe(hazards_in_row, target_x, arrival_time,
                   cell_size=CELL_SIZE, grid_cols=GRID_COLS):
-    """Check if a rideable platform covers target_x at arrival_time."""
+    """Check if a rideable platform covers target_x at arrival_time.
+
+    The frog must land ON a log/turtle. Hazard x is the CENTER.
+    We need the frog's center to be well within the platform bounds.
+    """
     for h in hazards_in_row:
         if not h.get("rideable", False):
             continue
         hx = predict_hazard_x(h, arrival_time, cell_size, grid_cols)
-        hw = h["width"] * cell_size
-        margin = cell_size * 0.3
-        if hx - margin <= target_x <= hx + hw + margin:
+        half_w = h["width"] * cell_size * 0.5
+        platform_left = hx - half_w
+        platform_right = hx + half_w
+        # Frog center must be inside platform with margin to spare
+        margin = FROG_CAPSULE_RADIUS  # 34 units inset from edge
+        if platform_left + margin <= target_x <= platform_right - margin:
             return True
     return False
 
 
 def _find_safe_wait(hazards_in_row, target_x, base_time, row,
                     cell_size=CELL_SIZE, grid_cols=GRID_COLS,
-                    max_wait=1.5, time_step=0.02):
-    """Find minimum wait before hopping is safe. Max 1.5s then go anyway."""
+                    max_wait=None, time_step=0.02):
+    """Find minimum wait before hopping is safe.
+
+    Road rows: max 1.5s wait, then hop anyway (accept risk).
+    River rows: max 8s wait (platforms MUST be present), never hop blind.
+    """
     is_river = row in RIVER_ROWS
+    if max_wait is None:
+        max_wait = 8.0 if is_river else 1.5
 
     wait = 0.0
     while wait < max_wait:
@@ -98,7 +122,11 @@ def _find_safe_wait(hazards_in_row, target_x, base_time, row,
                 return wait
         wait += time_step
 
-    return 0.0  # No safe window found — hop anyway, accept the risk
+    if is_river:
+        # NEVER hop blind into water — return None to signal "no safe window"
+        return None
+    # Road: hop anyway after max_wait, accept the risk
+    return 0.0
 
 
 def plan_path(hazards, frog_col=6, frog_row=0, target_col=6,
@@ -106,8 +134,9 @@ def plan_path(hazards, frog_col=6, frog_row=0, target_col=6,
               grid_cols=GRID_COLS):
     """Compute a fast safe hop sequence from start to home slot.
 
-    Aggressive timing: max 1.5s wait per row, hops immediately if no
-    safe window found. Total path executes in ~4-6 seconds.
+    Road rows: wait for gap, hop through. Max 1.5s wait per row.
+    River rows: wait for rideable platform, hop ONTO it. Max 8s wait.
+    If no platform found at target column, try adjacent columns.
 
     Returns:
         list of dicts: [{"wait": float, "direction": str}, ...]
@@ -135,7 +164,7 @@ def plan_path(hazards, frog_col=6, frog_row=0, target_col=6,
                 elapsed += HOP_EXEC_TIME
 
         next_row = current_row + 1
-        target_x = target_col * cell_size
+        target_x = current_col * cell_size
 
         if next_row in SAFE_ROWS or next_row >= HOME_ROW:
             path.append({"wait": 0.0, "direction": "up"})
@@ -144,17 +173,76 @@ def plan_path(hazards, frog_col=6, frog_row=0, target_col=6,
             continue
 
         row_hazards = hazards_by_row.get(next_row, [])
-        if not row_hazards:
+
+        # Road with no hazards or safe row — hop immediately
+        if not row_hazards and next_row not in RIVER_ROWS:
             path.append({"wait": 0.0, "direction": "up"})
             current_row = next_row
             elapsed += HOP_EXEC_TIME
             continue
 
+        # River with no rideable platforms — this shouldn't happen in a
+        # valid game, but if it does, hop anyway (will die)
+        if next_row in RIVER_ROWS:
+            rideables = [h for h in row_hazards if h.get("rideable", False)]
+            if not rideables:
+                path.append({"wait": 0.0, "direction": "up"})
+                current_row = next_row
+                elapsed += HOP_EXEC_TIME
+                continue
+
+        # Find safe wait at current column
         wait = _find_safe_wait(row_hazards, target_x, elapsed, next_row,
                                cell_size, grid_cols)
-        path.append({"wait": wait, "direction": "up"})
-        current_row = next_row
-        elapsed += wait + HOP_EXEC_TIME
+
+        if wait is not None:
+            # Found a safe window at current column
+            path.append({"wait": wait, "direction": "up"})
+            current_row = next_row
+            elapsed += wait + HOP_EXEC_TIME
+            continue
+
+        # River row with no safe window at target column —
+        # try adjacent columns (±1, ±2, ±3) to find a platform
+        found_alt = False
+        for offset in [1, -1, 2, -2, 3, -3]:
+            alt_col = current_col + offset
+            if alt_col < 0 or alt_col >= grid_cols:
+                continue
+            alt_x = alt_col * cell_size
+            alt_wait = _find_safe_wait(row_hazards, alt_x, elapsed, next_row,
+                                       cell_size, grid_cols)
+            if alt_wait is not None:
+                # Move laterally to alt_col first (only on safe rows)
+                if current_row in SAFE_ROWS:
+                    while current_col != alt_col:
+                        d = "right" if current_col < alt_col else "left"
+                        path.append({"wait": 0.0, "direction": d})
+                        current_col += (1 if d == "right" else -1)
+                        elapsed += HOP_EXEC_TIME
+                    # Now hop up with the wait
+                    path.append({"wait": alt_wait, "direction": "up"})
+                    current_row = next_row
+                    elapsed += alt_wait + HOP_EXEC_TIME
+                    found_alt = True
+                else:
+                    # Not on a safe row — can't move laterally, just wait
+                    # longer at current position (try with 12s max)
+                    long_wait = _find_safe_wait(
+                        row_hazards, target_x, elapsed, next_row,
+                        cell_size, grid_cols, max_wait=12.0)
+                    if long_wait is not None:
+                        path.append({"wait": long_wait, "direction": "up"})
+                        current_row = next_row
+                        elapsed += long_wait + HOP_EXEC_TIME
+                        found_alt = True
+                break
+
+        if not found_alt:
+            # Last resort: hop anyway (will likely die, retry loop handles it)
+            path.append({"wait": 0.5, "direction": "up"})
+            current_row = next_row
+            elapsed += 0.5 + HOP_EXEC_TIME
 
     return path
 
