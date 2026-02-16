@@ -66,8 +66,8 @@ void UFroggerVFXManager::SpawnDeathPuff(FVector Location, EDeathType DeathType)
 		float FOV = CamMgr->GetFOVAngle();
 		StartScale = CalculateScaleForScreenSize(CamDist, FOV, 0.08f); // 8% of screen
 		EndScale = StartScale * 3.0f;
-		UE_LOG(LogFroggerVFX, Warning, TEXT("DeathPuff: CamZ=%.0f FrogZ=%.0f CamDist=%.0f FOV=%.1f StartScale=%.2f EndScale=%.2f"),
-			CamMgr->GetCameraLocation().Z, Location.Z, CamDist, FOV, StartScale, EndScale);
+		UE_LOG(LogFroggerVFX, Warning, TEXT("DeathPuff: Location=(%.0f, %.0f, %.0f) CamDist=%.0f FOV=%.1f Scale=%.2f->%.2f"),
+			Location.X, Location.Y, Location.Z, CamDist, FOV, StartScale, EndScale);
 	}
 	else
 	{
@@ -83,7 +83,7 @@ void UFroggerVFXManager::SpawnDeathPuff(FVector Location, EDeathType DeathType)
 		Effect.Actor = VFXActor;
 		Effect.SpawnLocation = Location;
 		Effect.SpawnTime = World->GetTimeSeconds();
-		Effect.Duration = 0.75f;
+		Effect.Duration = 2.0f;
 		Effect.StartScale = StartScale;
 		Effect.EndScale = EndScale;
 		ActiveEffects.Add(Effect);
@@ -297,19 +297,25 @@ AActor* UFroggerVFXManager::SpawnVFXActor(UWorld* World, FVector Location,
 		return nullptr;
 	}
 
-	AActor* Actor = World->SpawnActor<AActor>(AActor::StaticClass(),
-		FTransform(FRotator::ZeroRotator, Location, FVector(Scale)));
+	AActor* Actor = World->SpawnActor<AActor>(AActor::StaticClass());
 	if (!Actor)
 	{
 		return nullptr;
 	}
 
-	// Add a static mesh component
+	// Add mesh as root component FIRST, then set transform.
+	// AActor has no RootComponent by default — passing FTransform to
+	// SpawnActor is silently discarded without one, causing the mesh
+	// to render at world origin (0,0,0) instead of Location.
 	UStaticMeshComponent* MeshComp = NewObject<UStaticMeshComponent>(Actor);
 	MeshComp->SetStaticMesh(LoadObject<UStaticMesh>(nullptr, MeshPath));
 	MeshComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	MeshComp->RegisterComponent();
 	Actor->SetRootComponent(MeshComp);
+	MeshComp->RegisterComponent();
+
+	// Now that we have a root component, set position and scale
+	Actor->SetActorLocation(Location);
+	Actor->SetActorScale3D(FVector(Scale));
 
 	// Apply flat color material
 	UMaterial* FlatColor = GetOrCreateFlatColorMaterial();
