@@ -5,8 +5,8 @@
 | Date | 2026-02-15 |
 | Session ID | `247322c9-2ef2-44f0-a3c1-77b896924763` |
 | Model | claude-opus-4-6 |
-| Tokens | ~5,093,461 input, ~360 output |
-| Duration | 5m 7s |
+| Tokens | ~5,737,746 input, ~439 output |
+| Duration | 5m 54s |
 
 ---
 
@@ -208,3 +208,47 @@ Now update the project-level memory file.
 Now broadcast the stakeholder directive to all teammates.
 
 - **Used TaskUpdate** on task 10
+
+- **Used SendMessage**
+
+## Assistant (00:04 UTC)
+
+Now let me also broadcast to all active teammates since the stakeholder explicitly asked me to make sure everyone understands.
+
+- **Used SendMessage**
+
+- **Used TaskUpdate** on task 10
+
+- **Used TaskUpdate** on task 3
+
+## Assistant (00:04 UTC)
+
+The Sprint 8 retrospective is complete. Here is a summary of everything produced:
+
+---
+
+## Retrospective Output
+
+### Files Modified
+
+1. **`/Users/randroid/Documents/Dev/Unreal/UnrealFrog/.team/retrospective-log.md`** -- Full retrospective entry appended (~250 lines). Covers what went well, what went wrong (5 specific failures), 4 root causes, 4 agreement changes, action item status, and Sprint 9 priorities. Includes a pattern table showing the "nobody launched the game" failure across Sprints 2, 5, 6, 7, and 8.
+
+2. **`/Users/randroid/Documents/Dev/Unreal/UnrealFrog/.team/agreements.md`** -- Four changes:
+   - **Section 5a**: Rewritten from flat unordered list to numbered steps 1-6. Visual verification (step 4) blocks QA sign-off (step 5). The ordering is the enforcement mechanism.
+   - **Section 9**: Rewritten from aspirational checklists to a hard gate requiring screenshot evidence for any visual commit. XP Coach must verify evidence exists.
+   - **Section 20**: Updated to reflect PlayUnreal code exists but has never been run against a live game.
+   - **NEW Section 21**: Visual Commit Evidence Gate. Defines what counts as evidence (screenshots, PlayUnreal logs) and what does NOT count (passing tests, seam-matrix entries, verbal claims). Also drops 3 chronic P2 items per Section 17.
+
+3. **`/Users/randroid/Documents/Dev/Unreal/UnrealFrog/.claude/agent-memory/xp-coach/MEMORY.md`** -- Sprint 8 retrospective findings, root causes, and self-correction commitment.
+
+### Key Findings
+
+**The pattern:** The team writes code that describes verification but never performs verification. PlayUnreal was built (698 LOC) and never run. VFX camera-relative scaling was implemented (181 LOC) and never checked in a running game. The seam matrix was updated to say "COVERED" for seams that were never exercised.
+
+**The root cause:** The team cannot distinguish between writing code and verifying code. "I implemented `CalculateScaleForScreenSize()`" becomes "VFX is now visible" in the team's mental model. No amount of agreements will fix this without structural enforcement -- hence the ordered Definition of Done and the hard gate in Section 21.
+
+**Self-accountability:** I (XP Coach) wrote a sprint plan with visual verification in the correct phase position and then allowed the team to skip that phase. Planning the process is not enforcing the process. In Sprint 9, I will verify execution at each phase gate.
+
+### Sprint 9 Priority
+
+One goal: Make PlayUnreal work for real and use it to verify every Sprint 8 visual change. The stakeholder directive is clear: "Fix PlayUnreal at all costs."
