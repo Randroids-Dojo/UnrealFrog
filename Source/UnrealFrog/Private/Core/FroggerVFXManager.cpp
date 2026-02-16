@@ -64,8 +64,14 @@ void UFroggerVFXManager::SpawnDeathPuff(FVector Location, EDeathType DeathType)
 	{
 		float CamDist = CamMgr->GetCameraLocation().Z - Location.Z;
 		float FOV = CamMgr->GetFOVAngle();
-		StartScale = CalculateScaleForScreenSize(CamDist, FOV, 0.05f); // 5% of screen
-		EndScale = StartScale * 2.5f;
+		StartScale = CalculateScaleForScreenSize(CamDist, FOV, 0.08f); // 8% of screen
+		EndScale = StartScale * 3.0f;
+		UE_LOG(LogFroggerVFX, Warning, TEXT("DeathPuff: CamZ=%.0f FrogZ=%.0f CamDist=%.0f FOV=%.1f StartScale=%.2f EndScale=%.2f"),
+			CamMgr->GetCameraLocation().Z, Location.Z, CamDist, FOV, StartScale, EndScale);
+	}
+	else
+	{
+		UE_LOG(LogFroggerVFX, Warning, TEXT("DeathPuff: NO CAMERA MANAGER — using fallback scale %.2f"), StartScale);
 	}
 
 	AActor* VFXActor = SpawnVFXActor(World, Location,
@@ -77,7 +83,7 @@ void UFroggerVFXManager::SpawnDeathPuff(FVector Location, EDeathType DeathType)
 		Effect.Actor = VFXActor;
 		Effect.SpawnLocation = Location;
 		Effect.SpawnTime = World->GetTimeSeconds();
-		Effect.Duration = 0.5f;
+		Effect.Duration = 0.75f;
 		Effect.StartScale = StartScale;
 		Effect.EndScale = EndScale;
 		ActiveEffects.Add(Effect);
@@ -98,15 +104,15 @@ void UFroggerVFXManager::SpawnHopDust(FVector Location)
 		return;
 	}
 
-	// Compute camera-relative scale for hop dust (2% of screen — subtle)
+	// Compute camera-relative scale for hop dust (3% of screen)
 	float DustStartScale = 0.15f;
 	float DustEndScale = 0.4f;
 	if (APlayerCameraManager* CamMgr = UGameplayStatics::GetPlayerCameraManager(World, 0))
 	{
 		float CamDist = CamMgr->GetCameraLocation().Z - Location.Z;
 		float FOV = CamMgr->GetFOVAngle();
-		DustStartScale = CalculateScaleForScreenSize(CamDist, FOV, 0.02f);
-		DustEndScale = DustStartScale * 2.0f;
+		DustStartScale = CalculateScaleForScreenSize(CamDist, FOV, 0.03f);
+		DustEndScale = DustStartScale * 2.5f;
 	}
 
 	// Spawn 3 small cubes around the hop origin
@@ -129,7 +135,7 @@ void UFroggerVFXManager::SpawnHopDust(FVector Location)
 			Effect.Actor = VFXActor;
 			Effect.SpawnLocation = Location + Offsets[i];
 			Effect.SpawnTime = World->GetTimeSeconds();
-			Effect.Duration = 0.2f;
+			Effect.Duration = 0.3f;
 			Effect.StartScale = DustStartScale;
 			Effect.EndScale = DustEndScale;
 			ActiveEffects.Add(Effect);
