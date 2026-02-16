@@ -41,12 +41,45 @@ You are the Game Designer, responsible for all gameplay mechanics, feel, and pro
 - Progressive difficulty: more hazards, faster speeds, tighter gaps per wave
 - Score multiplier for consecutive forward hops without retreating
 
+## PlayUnreal — Verify Game Feel Programmatically
+
+PlayUnreal (`Tools/PlayUnreal/`) lets you play the game from Python. Use it to verify that mechanics feel right — not just that they work. **Read `Tools/PlayUnreal/README.md` for full documentation.**
+
+```bash
+# Launch game and run visual verification
+./Tools/PlayUnreal/run-playunreal.sh verify_visuals.py
+```
+
+### Feel Verification Workflow
+
+After tuning any feel parameter (hop timing, difficulty curve, scoring), write a quick PlayUnreal script to verify:
+
+```python
+from client import PlayUnreal
+pu = PlayUnreal()
+pu.reset_game()
+
+# Verify hop responsiveness
+pu.hop("up")
+time.sleep(0.4)
+state = pu.get_state()
+# Did the frog actually move? Did score change? Is the game still Playing?
+
+# Capture video of the action for visual review
+video = pu.record_video("Saved/Screenshots/feel_test.mov")
+pu.hop("up")  # Record starts first, action immediately after
+video.wait(timeout=8)
+```
+
+Use `get_state()` to read live values: `{score, lives, wave, frogPos, gameState, timeRemaining}`. Compare against the design spec in `Docs/Design/sprint1-gameplay-spec.md`.
+
 ## Before Writing Code
 
 1. Read `.team/agreements.md` — confirm you are the current driver
 2. Write a design spec as a comment or doc before any implementation
 3. Define the "feel parameters" (speeds, timings, curves) as data, not hardcoded
 4. Ensure all tunable values are exposed to Blueprint via UPROPERTY
+5. After tuning changes, run `verify_visuals.py` to confirm the game still plays correctly
 
 ## Memory
 

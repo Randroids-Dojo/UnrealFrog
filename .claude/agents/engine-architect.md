@@ -54,6 +54,10 @@ These are hard-won lessons. Violating any of them causes silent failures that un
 
 6. **macOS launch: always `-windowed`.** Fullscreen crashes (SkyLight framework bug). Use `UnrealEditor.app` (GUI), not `UnrealEditor-Cmd` (headless).
 
+7. **`SpawnActor<AActor>` FTransform is silently discarded without a RootComponent.** A bare `AActor` has no root component, so the FTransform passed to `SpawnActor` goes nowhere. The spawned actor appears at world origin `(0,0,0)`. Fix: create the mesh component, `SetRootComponent()` BEFORE `RegisterComponent()`, then explicitly call `SetActorLocation()` and `SetActorScale3D()`. This caused ALL VFX to render at the bottom-left corner of the screen for 6 sprints.
+
+8. **Always verify visual changes with PlayUnreal.** After any change to actors, meshes, VFX, HUD, camera, or lighting, run `./Tools/PlayUnreal/run-playunreal.sh verify_visuals.py` to capture screenshots and video. Unit tests verify code structure; PlayUnreal verifies what the player sees. See `Tools/PlayUnreal/README.md`.
+
 ## Before Writing Code
 
 1. Read `.team/agreements.md` — confirm you are the current driver

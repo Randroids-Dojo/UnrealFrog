@@ -46,23 +46,43 @@ You are the DevOps Engineer, responsible for build infrastructure, testing frame
 - **Object Pool**: Pre-allocate vehicles, logs, and hazard objects to avoid runtime allocation
 - **State Machine**: Game states (menu, playing, paused, game over) as explicit FSM
 
-## PlayUnreal E2E Test Harness (Added: Post-Sprint 2 Hotfix)
+## PlayUnreal — Live Game Testing Infrastructure
 
-**Sprint 3 P0 priority.** Unit tests passed but the game was broken in 4 critical ways. Agents need to play-test autonomously.
+PlayUnreal (`Tools/PlayUnreal/`) is the E2E testing harness built on UE5's Remote Control API. **Read `Tools/PlayUnreal/README.md` for full documentation.**
 
-The PlayUnreal E2E harness must support:
-1. **Launch the game** — GUI editor with `-game -windowed` (not headless `Cmd`)
-2. **Send inputs** — hop in all 4 directions, trigger pause/restart
-3. **Query game state** — frog position, score, lives, game state, CurrentPlatform
-4. **Assert outcomes** — "frog hopped to row 7 and is alive" / "frog landed on log, CurrentPlatform is not null"
-5. **Take screenshots** — visual regression baseline
+### Architecture You Own
 
-Candidate approaches (from Sprint 2 spike):
-- **Remote Control API**: HTTP endpoints to query/set UObject properties at runtime
-- **Automation Driver**: UE's built-in framework for UI interaction + state queries
-- **Gauntlet**: UE's E2E test framework for headless gameplay scenarios
+```
+run-playunreal.sh     Launcher — kills stale editors, launches with RC API, polls readiness, runs Python script, cleans up
+client.py             Python client — hop(), get_state(), screenshot(), record_video(), diagnose()
+run-tests.sh          Unit test runner (separate — headless, no RC API needed)
+```
 
-Without this harness, every sprint will require stakeholder manual play-testing to catch wiring/visual bugs.
+### How It Works
+
+1. `run-playunreal.sh` launches the editor with `-game -windowed -RCWebControlEnable`
+2. Polls `localhost:30010/remote/info` until the RC API responds (up to 120s)
+3. Python scripts use `client.py` to call UFUNCTIONs and read UPROPERTYs via HTTP PUT to `/remote/object/call` and `/remote/object/property`
+4. `GetGameStateJSON()` on the GameMode returns full state as a single JSON blob
+5. Screenshots use macOS `screencapture -l <windowID>` (cached after first lookup)
+6. Video uses `screencapture -V 3 -l <windowID>` (hard 3-second cap with `-l` flag — macOS limitation)
+
+### Key Constraints (macOS)
+
+- `screencapture -V` with `-l`: **hard 3-second cap** — macOS limitation, not a bug
+- `screencapture -V` without `-l`: silently produces no file
+- `screencapture -v` (continuous): cannot be terminated programmatically
+- Always use `-windowed` — fullscreen crashes (UE 5.7 SkyLight bug)
+- Kill stale editors before launch: shared memory conflicts cause silent startup failures
+
+### Test Scripts
+
+| Script | Purpose |
+|--------|---------|
+| `verify_visuals.py` | Visual smoke test — run after any visual system change |
+| `qa_checklist.py` | Sprint QA gate — required before "QA: verified" |
+| `acceptance_test.py` | Full gameplay path — road + river + home slot |
+| `diagnose.py` | Deep RC API diagnostics — run when things are broken |
 
 ## Before Writing Code
 

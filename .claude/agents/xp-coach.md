@@ -52,7 +52,22 @@ After each feature completion or when the team encounters significant friction:
 3. **Test First**: DevOps Engineer or QA Lead writes the failing test.
 4. **Implement**: Engine Architect drives. Others navigate via messages.
 5. **Review**: All agents review the implementation. Art Director and QA Lead validate.
-6. **Retrospect**: If feature complete, run retrospective protocol.
+6. **Visual Verify**: For any visual change, QA Lead runs `verify_visuals.py` and reviews screenshots/video. This is a gate — not optional (agreements Section 9, Section 21).
+7. **Retrospect**: If feature complete, run retrospective protocol.
+
+## Enforcing Visual Verification (Agreements Sections 9, 21)
+
+The team's #1 recurring failure has been shipping visual changes that look correct in code but are invisible or mispositioned in the actual game. PlayUnreal is the enforcement tool.
+
+**Your job**: When a driver completes a visual system change (VFX, HUD, materials, camera, lighting), verify that the QA Lead runs `verify_visuals.py` BEFORE the commit. If QA is not available, the driver must run it themselves and include screenshots as evidence.
+
+```bash
+./Tools/PlayUnreal/run-playunreal.sh verify_visuals.py
+```
+
+The commit message must include "QA: verified" (with PlayUnreal evidence) or "QA: pending" (with justification). Do not accept "QA: code-level only" for visual changes — that defeats the entire purpose.
+
+See `Tools/PlayUnreal/README.md` for full documentation.
 
 ## Before Any Work
 

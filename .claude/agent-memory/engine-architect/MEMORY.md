@@ -110,9 +110,9 @@
 ## Camera System (created Sprint 2 Phase 1)
 - File: Public/Core/FroggerCameraActor.h + Private/Core/FroggerCameraActor.cpp
 - AActor subclass with UCameraComponent (not ACameraActor)
-- Fixed position: (650, 750, 1800) -- centered above 13x15 grid
-- Pitch: -72 degrees (slight angle for depth perception, not pure top-down)
-- FOV: 60 degrees
+- Fixed position: (600, 700, 2200) -- centered above 13x15 grid
+- Pitch: -90 degrees (pure top-down)
+- FOV: 50 degrees
 - Tick disabled (PrimaryActorTick.bCanEverTick = false)
 - CameraComponent is RootComponent
 - Tunables: CameraPosition (FVector), CameraPitch (float), CameraFOV (float)

@@ -52,14 +52,62 @@ You are the QA Lead, responsible for quality assurance, game feel validation, an
 - Game over flow: clear feedback, score display, restart option
 - Performance: locked framerate with no hitches during gameplay
 
-## Pre-Play-Test Verification (Added: Post-Sprint 2 Hotfix)
+## PlayUnreal — Your Primary Testing Tool
 
-Before declaring a sprint "ready for play-test," verify these programmatically. Every one of these was a real bug that passed 81 unit tests.
+PlayUnreal (`Tools/PlayUnreal/`) lets you launch the game, send inputs, read state, take screenshots, and record video — all from Python. **Read `Tools/PlayUnreal/README.md` for full documentation.**
+
+### Scripts You Own
+
+| Script | When to Run | What It Does |
+|--------|------------|--------------|
+| `verify_visuals.py` | After ANY visual change (VFX, HUD, materials, camera, lighting) | Resets game, hops, captures death video, checks state transitions |
+| `qa_checklist.py` | Before adding "QA: verified" to any commit | Minimum gate: connection, reset, hops, score, responsiveness |
+| `acceptance_test.py` | After major gameplay changes | Full path: road crossing, river crossing, home slot |
+| `diagnose.py` | When PlayUnreal can't connect or objects aren't found | Deep RC API and object path diagnostics |
+
+### Running Tests
+
+```bash
+# Launch game + run script (handles editor lifecycle automatically)
+./Tools/PlayUnreal/run-playunreal.sh verify_visuals.py
+
+# Game already running from previous run
+./Tools/PlayUnreal/run-playunreal.sh --no-launch qa_checklist.py
+```
+
+### Capturing Transient Visual Effects
+
+Screenshots are too slow for effects that last <1 second (death puff, hop dust, score pops). Use video:
+
+```python
+# Start recording FIRST, then act — no delay between these lines
+video = pu.record_video("path/to/capture.mov")
+pu.hop("up")  # Trigger the effect during the 3-second recording
+video.wait(timeout=8)
+```
+
+Extract frames with the Swift extractor for visual analysis:
+```bash
+swift Saved/Screenshots/verify_visuals/frames/extract.swift input.mov output_dir/
+```
+
+### Sprint Sign-Off Workflow
+
+1. Run `./Tools/PlayUnreal/run-playunreal.sh qa_checklist.py` — must print "QA CHECKLIST: PASS"
+2. Run `./Tools/PlayUnreal/run-playunreal.sh verify_visuals.py` — must print "RESULT: PASS"
+3. Review screenshots in `Saved/Screenshots/` — verify actors are visible, colored, positioned correctly
+4. For visual system changes: extract and review video frames of transient effects
+5. Only then add "QA: verified" to the commit message
+
+## Pre-Play-Test Verification (Code-Level Checks)
+
+These supplement PlayUnreal — grep/read checks that catch common bugs before launching the game.
 
 ### Material & Visual Checks
 - [ ] Every actor with a mesh uses `GetOrCreateFlatColorMaterial()` — NEVER raw `SetVectorParameterValue("BaseColor", ...)` on engine primitives
 - [ ] Every `SetVectorParameterValue` uses `TEXT("Color")` (our custom parameter), not `TEXT("BaseColor")`
 - [ ] Scene has directional light + sky light (empty maps have NO lighting)
+- [ ] Runtime-spawned actors: `SetRootComponent()` BEFORE `RegisterComponent()`, then `SetActorLocation()` explicitly (SpawnActor FTransform is silently discarded without a root component)
 
 ### Delegate Wiring Checks
 - [ ] For every `DECLARE_DYNAMIC_MULTICAST_DELEGATE`, grep the codebase for at least one `AddDynamic` binding
