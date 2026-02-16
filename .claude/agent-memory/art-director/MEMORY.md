@@ -91,3 +91,37 @@
 - **TickDeathFlash()**: Public method for test-driven decay verification without Canvas dependency
 - **DrawDeathFlash()**: Private Canvas drawing helper, full-screen FCanvasTileItem
 - **Tests added**: `FHUD_DeathFlashActivates` (trigger logic), `FHUD_DeathFlashDecays` (decay math via TickDeathFlash)
+
+## Sprint 11 Retro: Three.js to UE Pipeline Research
+
+### WebFrogger Asset Inventory
+- 3 geometry types only: BoxGeometry (17), CylinderGeometry (8), SphereGeometry (7)
+- All materials are MeshLambertMaterial with a single color (21 unique colors)
+- 10 model factories: Frog, Car, Truck, Bus, RaceCar, Log, TurtleGroup, LilyPad, SmallFrog, Hedge
+- Each model = THREE.Group with 3-12 positioned primitives
+- Scale: CELL = 1.0 in Three.js vs 100 UU in UnrealFrog (100x multiplier)
+
+### Pipeline Decision: Direct Translation (Approach 1)
+- No file format conversion needed for WebFrogger-level complexity
+- Three.js primitives map 1:1 to UE engine primitives (Cube, Sphere, Cylinder)
+- MeshLambertMaterial({color}) -> FlatColorMaterial + SetVectorParameterValue("Color")
+- THREE.Group -> AActor with UStaticMeshComponent children at SetRelativeLocation offsets
+- Produces zero binary assets -- pure C++ actor definitions
+
+### UE 5.7 glTF Capabilities (for future reference)
+- Interchange plugin: built-in, enabled by default, full glTF import via UInterchangeGLTFTranslator
+- Supports: static meshes, materials, textures, skeletal meshes, animations
+- GLTFExporter plugin: round-trip export (UE -> glTF)
+- GLTFCore parser: scene graph, mesh data, material slots
+- Automated import via UAssetImportTask + PythonScriptPlugin
+
+### WebFrogger Color Palette (hex, for direct porting)
+- frog: 0x22cc22, frogBelly: 0x88ee44, frogEye: 0xffffff, frogPupil: 0x111111
+- car1: 0xff3333, car2: 0x3366ff, car3: 0xffaa00
+- truck: 0x884488, bus: 0xffcc00, raceCar: 0xff00ff
+- log: 0x8B4513, logLight: 0xa0522d
+- turtle: 0x006633, turtleShell: 0x228844
+- lilyPad: 0x117711, lilyFlower: 0xff69b4
+- road: 0x333333, roadLine: 0xffff00
+- grass: 0x226622, median: 0x337733
+- water: 0x1a3a5c, sidewalk: 0x777777, hedge: 0x0a440a

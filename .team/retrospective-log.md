@@ -1744,3 +1744,190 @@ A post-commit reminder will nudge agents when committing changes to `Source/` or
 | **10** | **Platform detection** | **No** | **No** | **Yes (collision mismatch)** |
 
 **The trend:** Sprint 8-hotfix proved that running the game catches bugs. Sprint 10 proves the team reverts to skipping verification when the tool is not mandatory. The hotfix was the exception, not the new norm. The path forward is making verification automatic (Section 24: constants sync, seam tests) rather than relying on process discipline.
+
+---
+
+## Retrospective 12 — Sprint 11: "Why Aren't We Making Progress?"
+
+### Context
+
+Stakeholder feedback: **"We don't seem to be making much progress."** 11 sprints completed. 202 tests passing. Extensive tooling built (PlayUnreal, path planner, audio generator, VFX system, constant sync). But WebFrogger -- built with Three.js in a single prompt, one file, 1,311 lines -- may deliver comparable or superior player-facing quality. This retrospective answers: **where did the time go, and what needs to change?**
+
+### The Numbers
+
+#### Commit breakdown (113 total)
+
+| Category | Count | % |
+|----------|-------|---|
+| Gameplay features (player-visible) | 25 | 22% |
+| Tooling features (PlayUnreal, infra) | 13 | 12% |
+| Bug fixes | 16 | 14% |
+| Tests (standalone commits) | 7 | 6% |
+| Documentation | 30 | 27% |
+| Chore/refactor | 11 | 10% |
+| Bare transcript commits | 9 | 8% |
+
+**22% of commits directly added player-facing features.** The rest was tooling, process, documentation, fixes, and infrastructure.
+
+#### Lines of code
+
+| Category | Lines | % of total |
+|----------|-------|-----------|
+| Gameplay C++ (non-test) | 5,166 | 6% |
+| Test C++ | 7,914 | 10% |
+| Python tooling | 5,837 | 7% |
+| Transcripts (.md) | 76,836 | 64% |
+| Docs/planning/team (.md) | ~5,700 | 5% |
+| Agreements | 380 | <1% |
+| Retrospective log | 1,746 | 1% |
+| Agent profiles | 642 | <1% |
+| Skills docs | 602 | <1% |
+| MEMORY.md | 161 | <1% |
+
+**The project is 64% transcripts by line count.** The actual game is 5,166 lines of C++. WebFrogger is 1,311 lines of JavaScript with zero overhead.
+
+#### Process artifacts
+
+| Artifact | Count/Size |
+|----------|-----------|
+| Working agreements sections | 26 |
+| Retrospective entries | 12 (now 13) |
+| Agent profile files | 8 |
+| Skill documents | ~8 |
+| Sprint plan documents | ~6 |
+| MEMORY.md lessons | 161 lines |
+
+### Where the Time Actually Went (Sprint-by-Sprint)
+
+| Sprint | What was BUILT (player-visible) | What was NOT player-visible |
+|--------|-------------------------------|---------------------------|
+| 1 | Nothing playable | Walking skeleton, 38 tests, project scaffold |
+| 2 | Map, camera, ground, HUD, collision | 3 critical bugs discovered at first launch |
+| 2-hotfix | Fixed 4 visual bugs | Material system discovery, overlap timing |
+| 3 | Pause, turtle mechanic, scoring | Functional test framework, subsystem refactoring |
+| 4 | Audio SFX (9 sounds) | Seam test matrix, PlayUnreal E2E stubs, round restart fix |
+| 5 | Music, VFX, arcade HUD, title screen | VFX invisible (TickVFX never called) |
+| 6 | High score persistence, death flash | Test boundary math fix, deferred items dropped |
+| 7 | Difficulty scaling, input buffer tuning | Dead code fixes, log parser fix, 4 dead-wiring bugs |
+| 8 | (Nothing new visible) | PlayUnreal client, RC API, VFX scaling (all unverified) |
+| 9 | (Nothing new visible) | Path planner (5 iterations), spatial tests, SetInvincible |
+| 10 | (Nothing new visible) | Collision margin fix, constant sync planning |
+| 11 | (Nothing new visible) | GetGameConfigJSON, SYNC annotations, FindPlatform tests |
+
+**Sprints 8-11 (4 consecutive sprints) added ZERO new player-visible features.** The team spent 4 sprints building tooling to verify features, fixing the tooling, and syncing constants between the tooling and the game. This is the core of the stakeholder's frustration.
+
+### Root Cause Analysis
+
+#### 1. Process Accretion: 26 Agreements Governing 5,166 Lines of Game Code
+
+The agreements document grew from 5 sections to 26 over 11 sprints. Each agreement was a reasonable response to a real problem. In aggregate, they create a bureaucratic overhead that dwarfs the codebase they govern. The ratio is **1 agreement section per 199 lines of gameplay code**. A typical open-source game of this size has zero written agreements.
+
+The agreements themselves cost time to write, read, enforce, and update. Every retrospective adds sections. No retrospective has ever removed one (only "dropped" deferred items). The document is append-only.
+
+#### 2. The Tooling Trap: Building Tools to Verify Tools
+
+The team fell into a recursive loop:
+1. Sprint 5: VFX code written but invisible -> need PlayUnreal to verify
+2. Sprint 8: PlayUnreal built but never run against live game -> need to verify PlayUnreal works
+3. Sprint 9: PlayUnreal works, path planner built (5 iterations) -> path planner is tooling for tooling
+4. Sprint 10: Path planner breaks because constants diverge -> need constant sync tooling
+5. Sprint 11: Constant sync tooling built, SYNC annotations added -> tooling for tooling for tooling
+
+Each layer is rational in isolation. The stack is irrational in aggregate. **The path planner, constant sync system, SYNC annotations, and --check-sync flag are all infrastructure to help agents play a game that a human could test in 30 seconds.**
+
+#### 3. Retrospective Overhead: 12 Retros for 25 Gameplay Commits
+
+We have averaged **2.1 gameplay feature commits per retrospective.** Each retrospective produces a log entry (~130 lines), agreement updates, memory updates, and transcript commits. The retrospective apparatus is larger than some of our feature implementations.
+
+#### 4. Test Ratio Inversion: 7,914 Lines of Tests for 5,166 Lines of Game
+
+A 1.53:1 test-to-code ratio for a prototype game is extreme. Industry standard for shipping games is 0.3-0.5:1. For a proof-of-concept, even lower is acceptable. The team wrote seam tests, spatial tests, boundary tests, wiring tests, integration tests, gameplay scenario tests, and config validation tests -- all rigorously -- for a game that may not have the right features yet.
+
+#### 5. The Comparison That Matters
+
+WebFrogger delivered in 1 prompt:
+- Road with vehicles (3 types, 2 speeds, bidirectional)
+- River with logs (3 types, varying speeds)
+- 5 home slots
+- Score, high score, lives display
+- Title screen
+- Touch controls
+- Game over / restart flow
+- All visible, all working, all playable
+
+UnrealFrog after 11 sprints:
+- Road with vehicles (similar)
+- River with logs and turtles
+- 5 home slots
+- Score, high score, lives, timer, wave display
+- Title screen
+- Enhanced input
+- Audio (9 SFX + 2 music tracks)
+- VFX system (partially visible)
+- Difficulty scaling
+- Pause state
+- BUT: 4 consecutive sprints with no new player-visible features
+- BUT: VFX still not fully verified visible
+- BUT: wave completion untested in live game
+
+UnrealFrog has MORE systems. It may not have a visibly BETTER game.
+
+### The Core Problem
+
+**The team optimized for correctness over completeness.** Every system was tested, reviewed, verified, retrospected, and documented before moving to the next. This is appropriate for production software. It is inappropriate for a proof-of-concept whose mission is to demonstrate that AI agents can build real games in real engines.
+
+The proof-of-concept fails if the game is not visibly, obviously better than WebFrogger. 202 passing tests do not make the proof. A visibly superior game does.
+
+### Proposed Changes
+
+#### REMOVE: Process that costs more than it saves
+
+1. **Cut agreements to 10 sections max.** Merge or delete the 16 most specific sections (10-17, 19-25). Keep: Collaboration (1), TDD (2), Communication (3), Commits (4), Feature Workflow (5/5a), Assets (6), Retrospectives (7), PlayUnreal (8), Visual Verification (9). Everything else is either situational knowledge that belongs in MEMORY.md or learned-lesson that should be internalized, not enforced via document.
+
+2. **Stop committing transcripts.** 76,836 lines (64% of the repo) are conversation logs. They have zero player-facing value. Delete the transcripts directory and stop generating transcript commits.
+
+3. **Retrospectives: quarterly, not per-sprint.** 12 retros in 11 sprints produced diminishing returns. The last 4 retros identified the same pattern ("visual verification skipped") with different words. Run retros when something actually breaks, not on a schedule.
+
+4. **No more standalone doc/plan commits before a sprint.** The planning docs are useful for alignment but should not be separate commits. Plan in messages, execute in code, commit code.
+
+#### CHANGE: Rebalance test investment
+
+5. **Target 0.5:1 test-to-code ratio for new features.** Write the critical-path test (does the feature work?) and the regression test (does it not break?). Skip exhaustive boundary, wiring, and spatial tests until the feature proves its worth through play-testing. The current approach of "202 tests for a game nobody has verified is fun" is backwards.
+
+6. **Play-test BEFORE writing tests.** Invert the current flow. Launch the game, play it, identify what is wrong, THEN write a test for the specific bug. TDD is valuable for APIs and state machines. For visual/feel tuning, it is a premature abstraction.
+
+#### ADD: Focus on the output
+
+7. **Sprint 12 goal: match or exceed WebFrogger in 1 sprint.** No tooling. No new test categories. No new agreements. Ship visible features: polish visuals, verify VFX, fix wave logic, make the game look and feel better than WebFrogger. Every commit must produce a player-visible change.
+
+8. **"Demo or it didn't happen."** Every sprint ends with a 30-second screen recording of someone playing the game. If the recording doesn't show improvement, the sprint failed. This replaces the 6-step Definition of Done with one question: "Can you see the difference?"
+
+### Sprint 11 Stats
+
+- **Tests:** 202 (19 new: 10 FindPlatform boundary, 6 Gameplay scenario, 3 GameConfig)
+- **New player-visible features:** 0
+- **New tooling:** GetGameConfigJSON, PlatformLandingMargin UPROPERTY, SYNC annotations, --check-sync, Python constant sync
+- **Process artifacts updated:** agreements, retro-notes, seam-matrix, sprint plan
+- **Sprints since last player-visible feature:** 4 (Sprints 8-11)
+
+### Stakeholder Addendum
+
+**The stakeholder rejected the "less process" proposals.** The process (Plan, Code, Verify), retros, tests, tooling, and team agreements are all needed to work properly with agent teams. None of that is the problem. The problem is **sequencing**:
+
+- PlayUnreal should have been Sprint 1 (visual feedback loop first)
+- Graphics pipeline should have been Sprint 2 (see what you're building before adding mechanics)
+- Gameplay features should build on top of a visible, verifiable foundation
+
+The tooling investment was correct in kind but wrong in order. PlayUnreal, audio gen, constant sync — these are all things that will help on the next game. This game is a testbed for the process of building Unreal games with agents.
+
+**What actually changes for Sprint 12:**
+- Focus on player-visible features (match WebFrogger visual quality)
+- Use WebFrogger as the reference implementation — port its model factories to UE
+- Keep TDD, keep retros, keep agreements — but every commit must be visually verifiable
+- Sprint ends with a screen recording demonstrating the visual improvements
+
+**Lesson for future games:** Sprint 1 = feedback loop (PlayUnreal equivalent). Sprint 2 = graphics pipeline (see what you build). Sprint 3+ = gameplay on a visible foundation.
+
+### One-Line Summary
+
+**The sequencing was wrong: we built gameplay before we could see it. The process is right — it just needs to start with the visual feedback loop.**

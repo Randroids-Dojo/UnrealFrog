@@ -11,12 +11,13 @@ UnrealFrog exists to close the gap between that experience and Unreal Engine 5. 
 ## Project
 Unreal Engine 5.7 C++ project. 3D arcade Frogger with procedurally generated assets.
 Low-poly stylized aesthetic. Mob programming workflow with agent team coordination.
+202 automated tests across 20 categories. PlayUnreal live testing operational.
 
 ## Architecture
 - `/Source/UnrealFrog/` — C++ gameplay source (actors, components, subsystems)
 - `/Content/` — Unreal assets (meshes, materials, maps, sounds)
 - `/Config/` — Project configuration (DefaultEngine.ini, DefaultGame.ini)
-- `/Source/UnrealFrog/Tests/` — Automated test suites (170+ tests)
+- `/Source/UnrealFrog/Tests/` — Automated test suites (202 tests, 20 categories)
 - `/Tools/PlayUnreal/` — Live game testing: screenshots, video, state queries, hop commands
 - `/Tools/AudioGen/` — Procedural WAV generation (SFX + music)
 - `/Docs/` — Design specs, sprint plans, QA checklists, testing docs
@@ -91,7 +92,7 @@ After every feature/sprint: review git log → identify friction → categorize 
 ### Essential References
 
 **Team process** (read before any work):
-- `.team/agreements.md` — Living team norms (21 sections, battle-tested over 8 sprints)
+- `.team/agreements.md` — Living team norms (26 sections, battle-tested over 11 sprints)
 - `.team/roster.md` — Agent roles and file ownership boundaries
 - `.team/onboarding.md` — How to add/retire specialist agents
 - `.team/retrospective-log.md` — Full history of process improvements
@@ -111,7 +112,7 @@ After every feature/sprint: review git log → identify friction → categorize 
 
 **Testing**:
 - `Docs/Testing/seam-matrix.md` — Seam test coverage matrix (all system interaction pairs)
-- `Tools/PlayUnreal/run-tests.sh` — Unit test runner (170+ tests, category filters: `--seam`, `--audio`, `--e2e`, `--all`)
+- `Tools/PlayUnreal/run-tests.sh` — Unit test runner (202 tests, category filters: `--seam`, `--audio`, `--e2e`, `--all`)
 
 **Build and UE5 conventions**:
 - `.claude/skills/unreal-conventions/SKILL.md` — Naming, UPROPERTY/UFUNCTION patterns, lifecycle
@@ -129,6 +130,32 @@ After every feature/sprint: review git log → identify friction → categorize 
 
 ## Team
 Read `.team/agreements.md` before ANY work. Update it during retrospectives.
+
+## Sprint Sequencing Lesson (from Sprint 11 Retro)
+
+**The correct order for building UE games with agents:**
+1. **Sprint 1: Visual feedback loop** — PlayUnreal (or equivalent) must be operational before any gameplay code. Agents must be able to launch, screenshot, and interact with the game programmatically from day one.
+2. **Sprint 2: Graphics pipeline** — Multi-part models, materials, and visual verification must come before gameplay mechanics. Use WebFrogger (or web prototype) as the reference implementation. Agents must see what they're building.
+3. **Sprint 3+: Gameplay on a visible foundation** — Build mechanics, audio, scoring, etc. on top of a foundation where every change is visually verifiable.
+
+**Why:** UnrealFrog built gameplay before it could see anything. 11 sprints of correct logic, 202 passing tests, but the game looked like a tech demo (colored cubes and spheres). The tooling investment was correct in kind but wrong in order. This sequencing mistake — not the process itself — is what slowed progress.
+
+## WebFrogger Reference Implementation
+
+[WebFrogger](/Users/randroid/Documents/Dev/WebFrogger/) is the visual quality benchmark. Key facts:
+- 1,311 lines, single HTML file, Three.js
+- 10+ multi-part 3D models composed from primitives (Box, Cylinder, Sphere)
+- 21 flat colors, no textures — `MeshLambertMaterial({color})` only
+- All geometry maps 1:1 to UE engine primitives + FlatColorMaterial at 100x scale
+
+**Direct translation approach** (no pipeline needed for this complexity):
+- `BoxGeometry(w,h,d)` → UE Cube scaled to `(w*100, h*100, d*100)` UU
+- `SphereGeometry(r)` → UE Sphere scaled to `(r*100)` UU
+- `CylinderGeometry(r,r,h)` → UE Cylinder scaled appropriately
+- `MeshLambertMaterial({color: 0xRRGGBB})` → `GetOrCreateFlatColorMaterial()` + `SetVectorParameterValue("Color", FLinearColor)`
+- `THREE.Group` with children → `AActor` with `UStaticMeshComponent` children via `SetRelativeLocation`
+
+**For future games with complex assets:** Three.js GLTFExporter → .glb → UE Interchange import → .uasset. ~300 lines of tooling. Only needed when meshes exceed primitive composition.
 
 ## Critical Rules
 - NEVER modify engine source files

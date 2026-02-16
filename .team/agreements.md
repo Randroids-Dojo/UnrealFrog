@@ -1,7 +1,7 @@
 # Team Working Agreements
 
 *This is a living document. Updated during retrospectives by the XP Coach.*
-*Last updated: Sprint 10 Retrospective*
+*Last updated: Sprint 11 Retrospective (with stakeholder addendum)*
 
 ## Day 0 Agreements
 
@@ -363,6 +363,34 @@ A post-commit reminder nudges agents when committing changes to `Source/` or `To
 ```
 
 **Why:** Stakeholder request (Sprint 10). The Sprint 10 retro notes — written by the stakeholder, not agents — captured the collision mismatch incident clearly. Agents should be writing these notes themselves as events happen.
+
+### 26. Sprint Sequencing for New Games (Added: Sprint 11 Retrospective — Stakeholder Directive)
+
+**When starting a new UE game with agents, sprints must follow this order:**
+
+1. **Sprint 1: Visual feedback loop.** PlayUnreal (or equivalent programmatic game interaction tool) must be operational before any gameplay code. Agents must be able to launch, screenshot, and interact with the running game from day one. Without this, agents build blind.
+
+2. **Sprint 2: Graphics pipeline.** Multi-part models, materials, and visual verification must be in place before gameplay mechanics. If a web prototype exists (e.g., WebFrogger), port its visual assets to UE as the first content sprint. Agents must see what they're building.
+
+3. **Sprint 3+: Gameplay on a visible foundation.** Mechanics, audio, scoring, and polish are built on top of a foundation where every change is visually verifiable via PlayUnreal screenshots.
+
+**Why:** UnrealFrog built 11 sprints of correct gameplay logic, 202 passing tests, and extensive tooling — but the game looked like a tech demo (single-colored cubes and spheres) because visual quality was never prioritized. The tooling investment (PlayUnreal, audio gen, constant sync) was correct in kind but wrong in order. A web prototype (WebFrogger, 1,311 lines) built in a single prompt had superior visual quality because the feedback loop was closed by default.
+
+**The game is a testbed.** The tools and process for building UE games with agents are the real product. The sequencing lesson applies to every future game: feedback loop first, visuals second, gameplay third.
+
+### 27. WebFrogger as Visual Reference (Added: Sprint 11 Retrospective)
+
+**WebFrogger (`/Users/randroid/Documents/Dev/WebFrogger/index.html`) is the visual quality benchmark for UnrealFrog.** When building or updating 3D models, reference WebFrogger's model factory functions (`createFrog()`, `createCar()`, `createTruck()`, `createBus()`, `createLog()`, `createTurtleGroup()`, `createLilyPad()`).
+
+**Translation approach** (no import pipeline needed for primitive-based models):
+- Three.js `BoxGeometry(w,h,d)` → UE Cube scaled to `(w*100, h*100, d*100)` UU
+- Three.js `SphereGeometry(r)` → UE Sphere scaled to `(r*100)` UU
+- Three.js `CylinderGeometry(r,r,h)` → UE Cylinder scaled appropriately
+- Three.js `MeshLambertMaterial({color: 0xRRGGBB})` → `GetOrCreateFlatColorMaterial()` + `SetVectorParameterValue("Color", FLinearColor)`
+- Three.js `Group` with positioned children → `AActor` with `UStaticMeshComponent` children via `SetRelativeLocation`
+- Scale factor: **100x** (Three.js uses 1.0 per cell, UE uses 100 UU per cell)
+
+**For future games with complex assets:** Three.js GLTFExporter → .glb → UE Interchange import is viable (~300 lines of tooling). Build that pipeline when models exceed primitive composition.
 
 ## Things We Will Figure Out Together
 
