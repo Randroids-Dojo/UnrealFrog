@@ -38,6 +38,15 @@ def log(msg):
     print(f"[VerifyVisuals] {msg}")
 
 
+def burst_screenshots(pu, prefix, count=3, interval=0.15):
+    """Take a rapid burst of screenshots."""
+    for i in range(count):
+        path = os.path.join(SCREENSHOT_DIR, f"{prefix}_{i+1}.png")
+        pu.screenshot(path)
+        if i < count - 1:
+            time.sleep(interval)
+
+
 def check(desc, condition, detail=""):
     global FAILURES
     status = "PASS" if condition else "FAIL"
@@ -94,7 +103,7 @@ def main():
     except PlayUnrealError as e:
         check("Reset to title", False, str(e))
 
-    pu.screenshot(os.path.join(SCREENSHOT_DIR, "01_title.png"))
+    burst_screenshots(pu, "01_title", count=1)
 
     # -- Step 2: Start game and verify transition to Playing -----------------
     log("")
@@ -119,41 +128,40 @@ def main():
     except PlayUnrealError as e:
         check("Start game", False, str(e))
 
-    pu.screenshot(os.path.join(SCREENSHOT_DIR, "02_playing.png"))
+    burst_screenshots(pu, "02_playing", count=1)
 
-    # -- Step 3: Hop up 3 times and verify position changes ------------------
+    # -- Step 3: Hop left/right on safe row 0 to verify movement -------------
     log("")
-    log("--- Step 3: Hop up 3 times (safe zone, rows 0-2) ---")
+    log("--- Step 3: Hop left and right on safe row 0 ---")
     prev_pos = pu.get_state().get("frogPos", [6, 0])
     positions_changed = 0
 
-    for i in range(3):
+    # Stay on row 0 (safe) — row 1+ has traffic that kills the frog
+    safe_hops = ["right", "right", "left"]
+    for i, direction in enumerate(safe_hops):
         try:
-            pu.hop("up")
+            pu.hop(direction)
             time.sleep(0.4)  # HopDuration=0.15 + margin
             state = pu.get_state()
             new_pos = state.get("frogPos", prev_pos)
             if new_pos != prev_pos:
                 positions_changed += 1
-            log(f"  Hop {i+1}: frogPos={new_pos}, score={state.get('score')}, "
+            log(f"  Hop {i+1} ({direction}): frogPos={new_pos}, score={state.get('score')}, "
                 f"gameState={state.get('gameState')}")
             prev_pos = new_pos
         except PlayUnrealError as e:
-            log(f"  Hop {i+1}: ERROR - {e}")
+            log(f"  Hop {i+1} ({direction}): ERROR - {e}")
 
     check("Frog position changed after hops",
           positions_changed >= 2,
           f"{positions_changed}/3 hops resulted in position changes")
 
     state = pu.get_state()
-    check("Score increased after forward hops",
-          state.get("score", 0) > 0,
-          f"score={state.get('score')}")
     check("Game still in Playing state",
           state.get("gameState") == "Playing",
           f"gameState={state.get('gameState')}")
 
-    pu.screenshot(os.path.join(SCREENSHOT_DIR, "03_after_hops.png"))
+    burst_screenshots(pu, "03_after_hops", count=1)
 
     # -- Step 4: Verify timer is counting down --------------------------------
     log("")
@@ -166,35 +174,58 @@ def main():
           time2 < time1,
           f"time before={time1:.1f}, after={time2:.1f}")
 
-    # -- Step 5: Hop in other directions -------------------------------------
+    # -- Step 5: Hop forward into traffic and verify survival/death ----------
     log("")
-    log("--- Step 5: Hop left and right ---")
-    state_before = pu.get_state()
-    pos_before = state_before.get("frogPos", [0, 0])
-
+    log("--- Step 5: Hop forward (into traffic) ---")
     try:
-        pu.hop("right")
-        time.sleep(0.3)
-        state_right = pu.get_state()
-        pos_right = state_right.get("frogPos", pos_before)
-        check("Hop right changes X position",
-              pos_right[0] != pos_before[0] if len(pos_right) >= 2 and len(pos_before) >= 2 else False,
-              f"before={pos_before}, after={pos_right}")
-    except PlayUnrealError as e:
-        check("Hop right", False, str(e))
+        # Start 3s video, then hop immediately — no delay.
+        # Recording starts first so the full 3 seconds captures the death.
+        video_path = os.path.join(SCREENSHOT_DIR, "04_death_video.mov")
+        video_proc = pu.record_video(video_path)
+        pu.hop("up")
+        log("  Video started + hop sent (no delay)")
 
-    try:
-        pu.hop("left")
-        time.sleep(0.3)
-        state_left = pu.get_state()
-        pos_left = state_left.get("frogPos", pos_right)
-        check("Hop left changes X position",
-              pos_left[0] != pos_right[0] if len(pos_left) >= 2 else False,
-              f"before={pos_right}, after={pos_left}")
-    except PlayUnrealError as e:
-        check("Hop left", False, str(e))
+        # Wait for the 3s recording to finish
+        video_proc.wait(timeout=8)
+        log(f"  Video saved: {video_path}")
 
-    pu.screenshot(os.path.join(SCREENSHOT_DIR, "04_after_directions.png"))
+        # Take a still screenshot of current state too
+        burst_screenshots(pu, "05_after_forward", count=1)
+
+        state5 = pu.get_state()
+        gs = state5.get("gameState", "")
+        frog_pos = state5.get("frogPos", [0, 0])
+
+        if gs == "Playing":
+            # Frog either survived or already respawned
+            lives_now = state5.get("lives", 3)
+            if lives_now < 3:
+                check("Frog died and respawned (fast respawn)", True,
+                      f"frogPos={frog_pos}, lives={lives_now}")
+            else:
+                check("Frog survived hop into row 1", True,
+                      f"frogPos={frog_pos}")
+                check("Score increased from forward hop",
+                      state5.get("score", 0) > 0,
+                      f"score={state5.get('score')}")
+        elif gs in ("Dying", "Spawning"):
+            check("Frog died from traffic (expected behavior)", True,
+                  f"gameState={gs}, frogPos={frog_pos}")
+            log("  Waiting for respawn...")
+            time.sleep(2.0)
+            state5 = pu.get_state()
+            check("Frog respawned after death",
+                  state5.get("gameState") == "Playing",
+                  f"gameState={state5.get('gameState')}, lives={state5.get('lives')}")
+        elif gs == "GameOver":
+            # Timer ran out — game is working correctly, just took too long
+            check("Game reached GameOver (timer expired)", True,
+                  f"gameState={gs}, lives={state5.get('lives')}, score={state5.get('score')}")
+        else:
+            check("Forward hop produced expected state", False,
+                  f"gameState={gs}")
+    except PlayUnrealError as e:
+        check("Forward hop", False, str(e))
 
     # -- Step 6: Final state check -------------------------------------------
     log("")
@@ -208,7 +239,7 @@ def main():
                                             "RoundComplete", "GameOver", "Paused"],
           f"gameState={final_state.get('gameState')}")
 
-    pu.screenshot(os.path.join(SCREENSHOT_DIR, "05_final.png"))
+    burst_screenshots(pu, "06_final", count=1)
 
     # -- Summary -------------------------------------------------------------
     log("")

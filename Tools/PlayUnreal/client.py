@@ -13,6 +13,7 @@ Usage:
 """
 
 import json
+import os
 import time
 import urllib.request
 import urllib.error
@@ -122,55 +123,126 @@ class PlayUnreal:
 
         return state
 
-    def screenshot(self, path=None):
-        """Take a screenshot of the current frame.
+    _cached_window_id = None
 
-        Uses the RC API's HTTP endpoint to send a console command.
-        HighResShot triggers the engine screenshot pipeline.
+    def record_video(self, path=None):
+        """Record a 3-second video of the game window.
+
+        Uses screencapture -V 3 -l <windowID>. The -l flag imposes a hard
+        3-second cap, but that's enough if you send the action BEFORE or
+        simultaneously with starting the recording.
 
         Args:
-            path: Optional file path. If None, uses engine default location.
+            path: File path for the .mov video.
 
         Returns:
-            True if the command was sent (does not guarantee file was written).
+            subprocess.Popen handle. Call .wait(timeout=8) when done.
         """
-        # Build console command — HighResShot saves to Saved/Screenshots/
-        cmd = "HighResShot 1920x1080"
-        if path:
-            cmd = f"HighResShot 1920x1080 filename=\"{path}\""
+        import subprocess
 
-        # Try sending via the PlayerController (most reliable in -game mode)
-        frog_path = self._get_frog_path()
-        # The controller owns the viewport — use the GameMode to run a command
-        gm_path = self._get_gm_path()
+        if path is None:
+            path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                "..", "..", "Saved", "Screenshots", "recording.mov")
 
-        # RC API /remote/object/call can invoke console commands through any
-        # UObject that has a world context.  We try the GameMode first.
-        for target in [gm_path, frog_path]:
-            try:
-                # UE RC API does not have a dedicated "console command" endpoint.
-                # Instead, use the /remote/object/property endpoint to run
-                # ScreenshotRequested or use a custom UFUNCTION.
-                # For now, use a direct HTTP call via the engine's HTTP router.
-                self._put("/remote/object/call", {
-                    "ObjectPath": target,
-                    "FunctionName": "ConsoleCommand",
-                    "Parameters": {"Command": cmd},
-                    "GenerateTransaction": False
-                })
-                return True
-            except CallError:
-                continue
+        os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
 
-        # Last resort: try undocumented batch endpoint
+        # Warm up window ID cache before the action so recording starts fast
+        self._get_window_id()
+
+        cmd = ["screencapture", "-V", "3", "-x"]
+        wid = PlayUnreal._cached_window_id
+        if wid:
+            cmd.extend(["-l", wid])
+        cmd.append(path)
+
+        return subprocess.Popen(cmd)
+
+    def _get_window_id(self):
+        """Get the UnrealEditor window ID, using cache for speed."""
+        import subprocess
+
+        if PlayUnreal._cached_window_id:
+            return PlayUnreal._cached_window_id
+
         try:
-            self._put("/remote/object/call", {
-                "ObjectPath": "/Engine/Transient.GameEngine",
-                "FunctionName": "ConsoleCommand",
-                "Parameters": {"Command": cmd}
-            })
-            return True
-        except CallError:
+            result = subprocess.run(
+                ["osascript", "-e",
+                 'tell application "System Events" to get id of every window '
+                 'of every process whose name contains "UnrealEditor"'],
+                capture_output=True, text=True, timeout=5
+            )
+            ids_str = result.stdout.strip()
+            if ids_str and ids_str != "":
+                for token in ids_str.replace(",", " ").split():
+                    token = token.strip()
+                    if token.isdigit():
+                        PlayUnreal._cached_window_id = token
+                        return token
+        except (subprocess.TimeoutExpired, Exception):
+            pass
+
+        return None
+
+    def screenshot(self, path=None):
+        """Take a screenshot of the game window.
+
+        Uses macOS screencapture. Caches window ID after first lookup
+        so subsequent calls are fast (important for burst screenshots).
+
+        Args:
+            path: File path for the screenshot. If None, uses a default path.
+
+        Returns:
+            True if the screenshot was saved successfully.
+        """
+        import subprocess
+
+        if path is None:
+            path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                "..", "..", "Saved", "Screenshots", "screenshot.png")
+
+        os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+
+        # Use cached window ID if available
+        if PlayUnreal._cached_window_id:
+            try:
+                subprocess.run(
+                    ["screencapture", "-l", PlayUnreal._cached_window_id, "-x", path],
+                    timeout=5
+                )
+                if os.path.exists(path):
+                    return True
+            except (subprocess.TimeoutExpired, Exception):
+                PlayUnreal._cached_window_id = None
+
+        # Look up window ID (slow — only done once)
+        try:
+            result = subprocess.run(
+                ["osascript", "-e",
+                 'tell application "System Events" to get id of every window '
+                 'of every process whose name contains "UnrealEditor"'],
+                capture_output=True, text=True, timeout=5
+            )
+            ids_str = result.stdout.strip()
+            if ids_str and ids_str != "":
+                for token in ids_str.replace(",", " ").split():
+                    token = token.strip()
+                    if token.isdigit():
+                        PlayUnreal._cached_window_id = token
+                        subprocess.run(
+                            ["screencapture", "-l", token, "-x", path],
+                            timeout=5
+                        )
+                        if os.path.exists(path):
+                            return True
+        except (subprocess.TimeoutExpired, Exception):
+            pass
+
+        # Fallback: capture entire main display (fast, no window lookup)
+        try:
+            subprocess.run(["screencapture", "-x", path], timeout=5)
+            return os.path.exists(path)
+        except (subprocess.TimeoutExpired, Exception):
             return False
 
     def reset_game(self):
