@@ -97,19 +97,14 @@ def ensure_playing(pu, gm_path):
         return None
 
 
-from path_planner import plan_path, execute_path
+from path_planner import navigate_to_home_slot as _nav_home
 
 
 def hop_to_home_slot(pu, gm_path, max_deaths=10, label=""):
-    """Navigate frog to a home slot using predictive path planning.
+    """Navigate frog to a home slot using incremental path planning.
 
-    Strategy: query hazards ONCE, compute a full safe path using linear
-    extrapolation of hazard positions, then execute the hop sequence with
-    minimal API calls (one per hop, no polling).
-
-    If the frog dies, re-queries hazards and re-plans from new position.
-
-    Target column: 6 (center home slot).
+    Delegates to path_planner.navigate_to_home_slot which plans one hop
+    at a time with fresh hazard data. Handles game-over by restarting.
 
     Returns:
         dict with keys:
@@ -118,89 +113,40 @@ def hop_to_home_slot(pu, gm_path, max_deaths=10, label=""):
             "deaths": int -- number of deaths during the attempt
             "home_filled": int -- homeSlotsFilledCount after attempt
     """
-    deaths = 0
     restarts = 0
-    initial_filled = None
+    total_deaths = 0
 
-    while restarts <= max_deaths:
-        state = pu.get_state()
-        gs = state.get("gameState", "")
+    while restarts <= 3:  # max 3 game-over restarts
+        log(f"  {label}Starting incremental navigation (attempt {restarts + 1})")
+        result = _nav_home(pu, target_col=6, max_deaths=max_deaths)
 
-        if gs == "GameOver":
-            restarts += 1
-            if restarts > max_deaths:
-                log(f"  {label}Giving up after {max_deaths} game overs")
-                return {"success": False, "state": state, "deaths": deaths,
-                        "home_filled": state.get("homeSlotsFilledCount", 0)}
-            log(f"  {label}Game over #{restarts}, restarting...")
-            result = ensure_playing(pu, gm_path)
-            if not result:
-                return {"success": False, "state": state, "deaths": deaths,
-                        "home_filled": 0}
-            initial_filled = None
-            continue
+        total_deaths += result["deaths"]
+        log(f"  {label}Navigation: success={result['success']}, "
+            f"hops={result['total_hops']}, deaths={result['deaths']}, "
+            f"elapsed={result['elapsed']:.1f}s")
 
-        if gs in ("Dying", "Spawning"):
-            deaths += 1
-            time.sleep(2.0)
-            continue
-
-        if gs == "RoundComplete":
-            return {"success": True, "state": state, "deaths": deaths,
+        if result["success"]:
+            state = result["state"]
+            return {"success": True, "state": state, "deaths": total_deaths,
                     "home_filled": state.get("homeSlotsFilledCount", 0)}
 
-        if gs != "Playing":
-            time.sleep(1.0)
+        # Check if game over — restart if so
+        state = result["state"]
+        gs = state.get("gameState", "")
+        if gs == "GameOver":
+            restarts += 1
+            log(f"  {label}Game over, restarting ({restarts}/3)...")
+            new_state = ensure_playing(pu, gm_path)
+            if not new_state:
+                return {"success": False, "state": state, "deaths": total_deaths,
+                        "home_filled": 0}
             continue
 
-        # Track initial home slots to detect new fills
-        home_filled = state.get("homeSlotsFilledCount", 0)
-        if initial_filled is None:
-            initial_filled = home_filled
-        if home_filled > initial_filled:
-            return {"success": True, "state": state, "deaths": deaths,
-                    "home_filled": home_filled}
+        # Failed but not game over — give up
+        return {"success": False, "state": state, "deaths": total_deaths,
+                "home_filled": state.get("homeSlotsFilledCount", 0)}
 
-        pos = state.get("frogPos", [6, 0])
-        frog_col = int(pos[0]) if isinstance(pos, list) and len(pos) > 0 else 6
-        frog_row = int(pos[1]) if isinstance(pos, list) and len(pos) > 1 else 0
-
-        # Query hazards ONCE (single API call)
-        hazards = pu.get_hazards()
-
-        # Compute full safe path (pure math, no API calls)
-        path = plan_path(hazards, frog_col=frog_col, frog_row=frog_row,
-                         target_col=6)
-        log(f"  {label}Planned {len(path)}-hop path from ({frog_col},{frog_row})")
-
-        # Execute the computed path (one API call per hop, no polling)
-        result = execute_path(pu, path)
-        log(f"  {label}Executed {result['hops']} hops in {result['elapsed']:.1f}s")
-
-        # Check if we succeeded
-        final_state = pu.get_state()
-        final_gs = final_state.get("gameState", "")
-        final_filled = final_state.get("homeSlotsFilledCount", 0)
-
-        if final_filled > (initial_filled or 0):
-            return {"success": True, "state": final_state, "deaths": deaths,
-                    "home_filled": final_filled}
-        if final_gs == "RoundComplete":
-            return {"success": True, "state": final_state, "deaths": deaths,
-                    "home_filled": final_state.get("homeSlotsFilledCount", 0)}
-
-        # Didn't reach home — frog may have died during path execution
-        if final_gs in ("Dying", "Spawning", "GameOver"):
-            deaths += 1
-            time.sleep(2.0)
-            continue
-
-        # Still playing but didn't fill a slot — re-plan
-        restarts += 1
-        log(f"  {label}Path completed but no home slot filled, re-planning... "
-            f"(attempt {restarts}/{max_deaths})")
-
-    return {"success": False, "state": pu.get_state(), "deaths": deaths,
+    return {"success": False, "state": pu.get_state(), "deaths": total_deaths,
             "home_filled": 0}
 
 

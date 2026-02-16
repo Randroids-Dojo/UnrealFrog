@@ -1,19 +1,20 @@
 """Predictive safe-path planner for Frogger-style games.
 
-Given a snapshot of hazard positions and velocities, computes a sequence
-of timed hops that safely navigates the frog from start to a home slot.
-No polling required during execution — query once, plan once, execute.
+Incremental planning: queries hazards fresh before each hop, so predictions
+are always based on current positions. Handles platform drift on river.
 
-Optimized for speed: short waits, tight timing, fast retries on death.
-A full crossing (14 rows) executes in ~4-6 seconds.
+Road rows: swept-collision check ensures no hazard passes through the frog
+during the entire 0.15s hop animation.
+
+River rows: waits for a rideable platform to be at the frog's position,
+then hops onto it. Re-queries after landing to track drift.
 
 Usage:
-    from path_planner import plan_path, execute_path
-
-    hazards = pu.get_hazards()
-    path = plan_path(hazards, frog_col=6, frog_row=0, target_col=6)
-    execute_path(pu, path)
+    from path_planner import navigate_to_home_slot
+    result = navigate_to_home_slot(pu, target_col=6)
 """
+
+import time
 
 # Game constants (defaults match UnrealFrog)
 CELL_SIZE = 100.0
@@ -25,27 +26,23 @@ RIVER_ROWS = {7, 8, 9, 10, 11, 12}
 HOME_ROW = 14
 
 # Collision geometry (from FrogCharacter.cpp / HazardBase.cpp)
-FROG_CAPSULE_RADIUS = 34.0  # UCapsuleComponent radius
-CLEARANCE_BUFFER = 20.0  # extra safety margin for timing imprecision
+# Capsule overlap with box: |frog_x - hazard_x| < hazard_half_w + capsule_radius
+FROG_CAPSULE_RADIUS = 34.0
+# Extra buffer for API latency timing error (~80ms * ~200 units/s = 16 units)
+TIMING_BUFFER = 30.0
 
-# Execution timing — tuned for speed
-# RC API call takes ~50-100ms, so real hop-to-hop time is ~0.20-0.25s.
-# We account for this in predictions by using API_LATENCY.
-API_LATENCY = 0.08  # estimated RC API round-trip
-HOP_EXEC_TIME = HOP_DURATION + API_LATENCY  # ~0.23s real time per hop
+# Execution timing
+API_LATENCY = 0.10  # conservative RC API round-trip estimate
+POST_HOP_WAIT = HOP_DURATION + 0.04  # wait after sending hop command
 
 
-def predict_hazard_x(hazard, dt, cell_size=CELL_SIZE, grid_cols=GRID_COLS):
-    """Predict a hazard's X position after dt seconds.
-
-    Linear extrapolation with wrapping. Matches HazardBase exactly.
-    Returns the CENTER X of the hazard (GetActorLocation().X).
-    """
+def predict_hazard_x(hazard, dt):
+    """Predict a hazard's CENTER X position after dt seconds."""
     x0 = hazard["x"]
     speed = hazard["speed"]
     direction = 1.0 if hazard["movesRight"] else -1.0
-    world_width = hazard["width"] * cell_size
-    grid_world_width = grid_cols * cell_size
+    world_width = hazard["width"] * CELL_SIZE
+    grid_world_width = GRID_COLS * CELL_SIZE
 
     wrap_min = -world_width
     wrap_max = grid_world_width + world_width
@@ -55,98 +52,243 @@ def predict_hazard_x(hazard, dt, cell_size=CELL_SIZE, grid_cols=GRID_COLS):
     return ((raw_x - wrap_min) % wrap_range) + wrap_min
 
 
-def is_road_safe(hazards_in_row, target_x, arrival_time,
-                 cell_size=CELL_SIZE, grid_cols=GRID_COLS):
-    """Check if target_x is clear of road hazards at arrival_time.
+def is_road_safe_swept(hazards_in_row, frog_x, hop_duration=HOP_DURATION):
+    """Check if frog_x is clear of ALL road hazards for the full hop duration.
 
-    Hazard x is the CENTER. Hazard extends width*cell_size/2 in each direction.
-    Frog has capsule radius 34 + clearance buffer.
+    Uses swept collision: checks if the hazard's extent passes through the
+    frog's extent at ANY point during [0, hop_duration].
+
+    Checks at 6 time samples across the hop to catch fast-moving hazards.
     """
-    frog_half = FROG_CAPSULE_RADIUS + CLEARANCE_BUFFER  # 54 units
+    danger_radius = FROG_CAPSULE_RADIUS + TIMING_BUFFER  # 64 units each side
+
+    # Sample at multiple times during the hop
+    check_times = [i * hop_duration / 5 for i in range(6)]  # 0, 0.03, 0.06, ...0.15
 
     for h in hazards_in_row:
-        hx = predict_hazard_x(h, arrival_time, cell_size, grid_cols)
-        half_w = h["width"] * cell_size * 0.5
-        hazard_left = hx - half_w
-        hazard_right = hx + half_w
-        # Overlap if frog extent intersects hazard extent
-        if (target_x + frog_half > hazard_left and
-                target_x - frog_half < hazard_right):
-            return False
+        if h.get("rideable", False):
+            continue  # Skip river platforms that might be in road data
+        half_w = h["width"] * CELL_SIZE * 0.5
+
+        for t in check_times:
+            hx = predict_hazard_x(h, t)
+            # Overlap if frog extent intersects hazard extent
+            if abs(frog_x - hx) < half_w + danger_radius:
+                return False
     return True
 
 
-def is_river_safe(hazards_in_row, target_x, arrival_time,
-                  cell_size=CELL_SIZE, grid_cols=GRID_COLS):
-    """Check if a rideable platform covers target_x at arrival_time.
+def find_river_platform_wait(hazards_in_row, frog_x, max_wait=6.0):
+    """Find when a rideable platform will be at frog_x.
 
-    The frog must land ON a log/turtle. Hazard x is the CENTER.
-    We need the frog's center to be well within the platform bounds.
+    Uses the actual game collision check: |frog_x - platform_x| <= half_width.
+    Scans forward in time to find the first moment a platform covers frog_x.
+
+    Returns wait time in seconds, or None if no platform found.
     """
-    for h in hazards_in_row:
-        if not h.get("rideable", False):
-            continue
-        hx = predict_hazard_x(h, arrival_time, cell_size, grid_cols)
-        half_w = h["width"] * cell_size * 0.5
-        platform_left = hx - half_w
-        platform_right = hx + half_w
-        # Frog center must be inside platform with margin to spare
-        margin = FROG_CAPSULE_RADIUS  # 34 units inset from edge
-        if platform_left + margin <= target_x <= platform_right - margin:
-            return True
-    return False
+    rideables = [h for h in hazards_in_row if h.get("rideable", False)]
+    if not rideables:
+        return None
 
-
-def _find_safe_wait(hazards_in_row, target_x, base_time, row,
-                    cell_size=CELL_SIZE, grid_cols=GRID_COLS,
-                    max_wait=None, time_step=0.02):
-    """Find minimum wait before hopping is safe.
-
-    Road rows: max 1.5s wait, then hop anyway (accept risk).
-    River rows: max 8s wait (platforms MUST be present), never hop blind.
-    """
-    is_river = row in RIVER_ROWS
-    if max_wait is None:
-        max_wait = 8.0 if is_river else 1.5
-
+    # The frog needs to ARRIVE on the platform. So we check at (wait + HOP_DURATION).
+    # Also check that the platform still covers frog_x for a small window after landing
+    # (the frog spends ~0.05s settling before it starts riding).
+    time_step = 0.02
     wait = 0.0
+
     while wait < max_wait:
-        arrival = base_time + wait + HOP_DURATION
-        if is_river:
-            if is_river_safe(hazards_in_row, target_x, arrival,
-                             cell_size, grid_cols):
-                return wait
-        else:
-            if is_road_safe(hazards_in_row, target_x, arrival,
-                            cell_size, grid_cols):
+        arrival_time = wait + HOP_DURATION
+        for h in rideables:
+            hx = predict_hazard_x(h, arrival_time)
+            half_w = h["width"] * CELL_SIZE * 0.5
+            # Match the game's FindPlatformAtCurrentPosition check:
+            # |frog_x - hazard_x| <= half_width
+            # Use a small inset margin for safety
+            margin = 20.0  # land well inside the platform, not on the edge
+            if abs(frog_x - hx) <= half_w - margin:
                 return wait
         wait += time_step
 
-    if is_river:
-        # NEVER hop blind into water — return None to signal "no safe window"
-        return None
-    # Road: hop anyway after max_wait, accept the risk
-    return 0.0
+    return None
 
 
-def plan_path(hazards, frog_col=6, frog_row=0, target_col=6,
-              target_row=HOME_ROW, cell_size=CELL_SIZE,
-              grid_cols=GRID_COLS):
-    """Compute a fast safe hop sequence from start to home slot.
+def navigate_to_home_slot(pu, target_col=6, max_deaths=8):
+    """Navigate frog from current position to a home slot.
 
-    Road rows: wait for gap, hop through. Max 1.5s wait per row.
-    River rows: wait for rideable platform, hop ONTO it. Max 8s wait.
-    If no platform found at target column, try adjacent columns.
+    Incremental planning: queries hazards fresh before each dangerous hop.
+    Re-queries state after each hop to track position (especially platform drift).
+
+    Args:
+        pu: PlayUnreal client instance
+        target_col: home slot column to target (default 6 = center)
+        max_deaths: give up after this many deaths
 
     Returns:
-        list of dicts: [{"wait": float, "direction": str}, ...]
+        dict with success, total_hops, deaths, elapsed, state
+    """
+    total_hops = 0
+    deaths = 0
+    initial_filled = None
+    start = time.time()
+    attempt = 0
+
+    while attempt < max_deaths * 3:  # allow retries
+        attempt += 1
+
+        # Get current state
+        state = pu.get_state()
+        gs = state.get("gameState", "")
+
+        if gs == "GameOver":
+            return _result(False, total_hops, deaths, start, state)
+
+        if gs in ("Dying", "Spawning"):
+            deaths += 1
+            time.sleep(1.5)
+            continue
+
+        if gs == "RoundComplete":
+            return _result(True, total_hops, deaths, start, state)
+
+        if gs != "Playing":
+            time.sleep(0.5)
+            continue
+
+        # Track home slot fills
+        filled = state.get("homeSlotsFilledCount", 0)
+        if initial_filled is None:
+            initial_filled = filled
+        if filled > initial_filled:
+            return _result(True, total_hops, deaths, start, state)
+
+        pos = state.get("frogPos", [6, 0])
+        frog_col = int(pos[0]) if isinstance(pos, list) and len(pos) > 0 else 6
+        frog_row = int(pos[1]) if isinstance(pos, list) and len(pos) > 1 else 0
+
+        if frog_row >= HOME_ROW:
+            return _result(True, total_hops, deaths, start, state)
+
+        # Decide next hop
+        next_row = frog_row + 1
+
+        # Lateral alignment — only on safe rows
+        if frog_row in SAFE_ROWS and frog_col != target_col:
+            direction = "right" if frog_col < target_col else "left"
+            pu.hop(direction)
+            total_hops += 1
+            time.sleep(POST_HOP_WAIT)
+            continue
+
+        # Safe rows and home row — hop immediately
+        if next_row in SAFE_ROWS or next_row >= HOME_ROW:
+            pu.hop("up")
+            total_hops += 1
+            time.sleep(POST_HOP_WAIT)
+            continue
+
+        # Dangerous row — query fresh hazards
+        hazards = pu.get_hazards()
+        row_hazards = [h for h in hazards if h.get("row") == next_row]
+
+        frog_x = frog_col * CELL_SIZE
+
+        if next_row in ROAD_ROWS:
+            # Road: wait for a gap using swept-collision check
+            waited = _wait_for_road_gap(row_hazards, frog_x, timeout=4.0)
+            if waited < 0:
+                # Timeout — hop anyway, accept risk
+                pass
+            pu.hop("up")
+            total_hops += 1
+            time.sleep(POST_HOP_WAIT)
+            continue
+
+        if next_row in RIVER_ROWS:
+            # River: wait for a platform to arrive at frog's X
+            wait = find_river_platform_wait(row_hazards, frog_x, max_wait=6.0)
+            if wait is not None and wait > 0.02:
+                time.sleep(wait)
+            elif wait is None:
+                # No platform will pass — try waiting longer with real-time checks
+                found = _wait_for_platform_realtime(pu, frog_x, next_row, timeout=8.0)
+                if not found:
+                    # Last resort: hop anyway (will die, retry loop handles it)
+                    pass
+            pu.hop("up")
+            total_hops += 1
+            time.sleep(POST_HOP_WAIT)
+            continue
+
+        # Unknown row type — hop
+        pu.hop("up")
+        total_hops += 1
+        time.sleep(POST_HOP_WAIT)
+
+    return _result(False, total_hops, deaths, start,
+                   pu.get_state() if pu else {})
+
+
+def _wait_for_road_gap(hazards_in_row, frog_x, timeout=4.0):
+    """Spin-wait until the road is clear for a hop. Returns seconds waited."""
+    start = time.time()
+    while time.time() - start < timeout:
+        if is_road_safe_swept(hazards_in_row, frog_x):
+            return time.time() - start
+        time.sleep(0.01)
+    return -1  # timeout
+
+
+def _wait_for_platform_realtime(pu, frog_x, target_row, timeout=8.0):
+    """Re-query hazards in a loop until a platform is at frog_x.
+
+    Used as fallback when single-snapshot prediction fails.
+    """
+    start = time.time()
+    while time.time() - start < timeout:
+        hazards = pu.get_hazards()
+        row_hazards = [h for h in hazards if h.get("row") == target_row]
+        rideables = [h for h in row_hazards if h.get("rideable", False)]
+
+        for h in rideables:
+            hx = h["x"]  # current position (just queried)
+            half_w = h["width"] * CELL_SIZE * 0.5
+            # Check if platform is approaching and will be at frog_x within HOP_DURATION
+            wait = find_river_platform_wait([h], frog_x, max_wait=HOP_DURATION + 0.1)
+            if wait is not None:
+                if wait > 0.02:
+                    time.sleep(wait)
+                return True
+
+        time.sleep(0.05)
+    return False
+
+
+def _result(success, total_hops, deaths, start, state):
+    """Build a standard result dict."""
+    return {
+        "success": success,
+        "total_hops": total_hops,
+        "deaths": deaths,
+        "elapsed": time.time() - start,
+        "state": state,
+    }
+
+
+# Legacy API compatibility — plan_path and execute_path for verify_visuals.py
+def plan_path(hazards, frog_col=6, frog_row=0, target_col=6,
+              target_row=HOME_ROW):
+    """Compute hop sequence (legacy API — used by verify_visuals.py).
+
+    Returns list of {"wait": float, "direction": str} dicts.
+    Note: This plans from a single snapshot. For better results,
+    use navigate_to_home_slot() which re-queries per hop.
     """
     path = []
     current_col = frog_col
     current_row = frog_row
     elapsed = 0.0
+    hop_exec_time = HOP_DURATION + API_LATENCY
 
-    # Group hazards by row
     hazards_by_row = {}
     for h in hazards:
         r = h.get("row", -1)
@@ -155,211 +297,84 @@ def plan_path(hazards, frog_col=6, frog_row=0, target_col=6,
         hazards_by_row[r].append(h)
 
     while current_row < target_row:
-        # Lateral alignment on safe rows
         if current_row in SAFE_ROWS and current_col != target_col:
             while current_col != target_col:
                 d = "right" if current_col < target_col else "left"
                 path.append({"wait": 0.0, "direction": d})
                 current_col += (1 if d == "right" else -1)
-                elapsed += HOP_EXEC_TIME
+                elapsed += hop_exec_time
 
         next_row = current_row + 1
-        target_x = current_col * cell_size
+        target_x = current_col * CELL_SIZE
 
         if next_row in SAFE_ROWS or next_row >= HOME_ROW:
             path.append({"wait": 0.0, "direction": "up"})
             current_row = next_row
-            elapsed += HOP_EXEC_TIME
+            elapsed += hop_exec_time
             continue
 
         row_hazards = hazards_by_row.get(next_row, [])
-
-        # Road with no hazards or safe row — hop immediately
-        if not row_hazards and next_row not in RIVER_ROWS:
+        if not row_hazards:
             path.append({"wait": 0.0, "direction": "up"})
             current_row = next_row
-            elapsed += HOP_EXEC_TIME
+            elapsed += hop_exec_time
             continue
 
-        # River with no rideable platforms — this shouldn't happen in a
-        # valid game, but if it does, hop anyway (will die)
-        if next_row in RIVER_ROWS:
-            rideables = [h for h in row_hazards if h.get("rideable", False)]
-            if not rideables:
-                path.append({"wait": 0.0, "direction": "up"})
-                current_row = next_row
-                elapsed += HOP_EXEC_TIME
-                continue
-
-        # Find safe wait at current column
-        wait = _find_safe_wait(row_hazards, target_x, elapsed, next_row,
-                               cell_size, grid_cols)
-
-        if wait is not None:
-            # Found a safe window at current column
-            path.append({"wait": wait, "direction": "up"})
-            current_row = next_row
-            elapsed += wait + HOP_EXEC_TIME
-            continue
-
-        # River row with no safe window at target column —
-        # try adjacent columns (±1, ±2, ±3) to find a platform
-        found_alt = False
-        for offset in [1, -1, 2, -2, 3, -3]:
-            alt_col = current_col + offset
-            if alt_col < 0 or alt_col >= grid_cols:
-                continue
-            alt_x = alt_col * cell_size
-            alt_wait = _find_safe_wait(row_hazards, alt_x, elapsed, next_row,
-                                       cell_size, grid_cols)
-            if alt_wait is not None:
-                # Move laterally to alt_col first (only on safe rows)
-                if current_row in SAFE_ROWS:
-                    while current_col != alt_col:
-                        d = "right" if current_col < alt_col else "left"
-                        path.append({"wait": 0.0, "direction": d})
-                        current_col += (1 if d == "right" else -1)
-                        elapsed += HOP_EXEC_TIME
-                    # Now hop up with the wait
-                    path.append({"wait": alt_wait, "direction": "up"})
-                    current_row = next_row
-                    elapsed += alt_wait + HOP_EXEC_TIME
-                    found_alt = True
-                else:
-                    # Not on a safe row — can't move laterally, just wait
-                    # longer at current position (try with 12s max)
-                    long_wait = _find_safe_wait(
-                        row_hazards, target_x, elapsed, next_row,
-                        cell_size, grid_cols, max_wait=12.0)
-                    if long_wait is not None:
-                        path.append({"wait": long_wait, "direction": "up"})
-                        current_row = next_row
-                        elapsed += long_wait + HOP_EXEC_TIME
-                        found_alt = True
-                break
-
-        if not found_alt:
-            # Last resort: hop anyway (will likely die, retry loop handles it)
-            path.append({"wait": 0.5, "direction": "up"})
-            current_row = next_row
-            elapsed += 0.5 + HOP_EXEC_TIME
+        # Find safe wait
+        wait = _find_safe_wait_snapshot(row_hazards, target_x, elapsed, next_row)
+        path.append({"wait": max(wait, 0.0), "direction": "up"})
+        current_row = next_row
+        elapsed += max(wait, 0.0) + hop_exec_time
 
     return path
 
 
+def _find_safe_wait_snapshot(hazards_in_row, target_x, base_time, row,
+                              max_wait=6.0, time_step=0.02):
+    """Find wait time from a snapshot (legacy). Returns float or 0.0."""
+    is_river = row in RIVER_ROWS
+    wait = 0.0
+    while wait < max_wait:
+        arrival = base_time + wait + HOP_DURATION
+        if is_river:
+            rideables = [h for h in hazards_in_row if h.get("rideable", False)]
+            for h in rideables:
+                hx = predict_hazard_x(h, arrival)
+                half_w = h["width"] * CELL_SIZE * 0.5
+                if abs(target_x - hx) <= half_w - 20.0:
+                    return wait
+        else:
+            safe = True
+            for h in hazards_in_row:
+                if h.get("rideable", False):
+                    continue
+                for t_offset in [0, 0.05, 0.10, 0.15]:
+                    hx = predict_hazard_x(h, base_time + wait + t_offset)
+                    half_w = h["width"] * CELL_SIZE * 0.5
+                    if abs(target_x - hx) < half_w + FROG_CAPSULE_RADIUS + TIMING_BUFFER:
+                        safe = False
+                        break
+                if not safe:
+                    break
+            if safe:
+                return wait
+        wait += time_step
+    return 0.0
+
+
 def execute_path(pu, path):
-    """Execute a hop sequence as fast as possible.
-
-    No state checks during execution — just blast through.
-    One API call per hop, minimal sleep between hops.
-    """
-    import time
-
+    """Execute a pre-planned hop sequence (legacy API)."""
     total_hops = 0
     start_time = time.time()
 
     for step in path:
         if step["wait"] > 0.02:
             time.sleep(step["wait"])
-
         pu.hop(step["direction"])
         total_hops += 1
-        # Minimal wait — just enough for hop animation to complete.
-        # The UE input buffer opens at 0.08s into a 0.15s hop,
-        # so we only need to wait ~0.15s before the next hop is accepted.
-        time.sleep(HOP_DURATION + 0.02)
+        time.sleep(POST_HOP_WAIT)
 
-    elapsed = time.time() - start_time
     return {
         "hops": total_hops,
-        "elapsed": elapsed,
+        "elapsed": time.time() - start_time,
     }
-
-
-def navigate_to_home_slot(pu, target_col=6, max_attempts=8):
-    """Plan + execute with fast retries on death.
-
-    Each attempt: query hazards (1 call), plan (0 calls), execute (N calls).
-    On death: wait for respawn (1.5s), retry from new position.
-    """
-    import time
-
-    total_hops = 0
-    deaths = 0
-    initial_filled = None
-    start = time.time()
-
-    for attempt in range(max_attempts):
-        state = pu.get_state()
-        gs = state.get("gameState", "")
-
-        if gs == "GameOver":
-            return {"success": False, "total_hops": total_hops,
-                    "deaths": deaths, "elapsed": time.time() - start,
-                    "state": state}
-
-        if gs in ("Dying", "Spawning"):
-            time.sleep(1.5)  # DyingDuration=0.5 + SpawningDuration=1.0
-            continue
-
-        if gs == "RoundComplete":
-            return {"success": True, "total_hops": total_hops,
-                    "deaths": deaths, "elapsed": time.time() - start,
-                    "state": state}
-
-        if gs != "Playing":
-            try:
-                state = pu.wait_for_state("Playing", timeout=5)
-            except Exception:
-                continue
-
-        # Track home slot fills
-        filled = state.get("homeSlotsFilledCount", 0)
-        if initial_filled is None:
-            initial_filled = filled
-        if filled > initial_filled:
-            return {"success": True, "total_hops": total_hops,
-                    "deaths": deaths, "elapsed": time.time() - start,
-                    "state": state}
-
-        pos = state.get("frogPos", [6, 0])
-        frog_col = int(pos[0]) if isinstance(pos, list) else 6
-        frog_row = int(pos[1]) if isinstance(pos, list) and len(pos) > 1 else 0
-
-        # Query hazards ONCE
-        hazards = pu.get_hazards()
-
-        # Plan (pure math, instant)
-        path = plan_path(hazards, frog_col=frog_col, frog_row=frog_row,
-                         target_col=target_col)
-
-        # Execute (fast — one API call per hop, ~0.17s per hop)
-        result = execute_path(pu, path)
-        total_hops += result["hops"]
-
-        # Check outcome
-        time.sleep(0.3)
-        final = pu.get_state()
-        final_gs = final.get("gameState", "")
-        final_filled = final.get("homeSlotsFilledCount", 0)
-
-        if final_filled > (initial_filled or 0):
-            return {"success": True, "total_hops": total_hops,
-                    "deaths": deaths, "elapsed": time.time() - start,
-                    "state": final}
-        if final_gs == "RoundComplete":
-            return {"success": True, "total_hops": total_hops,
-                    "deaths": deaths, "elapsed": time.time() - start,
-                    "state": final}
-
-        # Died or still playing — retry
-        if final_gs in ("Dying", "Spawning", "GameOver"):
-            deaths += 1
-            time.sleep(1.5)
-        else:
-            # Still playing but didn't fill — maybe we're off-target, retry
-            deaths += 1
-
-    return {"success": False, "total_hops": total_hops,
-            "deaths": deaths, "elapsed": time.time() - start,
-            "state": pu.get_state() if pu else {}}
