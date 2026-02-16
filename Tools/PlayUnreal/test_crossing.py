@@ -16,7 +16,7 @@ from path_planner import (
     is_column_safe_for_hop, predict_hazard_x, _is_lateral_safe, _get_frog_pos,
     _get_frog_world_x, _find_platform_at_world_x, _find_current_platform,
     CELL_SIZE, ROAD_ROWS, RIVER_ROWS, SAFE_ROWS, POST_HOP_WAIT, HOP_DURATION,
-    HOME_ROW, GRID_COLS
+    HOME_ROW, GRID_COLS, PLATFORM_INSET
 )
 
 

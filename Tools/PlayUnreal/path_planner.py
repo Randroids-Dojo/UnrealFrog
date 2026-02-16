@@ -30,6 +30,10 @@ FROG_CAPSULE_RADIUS = 34.0
 # At 250 u/s (fastest hazard), 114 units = 0.46s of margin.
 SAFETY_MARGIN = 80.0
 
+# Platform landing margin: frog center must be this far inside the platform edge.
+# Game uses FROG_CAPSULE_RADIUS (34). We add 10 UU buffer for prediction drift.
+PLATFORM_INSET = FROG_CAPSULE_RADIUS + 10.0  # 44 UU
+
 # Measured timing (from debug_navigation.py)
 API_LATENCY = 0.01  # 9ms measured
 HOP_RESPONSE = 0.035  # 33ms until position changes
@@ -127,9 +131,9 @@ def find_platform_column(hazards_in_row, current_col, max_wait=4.0):
             for h in rideables:
                 hx = predict_hazard_x(h, arrival)
                 half_w = h["width"] * CELL_SIZE * 0.5
-                # Match game's FindPlatformAtCurrentPosition: |frog - hazard| <= half_w
-                # Use small inset so we land well inside, not on the edge
-                if abs(frog_x - hx) <= half_w - 20.0:
+                # Match game's FindPlatformAtCurrentPosition: |frog - hazard| <= half_w - capsule_radius
+                # PLATFORM_INSET adds extra buffer beyond the game's check
+                if abs(frog_x - hx) <= half_w - PLATFORM_INSET:
                     on_platform = True
                     break
 
@@ -205,7 +209,7 @@ def _find_platform_at_world_x(next_row_hazards, frog_world_x, max_wait=4.0,
         for h in rideables:
             hx = predict_hazard_x(h, arrival)
             half_w = h["width"] * CELL_SIZE * 0.5
-            if abs(frog_x_at_arrival - hx) <= half_w - 20.0:
+            if abs(frog_x_at_arrival - hx) <= half_w - PLATFORM_INSET:
                 return wait
     return None
 
@@ -235,7 +239,7 @@ def _is_lateral_safe(hazards, frog_row, target_col):
             # Check at t=0 (current) and t=HOP_DURATION (arrival)
             for t in (0.0, HOP_DURATION):
                 hx = predict_hazard_x(h, t)
-                if abs(frog_x - hx) <= half_w - 20.0:
+                if abs(frog_x - hx) <= half_w - PLATFORM_INSET:
                     return True
         return False  # No platform at target column
 
