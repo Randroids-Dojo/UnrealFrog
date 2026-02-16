@@ -12,20 +12,22 @@ Usage:
     result = navigate_to_home_slot(pu, target_col=6)
 """
 
+import json
+import os
 import time
 
-# Game constants
-CELL_SIZE = 100.0
-GRID_COLS = 13
-HOP_DURATION = 0.15
+# Game constants — defaults, call init_from_config() to overwrite from live game
+CELL_SIZE = 100.0  # SYNC: Source/UnrealFrog/Public/Core/FrogCharacter.h:GridCellSize
+GRID_COLS = 13  # SYNC: Source/UnrealFrog/Public/Core/FrogCharacter.h:GridColumns
+HOP_DURATION = 0.15  # SYNC: Source/UnrealFrog/Public/Core/FrogCharacter.h:HopDuration
 SAFE_ROWS = {0, 6, 13}
 ROAD_ROWS = {1, 2, 3, 4, 5}
 RIVER_ROWS = {7, 8, 9, 10, 11, 12}
-HOME_ROW = 14
+HOME_ROW = 14  # SYNC: Source/UnrealFrog/Public/Core/UnrealFrogGameMode.h:HomeSlotRow
 HOME_COLS = {1, 4, 6, 8, 11}
 
 # Collision geometry
-FROG_CAPSULE_RADIUS = 34.0
+FROG_CAPSULE_RADIUS = 34.0  # SYNC: Source/UnrealFrog/Private/Core/FrogCharacter.cpp:InitCapsuleSize
 # Safety margin: capsule (34) + generous buffer (80) = 114 total.
 # At 250 u/s (fastest hazard), 114 units = 0.46s of margin.
 SAFETY_MARGIN = 80.0
@@ -38,6 +40,57 @@ PLATFORM_INSET = FROG_CAPSULE_RADIUS + 10.0  # 44 UU
 API_LATENCY = 0.01  # 9ms measured
 HOP_RESPONSE = 0.035  # 33ms until position changes
 POST_HOP_WAIT = HOP_DURATION + 0.04  # total wait after hop command
+
+
+# -- Runtime config sync (Task #5) -------------------------------------------
+# Call init_from_config(config_dict) to overwrite defaults from GetGameConfigJSON().
+# Fallback: reads game_constants.json from disk if present.
+
+_CONFIG_LOADED = False
+
+
+def init_from_config(config):
+    """Overwrite module-level constants from a GetGameConfigJSON() dict."""
+    global CELL_SIZE, GRID_COLS, HOP_DURATION, HOME_ROW, FROG_CAPSULE_RADIUS
+    global PLATFORM_INSET, POST_HOP_WAIT, _CONFIG_LOADED
+    if not config or _CONFIG_LOADED:
+        return
+    if "cellSize" in config:
+        CELL_SIZE = float(config["cellSize"])
+    if "gridCols" in config:
+        GRID_COLS = int(config["gridCols"])
+    if "hopDuration" in config:
+        HOP_DURATION = float(config["hopDuration"])
+        POST_HOP_WAIT = HOP_DURATION + 0.04
+    if "homeRow" in config:
+        HOME_ROW = int(config["homeRow"])
+    if "capsuleRadius" in config:
+        FROG_CAPSULE_RADIUS = float(config["capsuleRadius"])
+    if "platformLandingMargin" in config:
+        PLATFORM_INSET = float(config["platformLandingMargin"]) + 10.0
+    elif "capsuleRadius" in config:
+        PLATFORM_INSET = FROG_CAPSULE_RADIUS + 10.0
+    _CONFIG_LOADED = True
+
+
+def _try_load_fallback_config():
+    """Try to load game_constants.json from disk at import time."""
+    fallback_paths = [
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "game_constants.json"),
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "Saved", "game_constants.json"),
+    ]
+    for path in fallback_paths:
+        if os.path.exists(path):
+            try:
+                with open(path) as f:
+                    config = json.loads(f.read())
+                init_from_config(config)
+                return
+            except (json.JSONDecodeError, IOError):
+                continue
+
+
+_try_load_fallback_config()
 
 
 def predict_hazard_x(hazard, dt):
@@ -266,6 +319,14 @@ def navigate_to_home_slot(pu, target_col=6, max_deaths=8):
     Returns:
         dict with success, total_hops, deaths, elapsed, state
     """
+    # Sync constants from live game if not already loaded
+    if not _CONFIG_LOADED:
+        try:
+            config = pu.get_config()
+            init_from_config(config)
+        except Exception:
+            pass
+
     total_hops = 0
     deaths = 0
     initial_filled = None

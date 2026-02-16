@@ -10,10 +10,13 @@
 #   ./Tools/PlayUnreal/run-tests.sh --integration          # Run integration tests only
 #   ./Tools/PlayUnreal/run-tests.sh --wiring               # Run delegate wiring tests only
 #   ./Tools/PlayUnreal/run-tests.sh --spatial              # Run spatial position assertion tests only
+#   ./Tools/PlayUnreal/run-tests.sh --collision             # Run collision tests only
+#   ./Tools/PlayUnreal/run-tests.sh --gameplay              # Run gameplay scenario tests only
 #   ./Tools/PlayUnreal/run-tests.sh "UnrealFrog.Wiring"    # Run custom filter (any UE test path)
 #   ./Tools/PlayUnreal/run-tests.sh --list                 # List available tests
 #   ./Tools/PlayUnreal/run-tests.sh --report               # Generate JSON test report
 #   ./Tools/PlayUnreal/run-tests.sh --functional           # Run functional tests (needs editor, not NullRHI)
+#   ./Tools/PlayUnreal/run-tests.sh --check-sync           # Verify Python/C++ constant sync (no UE needed)
 #
 # Exit codes:
 #   0 = all tests passed
@@ -49,12 +52,14 @@ resolve_category_filter() {
         --wiring)       echo "UnrealFrog.Wiring" ;;
         --vfx)          echo "UnrealFrog.VFX" ;;
         --spatial)      echo "UnrealFrog.Spatial" ;;
+        --collision)    echo "UnrealFrog.Collision" ;;
+        --gameplay)     echo "UnrealFrog.Gameplay" ;;
         *)              echo "" ;;
     esac
 }
 
 # Known category names for per-category reporting
-KNOWN_CATEGORIES="Character Collision Ground Input Score LaneSystem HUD Mesh Camera Orchestration GameState Wiring Integration Seam Audio PlayUnreal VFX Spatial"
+KNOWN_CATEGORIES="Character Collision Ground Input Score LaneSystem HUD Mesh Camera Orchestration GameState Wiring Integration Seam Audio PlayUnreal VFX Spatial Gameplay GameConfig"
 
 # -- Parse arguments ---------------------------------------------------------
 
@@ -63,6 +68,7 @@ CATEGORY_NAME=""
 LIST_MODE=false
 REPORT_MODE=false
 FUNCTIONAL_MODE=false
+CHECK_SYNC_MODE=false
 TIMEOUT_SECONDS=300  # 5 minutes
 
 while [[ $# -gt 0 ]]; do
@@ -79,11 +85,15 @@ while [[ $# -gt 0 ]]; do
             FUNCTIONAL_MODE=true
             shift
             ;;
+        --check-sync)
+            CHECK_SYNC_MODE=true
+            shift
+            ;;
         --timeout)
             TIMEOUT_SECONDS="$2"
             shift 2
             ;;
-        --all|--seam|--audio|--e2e|--integration|--wiring|--vfx|--spatial)
+        --all|--seam|--audio|--e2e|--integration|--wiring|--vfx|--spatial|--collision|--gameplay)
             CATEGORY_NAME="$1"
             TEST_FILTER="$(resolve_category_filter "$1")"
             shift
@@ -94,6 +104,90 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+# -- SYNC check mode (no UE needed) ------------------------------------------
+# Scan Python files for "# SYNC: path/to/file.h:VARIABLE" annotations and
+# verify the Python default matches the C++ source value.
+
+if [ "${CHECK_SYNC_MODE}" = true ]; then
+    echo "============================================"
+    echo "  Cross-Boundary Constant Sync Check"
+    echo "============================================"
+    echo ""
+
+    SYNC_ERRORS=0
+    SYNC_CHECKED=0
+
+    while IFS= read -r line; do
+        # Strip the filename prefix (grep returns "file.py:LINE")
+        content=$(echo "${line}" | sed 's|^.*/[^:]*\.py:||')
+
+        # Extract: CONST_NAME = value  # SYNC: relative/path:CppName
+        py_const=$(echo "${content}" | sed -n 's/^\([A-Z_]*\) = .*/\1/p')
+        py_value=$(echo "${content}" | sed -n 's/^[A-Z_]* = \([0-9.]*\).*/\1/p')
+        sync_ref=$(echo "${content}" | sed -n 's/.*# SYNC: \(.*\)/\1/p')
+
+        if [ -z "${py_const}" ] || [ -z "${py_value}" ] || [ -z "${sync_ref}" ]; then
+            continue
+        fi
+
+        # Parse sync ref: "relative/path.h:CppVariableName"
+        cpp_file=$(echo "${sync_ref}" | cut -d: -f1)
+        cpp_var=$(echo "${sync_ref}" | cut -d: -f2)
+        cpp_full="${PROJECT_ROOT}/${cpp_file}"
+
+        if [ ! -f "${cpp_full}" ]; then
+            # Try Source/ prefix
+            cpp_full="${PROJECT_ROOT}/Source/UnrealFrog/${cpp_file}"
+        fi
+
+        SYNC_CHECKED=$((SYNC_CHECKED + 1))
+
+        if [ ! -f "${cpp_full}" ]; then
+            echo "  WARN: ${py_const} -> ${cpp_file}:${cpp_var} — C++ file not found"
+            continue
+        fi
+
+        # Extract value from C++ (look for "CppVar = VALUE" or "CppVar(VALUE")
+        # Note: BSD sed doesn't support \s — use [[:space:]] or explicit spaces
+        cpp_value=$(grep -E "${cpp_var}[[:space:]]*=[[:space:]]*[0-9]" "${cpp_full}" 2>/dev/null \
+            | head -1 \
+            | sed -n "s/.*${cpp_var} *= *\([0-9.]*\).*/\1/p" || true)
+
+        if [ -z "${cpp_value}" ]; then
+            # Try constructor-style: CppVar(VALUE)
+            cpp_value=$(grep -E "${cpp_var}[[:space:]]*\([[:space:]]*[0-9]" "${cpp_full}" 2>/dev/null \
+                | head -1 \
+                | sed -n "s/.*${cpp_var} *( *\([0-9.]*\).*/\1/p" || true)
+        fi
+
+        if [ -z "${cpp_value}" ]; then
+            echo "  WARN: ${py_const}=${py_value} -> ${cpp_var} — could not extract C++ value"
+            continue
+        fi
+
+        # Compare (strip trailing zeros for float comparison)
+        py_norm=$(echo "${py_value}" | sed 's/\.0*$//' | sed 's/\(\.[0-9]*[1-9]\)0*$/\1/')
+        cpp_norm=$(echo "${cpp_value}" | sed 's/\.0*$//' | sed 's/\(\.[0-9]*[1-9]\)0*$/\1/')
+
+        if [ "${py_norm}" = "${cpp_norm}" ]; then
+            echo "  OK:   ${py_const}=${py_value} == ${cpp_var}=${cpp_value}"
+        else
+            echo "  MISMATCH: ${py_const}=${py_value} != ${cpp_var}=${cpp_value} (${cpp_file})"
+            SYNC_ERRORS=$((SYNC_ERRORS + 1))
+        fi
+    done < <(grep "# SYNC:" "${PROJECT_ROOT}"/Tools/PlayUnreal/*.py 2>/dev/null || true)
+
+    echo ""
+    echo "  Checked: ${SYNC_CHECKED}"
+    echo "  Mismatches: ${SYNC_ERRORS}"
+    echo "============================================"
+
+    if [ "${SYNC_ERRORS}" -gt 0 ]; then
+        exit 1
+    fi
+    exit 0
+fi
 
 # -- Validation --------------------------------------------------------------
 
@@ -376,6 +470,14 @@ if [ "${TOTAL}" -eq 0 ]; then
     echo "WARNING: No tests matched filter '${TEST_FILTER}'"
     echo "         Try: $0 --list"
     exit 2
+fi
+
+# -- Retro-notes nudge (Section 25) ------------------------------------------
+# Remind agents to document observations when they have uncommitted changes.
+if git -C "${PROJECT_ROOT}" diff --name-only HEAD 2>/dev/null | grep -qE "^Source/|^Tools/PlayUnreal/"; then
+    echo ""
+    echo "  [Retro] You have uncommitted changes in Source/ or Tools/PlayUnreal/."
+    echo "  [Retro] Add observations to .team/retro-notes.md as you go (Section 25)."
 fi
 
 echo ""
