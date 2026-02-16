@@ -117,32 +117,45 @@ def main():
     lives = state.get("lives", 0)
     home_filled = state.get("homeSlotsFilledCount", 0)
 
-    # The frog may have died during river crossing — that's OK for acceptance.
-    # The core assertions are:
-    # 1. We could send hop commands and they were executed
-    # 2. Score changed (any hop forward adds score)
-    # 3. The game is still responsive
+    # Assertions:
+    # 1. Hop commands were executed (score > 0 after hopping)
+    # 2. Game is still responsive
+    # 3. Either alive with progress OR died trying (partial pass)
 
     log("")
     log("=== Results ===")
-    assert_true(score >= 0, f"Score is non-negative ({score})")
     assert_true(pu.is_alive(), "Remote Control API still responding")
+    assert_true(score > 0, f"Score increased after hops ({score} > 0)")
 
-    # If we made it past the river, check home slot
-    if home_filled > 0:
-        log(f"  Home slots filled: {home_filled}")
-        assert_true(home_filled >= 1, f"At least 1 home slot filled ({home_filled})")
-        assert_true(lives >= 1, f"At least 1 life remaining ({lives})")
+    # Determine result tier based on outcome
+    if home_filled >= 1:
+        result_tier = "FULL PASS"
+        tier_detail = f"Home slot filled ({home_filled}), lives={lives}"
+    elif lives >= 1:
+        result_tier = "PARTIAL PASS"
+        tier_detail = f"Frog alive (lives={lives}) but no home slot filled"
+    else:
+        result_tier = "PARTIAL PASS (death run)"
+        tier_detail = f"Frog died (lives={lives}), no home slot filled — commands were accepted but frog did not survive"
 
     # Take final screenshot
     pu.screenshot(os.path.join(SCREENSHOT_DIR, "04_final.png"))
 
     log("")
-    log("=== ACCEPTANCE TEST PASSED ===")
+    log(f"=== ACCEPTANCE TEST: {result_tier} ===")
+    log(f"  {tier_detail}")
     log(f"  Score: {score}")
     log(f"  Lives: {lives}")
     log(f"  Home slots filled: {home_filled}")
     log(f"  Screenshots saved to: {SCREENSHOT_DIR}")
+
+    # A death-only run exits 0 (commands worked) but flags the result
+    if lives < 1 and home_filled < 1:
+        log("")
+        log("NOTE: The frog died without filling a home slot.")
+        log("      This is a PARTIAL pass — hop commands and state queries worked,")
+        log("      but the gameplay path (road -> river -> home) was not completed.")
+        log("      Re-run to attempt full path completion.")
 
 
 if __name__ == "__main__":
