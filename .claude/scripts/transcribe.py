@@ -490,8 +490,9 @@ def process_file(jsonl_path: Path, manifest: Dict[str, str], force: bool = False
     if not entries:
         return None
 
-    # Skip conversations with 1 or fewer real messages
-    if count_messages(entries) <= 1:
+    # Skip conversations with 4 or fewer real messages (noise: shutdown exchanges,
+    # stale task assignments, duplicate echoes)
+    if count_messages(entries) <= 4:
         return None
 
     key = manifest_key(jsonl_path)
