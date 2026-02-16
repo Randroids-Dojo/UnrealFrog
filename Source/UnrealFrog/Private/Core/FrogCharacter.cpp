@@ -425,8 +425,8 @@ void AFrogCharacter::FindPlatformAtCurrentPosition()
 		// so the frog's body doesn't visually hang off the edge into water.
 		float EffectiveHalfWidth = HalfWidth - PlatformLandingMargin;
 		if (EffectiveHalfWidth > 0.0f &&
-			FMath::Abs(FrogPos.X - HazardPos.X) <= EffectiveHalfWidth &&
-			FMath::Abs(FrogPos.Y - HazardPos.Y) <= HalfCell)
+			FMath::Abs(FrogPos.X - HazardPos.X) <= HalfCell &&
+			FMath::Abs(FrogPos.Y - HazardPos.Y) <= EffectiveHalfWidth)
 		{
 			CurrentPlatform = Hazard;
 			return;
@@ -454,8 +454,8 @@ void AFrogCharacter::HandleHazardOverlap(AHazardBase* Hazard)
 		float EffectiveHalfWidth = HalfWidth - PlatformLandingMargin;
 		float HalfCell = GridCellSize * 0.5f;
 		if (EffectiveHalfWidth > 0.0f &&
-			FMath::Abs(FrogPos.X - HazardPos.X) <= EffectiveHalfWidth &&
-			FMath::Abs(FrogPos.Y - HazardPos.Y) <= HalfCell)
+			FMath::Abs(FrogPos.X - HazardPos.X) <= HalfCell &&
+			FMath::Abs(FrogPos.Y - HazardPos.Y) <= EffectiveHalfWidth)
 		{
 			CurrentPlatform = Hazard;
 		}
