@@ -93,6 +93,15 @@ def format_date(ts_str: str) -> str:
         return "unknown-date"
 
 
+def format_time_for_filename(ts_str: str) -> str:
+    """Parse ISO timestamp and return HHMM for use in filenames."""
+    try:
+        dt = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+        return dt.strftime("%H%M")
+    except (ValueError, AttributeError):
+        return "0000"
+
+
 def extract_text_content(content: Any) -> str:
     """Extract plain text from message content (string or content blocks)."""
     if isinstance(content, str):
@@ -419,9 +428,38 @@ def get_first_user_text(entries: List[Dict[str, Any]]) -> str:
     return ""
 
 
+def count_messages(entries: List[Dict[str, Any]]) -> int:
+    """Count the number of real user + assistant messages (excluding skipped entries)."""
+    count = 0
+    for entry in entries:
+        if should_skip(entry):
+            continue
+        entry_type = entry.get("type", "")
+        if entry_type == "user":
+            msg = entry.get("message", {})
+            text = extract_text_content(msg.get("content", ""))
+            if text and text != "[Request interrupted by user for tool use]":
+                count += 1
+        elif entry_type == "assistant":
+            msg = entry.get("message", {})
+            content = msg.get("content", [])
+            has_content = False
+            if isinstance(content, list):
+                for block in content:
+                    if isinstance(block, dict) and block.get("type") in ("text", "tool_use"):
+                        has_content = True
+                        break
+            elif isinstance(content, str) and content.strip():
+                has_content = True
+            if has_content:
+                count += 1
+    return count
+
+
 def transcript_filename(metadata: Dict[str, Any], entries: List[Dict[str, Any]]) -> str:
-    """Generate a transcript filename: YYYY-MM-DD-first-six-words.md"""
+    """Generate a transcript filename: YYYY-MM-DD-HHMM-first-six-words.md"""
     date = metadata["date"]
+    time = format_time_for_filename(metadata["first_timestamp"]) if metadata.get("first_timestamp") else "0000"
     first_text = get_first_user_text(entries)
     if first_text:
         slug = slugify(first_text)
@@ -429,7 +467,7 @@ def transcript_filename(metadata: Dict[str, Any], entries: List[Dict[str, Any]])
         slug = metadata["slug"]
     else:
         slug = "untitled"
-    return f"{date}-{slug}.md"
+    return f"{date}-{time}-{slug}.md"
 
 
 def manifest_key(jsonl_path: Path) -> str:
@@ -450,6 +488,10 @@ def process_file(jsonl_path: Path, manifest: Dict[str, str], force: bool = False
     entries, metadata = parse_jsonl(jsonl_path)
 
     if not entries:
+        return None
+
+    # Skip conversations with 1 or fewer real messages
+    if count_messages(entries) <= 1:
         return None
 
     key = manifest_key(jsonl_path)
