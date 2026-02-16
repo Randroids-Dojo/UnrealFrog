@@ -177,12 +177,6 @@ def hop_to_home_slot(pu, gm_path, max_deaths=10, label=""):
         result = execute_path(pu, path)
         log(f"  {label}Executed {result['hops']} hops in {result['elapsed']:.1f}s")
 
-        if result["aborted"]:
-            log(f"  {label}Path aborted: {result.get('reason', 'unknown')}")
-            deaths += 1
-            time.sleep(2.0)
-            continue
-
         # Check if we succeeded
         final_state = pu.get_state()
         final_gs = final_state.get("gameState", "")
@@ -202,7 +196,9 @@ def hop_to_home_slot(pu, gm_path, max_deaths=10, label=""):
             continue
 
         # Still playing but didn't fill a slot — re-plan
-        log(f"  {label}Path completed but no home slot filled, re-planning...")
+        restarts += 1
+        log(f"  {label}Path completed but no home slot filled, re-planning... "
+            f"(attempt {restarts}/{max_deaths})")
 
     return {"success": False, "state": pu.get_state(), "deaths": deaths,
             "home_filled": 0}
