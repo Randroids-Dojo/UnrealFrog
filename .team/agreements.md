@@ -1,7 +1,7 @@
 # Team Working Agreements
 
 *This is a living document. Updated during retrospectives by the XP Coach.*
-*Last updated: Stakeholder Review, post-Sprint 7*
+*Last updated: Sprint 8 Retrospective*
 
 ## Day 0 Agreements
 
@@ -57,16 +57,18 @@ These are our starting agreements. They WILL evolve through retrospectives.
 9. **QA Lead play-tests BEFORE the sprint commit is created**, not after. If QA finds defects, they are fixed and re-tested before committing. The commit message may include "QA: verified" only after explicit QA sign-off. If QA play-test is not possible (no display, no QA agent available), the commit message must note "QA: pending" and a follow-up play-test is a P0 for the next session. (Updated: Sprint 5 Retrospective -- QA play-test was skipped in Sprint 5, breaking the Definition of Done.)
 10. XP Coach runs retrospective
 
-### 5a. Definition of Done (Added: Stakeholder Review)
+### 5a. Definition of Done (Updated: Sprint 8 Retrospective)
 
-A sprint is NOT done until:
-- The project builds successfully (Game + Editor targets)
-- All automated tests pass
-- **Seam tests exist** for all new system interactions introduced this sprint (Added: Post-Sprint 2 Hotfix Retrospective)
-- **Visual smoke test passes** after foundation phase: game launches, ground visible, player visible, camera correct, HUD renders (Added Sprint 2: three visual bugs were invisible to unit tests)
-- The game is playable — you can press Play and interact with the game
-- QA Lead has verified gameplay via PlayUnreal or manual play-testing
-- The project is left in a working state for the next sprint
+A sprint is NOT done until ALL of the following are completed **in order**. Each step BLOCKS the next -- no skipping.
+
+1. **Build succeeds** — Game + Editor targets both pass UBT build
+2. **All automated tests pass** — `run-tests.sh --all` reports 0 failures
+3. **Seam tests exist** for all new system interactions introduced this sprint
+4. **PlayUnreal visual verification passes** — For any commit that modified visual output (VFX, HUD, materials, camera, lighting, ground), PlayUnreal or manual play-testing has produced screenshots saved to `Saved/Screenshots/` showing the effect is visible from the gameplay camera. If NO visual changes were made this sprint, this step is N/A. (Added: Sprint 8 Retrospective -- Section 9 was violated for 7 consecutive sprints because it was a suggestion, not a gate.)
+5. **QA Lead signs off** — QA Lead has run the game (via PlayUnreal or manually) and confirmed: the game is playable, visual effects are visible, gameplay feels correct. QA cannot sign off until step 4 is complete.
+6. **The project is left in a working state** for the next sprint
+
+**Why the ordering matters (Sprint 8):** The flat unordered list allowed the team to skip visual verification (old step 4) while completing other steps. Seven sprints of "tests pass but game looks identical" proves that an unordered checklist is not enforced. Ordered gates ensure the most-skipped step (visual verification) cannot be bypassed.
 
 ### 6. Asset Pipeline
 
@@ -93,26 +95,28 @@ A sprint is NOT done until:
 - QA Lead and Game Designer use PlayUnreal to validate gameplay feel
 - DevOps Engineer owns the PlayUnreal infrastructure
 
-### 9. Visual Smoke Test After Foundation AND After Visual Systems (Updated: Stakeholder Review, post-Sprint 7)
+### 9. Visual Verification Is Mandatory, Not Aspirational (Updated: Sprint 8 Retrospective)
 
-After foundation systems are in place (actors, meshes, camera, ground), **launch the game before writing integration code** and verify:
-- [ ] Can you see the ground plane?
-- [ ] Can you see the player actor?
-- [ ] Does the camera show the full play area?
-- [ ] Does the HUD render text?
-- [ ] Is there lighting in the scene?
+**This section has been violated in every sprint since it was created (Sprints 2-8). The problem is not the rule -- it is enforcement. This version replaces checklists with a hard gate.**
 
-**Additionally, after ANY visual system is added or modified** (VFX effects, HUD elements, score pops, death flash, wave announcements), launch the game and verify:
-- [ ] Is the effect visible from the gameplay camera? (Not just "does the actor spawn")
-- [ ] Is it at the correct position relative to the action that triggered it?
-- [ ] Is it large enough and long enough to be noticed by a player?
-- [ ] Does it look correct at the actual camera distance (Z=2200)?
+**The rule:** Any commit that modifies visual output MUST be accompanied by a screenshot or PlayUnreal log proving the change is visible in the running game. "Visual output" means: VFX effects, HUD elements, materials, camera, lighting, ground appearance, score pops, death flash, wave announcements, or any other change intended to be seen by the player.
 
-If any fail, fix them immediately. The unit test "does this actor exist" is not the same as "can a human see it."
+**How to verify:**
+1. **Preferred:** Run `Tools/PlayUnreal/run-playunreal.sh <script>` where `<script>` triggers the visual element and takes a screenshot. Save to `Saved/Screenshots/`.
+2. **Fallback (if PlayUnreal is not operational):** Launch the game manually per Section 14 commands. Take a macOS screenshot (Cmd+Shift+4). Save to `Saved/Screenshots/`.
+3. **Last resort:** If neither method works, the commit message MUST include `visual verification: SKIPPED -- [specific reason]`. This marks the commit as a draft that BLOCKS sprint completion (see Section 5a step 4).
 
-**Why (Sprint 2):** Sprint 2 built 12 tasks before launching. Three critical visual bugs were invisible to unit tests.
+**XP Coach enforcement:** The XP Coach MUST verify that screenshot evidence exists before approving any visual commit. If no evidence exists and no "SKIPPED" note is in the commit message, the XP Coach rejects the commit. This is a hard gate.
 
-**Why (Sprint 7):** Score pops were hardcoded to top-left corner instead of frog's position. Death VFX was too small to see from the gameplay camera. Both passed all unit tests but were invisible/misplaced to the player. Three sprints of VFX work went unnoticed.
+**What to verify (unchanged from previous version):**
+- Is the effect visible from the gameplay camera at Z=2200?
+- Is it at the correct position relative to the action that triggered it?
+- Is it large enough and long enough to be noticed by a player?
+- Does it look correct at the actual camera distance?
+
+**Why (Sprint 2):** Sprint 2 built 12 tasks before launching. Three critical visual bugs invisible to unit tests.
+**Why (Sprint 7):** Score pops hardcoded to top-left. Death VFX too small. Both passed all tests but invisible to players.
+**Why (Sprint 8):** 888 lines of VFX/HUD code, 170 passing tests, zero visual verification performed. PlayUnreal was built in the same sprint and never used. Stakeholder confirmed: game looks identical to pre-Sprint 8. This section was violated for the 7th consecutive sprint.
 
 ### 10. Scene Requirements for New Maps (Added: Sprint 2 Retrospective)
 
@@ -231,20 +235,46 @@ Sprint 8 action: DevOps adds `mkdir`-based atomic lock file to run-tests.sh with
 
 **Why:** Engine Architect reported persistent signal 15 kills during Sprint 7 when multiple agents attempted concurrent test runs.
 
-### 20. PlayUnreal Must Support Scripted Gameplay (Added: Stakeholder Review, post-Sprint 7)
+### 20. PlayUnreal Must Support Scripted Gameplay (Updated: Sprint 8 Retrospective)
 
 **The PlayUnreal tooling must support an agent writing a Python script that launches the game, sends hop commands, reads game state, and verifies outcomes.** The minimal API:
 - `hop(direction)` — send a hop input to the running game
 - `get_state()` — return `{score, lives, wave, frogPos, gameState}` as JSON
 - `screenshot()` — save current frame to disk
 
-Until this exists, "QA: verified" in commit messages is only valid for code-level checks, not gameplay verification. This is a **P0 for Sprint 8**.
+Until PlayUnreal has been **verified working against a live game**, "QA: verified" in commit messages is only valid for code-level checks, not gameplay verification. **PlayUnreal is the team's highest priority.**
 
-**Current state:** PlayUnrealTest.cpp calls C++ methods directly (`GM->HandleHopCompleted()`). It never sends real inputs, never reads live state from outside, never takes screenshots. PythonScriptPlugin is enabled but unused. An agent cannot programmatically play the game.
+**Current state (Sprint 8):** Code exists but is UNVERIFIED. `Tools/PlayUnreal/client.py` (385 LOC), `acceptance_test.py` (159 LOC), and `run-playunreal.sh` (154 LOC) were committed in Sprint 8. `GetGameStateJSON()` was added to GameMode. RemoteControl plugins are enabled in .uproject. However, **none of this has been run against a live editor.** The acceptance test has never been executed. No screenshots have been taken. The code may or may not work.
 
-**Implementation approach:** C++ HTTP server (`UPlayUnrealServer`) on localhost exposing REST endpoints + Python client library (`Tools/PlayUnreal/client.py`). Acceptance test: a Python script that hops the frog across the road, across the river, and into a home slot.
+**Implementation approach:** UE 5.7 Remote Control API plugin (localhost:30010) + Python client. `GetGameStateJSON()` UFUNCTION on GameMode for state queries.
 
-**Why:** This has been deferred since Sprint 3 (5 sprints). The team has never been able to autonomously verify gameplay. Every stakeholder play-test finds bugs that 162+ automated tests missed. This is the single largest gap in the project's quality infrastructure.
+**Acceptance criterion (unchanged):** A Python script that hops the frog across the road, across the river, and into a home slot -- executed against a real running game, producing real screenshots.
+
+**Why:** Deferred since Sprint 3 (6 sprints). In Sprint 8, the code was written but never tested. The team has still never autonomously verified gameplay. Every stakeholder play-test finds bugs that 170+ automated tests missed.
+
+### 21. Visual Commit Evidence Gate (Added: Sprint 8 Retrospective)
+
+**Any commit that modifies visual output MUST include evidence of visual verification.** This is a HARD GATE enforced by the XP Coach. No exceptions.
+
+"Visual output" includes: VFX effects (spawn, scale, position, duration), HUD elements (score pops, timer, wave announcements), materials/colors, camera changes, lighting, ground appearance. If you are unsure whether a change is visual, it is visual.
+
+**Evidence** means ONE of the following committed alongside or immediately after the code commit:
+1. **Screenshot** saved to `Saved/Screenshots/` showing the effect from the gameplay camera
+2. **PlayUnreal script log** showing the effect was triggered and a screenshot was captured
+3. **Explicit skip note** in the commit message: `visual verification: SKIPPED -- [reason]`. A SKIPPED commit is a draft that BLOCKS sprint completion (Section 5a step 4).
+
+**What is NOT evidence:**
+- A passing unit test (tests verify code logic, not visual output)
+- An updated seam-matrix.md entry
+- A statement in a message or transcript claiming the effect was verified
+- A description of what the code is supposed to do
+
+**Why:** Sprint 8 wrote 888 lines of VFX/HUD code. 170 tests passed. Zero screenshots were taken. The stakeholder confirmed the game looks identical to before the sprint. Writing code is not verifying code. Writing tests is not verifying visual output. Only looking at the running game verifies visual output.
+
+**Items dropped (Sprint 8 Retrospective, per Section 17):**
+- **Visual regression testing (7th deferral):** DROPPED. PlayUnreal screenshots provide screenshot-based verification naturally. Automated pixel-diff comparison is not needed when agents are not even taking screenshots.
+- **Packaging step in CI (7th deferral):** DROPPED. No packaging sprint on the roadmap. Re-create if shipping build becomes a goal.
+- **Rename PlayUnreal E2E (8th deferral):** DROPPED. Entire PlayUnreal architecture was rebuilt in Sprint 8. Naming is moot.
 
 ## Things We Will Figure Out Together
 

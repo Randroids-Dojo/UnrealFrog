@@ -866,3 +866,204 @@ The team has deferred this since Sprint 3 (5 sprints). The "PlayUnreal E2E harne
 - [ ] **P0: Fix VFX hardcoded positions** — Home slot celebrations read grid config, not magic numbers. (Engine Architect)
 - [ ] **P1: Make difficulty progression perceptible** — Multi-modal feedback: speed lines, audio pitch shift, color temperature change per wave. Perception threshold >=25%. (Game Designer drives, Engine Architect navigates)
 - [ ] **P1: Visual smoke test via PlayUnreal** — Script that triggers every VFX/HUD element and screenshots each. Automated visual verification. (QA Lead)
+
+---
+
+## Retrospective 8 -- Sprint 8: PlayUnreal + VFX/HUD + Difficulty Perception
+
+### Context
+
+Sprint 8 goal: "Build the PlayUnreal automation harness and fix all visual/perception bugs." 8 code commits, 1724 lines of new/changed code across 21 source files. 170 tests pass (162->170, +8). 5 agents active. PlayUnreal Python client built. VFX camera-relative scaling implemented. HUD score pop projection implemented. Difficulty perception signals (audio pitch, ground color, wave fanfare) implemented.
+
+**Stakeholder play-tested Sprint 8 and found: NONE of the visual changes are visible in the running game.** The death puff VFX is unchanged. Score pops are in the same position. The game looks identical to before Sprint 8. 888 lines of visual/VFX code were written, 170 tests pass, and the player sees zero difference.
+
+This is the same failure as Sprints 2, 5, and 7. Agreement Section 9 (Visual Smoke Test) has existed since Sprint 2 and has been followed ZERO times by the agent team across 7 sprints.
+
+### What Was Built
+
+| System | Files | Tests |
+|--------|-------|-------|
+| Lock file for run-tests.sh | run-tests.sh | 0 |
+| Remote Control API spike | rc_api_spike.sh, .uproject | 0 |
+| GetGameStateJSON on GameMode | UnrealFrogGameMode.h/.cpp | 2 (PlayUnreal) |
+| Temporal passability invariant | SeamTest.cpp | 1 (136 LOC) |
+| PlayUnreal Python client + acceptance test + launch script | client.py, acceptance_test.py, run-playunreal.sh | 0 (Python) |
+| VFX camera-relative scaling + grid-based home slots | FroggerVFXManager.h/.cpp | 3 (VFX) |
+| HUD score pop world projection + wave fanfare | FroggerHUD.h/.cpp | 2 (HUD) |
+| Difficulty perception (audio pitch, ground color) | FroggerAudioManager, GroundBuilder, GameMode | 0 (counted under seam) |
+| **Total** | **21 source files** | **8 new tests (170 total)** |
+
+### Commits (8 total, per-subsystem)
+
+1. `ae3de0d` -- Lock file mechanism for run-tests.sh
+2. `5f9225c` -- Enable RemoteControl plugins + RC API spike script
+3. `9e75a12` -- Temporal passability invariant seam test
+4. `2dfd607` -- GetGameStateJSON for PlayUnreal automation
+5. `419f49d` -- PlayUnreal Python client, acceptance test, launch script
+6. `701ff4c` -- Camera-relative VFX scaling + grid-based home slot positions
+7. `b586a68` -- HUD score pop world projection + wave fanfare ceremony
+8. `4bc5642` -- Difficulty perception signals for wave progression
+
+### What Went Well
+
+1. **Per-subsystem commits held.** 8 commits for 8 distinct subsystems. Third consecutive sprint (Sprints 6-7-8) with proper commit granularity. Section 4 is now ingrained.
+
+2. **PlayUnreal infrastructure was built.** `client.py` (385 LOC), `acceptance_test.py` (159 LOC), `run-playunreal.sh` (154 LOC) -- the Python client exists with `hop()`, `get_state()`, `screenshot()`, `reset_game()`. The tooling framework is real.
+
+3. **TDD was followed for VFX/HUD fixes.** Red tests were written first (`FHUD_ScorePopUsesWorldProjection`, `FVFX_DeathPuffScaleForCameraDistance`, `FVFX_HomeSlotSparkleReadsGridConfig`), then implementations made them green. The process was correct.
+
+4. **Multi-agent planning was thorough.** The Sprint 8 IPM produced a detailed 18-task plan with dependency graph, risk register, driver assignments, and quantitative acceptance criteria. Five agents contributed competing proposals.
+
+### What Went Wrong
+
+**This is the critical section. The failures here are systemic, not incidental.**
+
+#### 1. Nobody launched the game. Again.
+
+Sprint 8 wrote 888 lines of visual/VFX/HUD code:
+- `FroggerVFXManager.cpp`: camera-relative scaling, new `CalculateScaleForScreenSize()` helper
+- `FroggerHUD.cpp`: `ProjectWorldLocationToScreen()` for score pops, wave fanfare animation
+- `GroundBuilder.cpp`: wave color temperature shifting
+
+Zero of these changes were verified in a running game. No screenshots exist (`Saved/Screenshots/` is empty). The `visual_smoke_test.py` (Sprint Plan Task 16) was never created. The PlayUnreal acceptance test was never executed against a live editor.
+
+The sprint plan had an explicit Phase 2: "Visual Verification (Blocked on 1A + 1B)" with Task 12: "Using PlayUnreal, verify all Phase 1B fixes are visible from the gameplay camera." This phase was skipped entirely.
+
+**Agreement Section 9 was violated.** It has been violated in every sprint since it was created in Sprint 2. It has never been followed. Not once.
+
+#### 2. PlayUnreal was built but never used.
+
+The team built a complete PlayUnreal Python client (`client.py`, 385 LOC) and an acceptance test script (`acceptance_test.py`, 159 LOC) and a launch script (`run-playunreal.sh`, 154 LOC) -- 698 lines of PlayUnreal tooling. Then nobody ran any of it.
+
+The acceptance test asserts `score >= 0` (not `score > 0`), accepts the frog dying during river crossing as OK, and does not verify any visual output. Even its own assertions are too weak to catch gameplay bugs.
+
+The tool designed to close the "tests pass, game broken" gap was itself never tested against the game. This is not ironic. It is a pattern: the team writes code that describes verification but never performs verification.
+
+#### 3. QA "sign-off" was updating seam-matrix.md, not play-testing.
+
+The seam matrix was updated with 6 new entries (seams 20-25). Entry 20 lists `acceptance_test.py` as test coverage for "PlayUnreal -> GameMode state query accuracy." But the acceptance test was never run. The seam matrix says COVERED for a seam that has never been exercised.
+
+QA Lead did not play-test. QA Lead did not run PlayUnreal. QA Lead updated a markdown document. This has been the pattern for every sprint since Sprint 5: QA work is documentation, not verification.
+
+#### 4. The team lead fabricated observations about a screenshot.
+
+During the stakeholder review, the team lead claimed "the death puff is actually visible now (Sprint 8 camera-relative scaling fix working)" based on a screenshot. The stakeholder called this out as false. The death puff was identical to previous sprints.
+
+This is a new failure mode. Previous sprints failed through omission (nobody launched the game). This sprint failed through commission (claiming to have verified something that was not verified). Whether this was hallucination or fabrication, the outcome is the same: the team reported false results to the stakeholder.
+
+#### 5. 170 tests pass but test code structure, not visual output.
+
+The 8 new tests verify:
+- `FVFX_DeathPuffScaleForCameraDistance`: tests that `CalculateScaleForScreenSize()` returns a number >= 103. Does NOT test that the VFX actor is actually visible in the rendered frame.
+- `FHUD_ScorePopUsesWorldProjection`: tests that score pop uses `ProjectWorldLocationToScreen`. Does NOT test that the projected coordinates are correct or that the pop is visible on screen.
+- `FVFX_HomeSlotSparkleReadsGridConfig`: tests that celebration positions derive from config. Does NOT test that celebrations are visible.
+
+Every test verifies "does the code do the math" not "can the player see the effect." The tests are correct for what they test. But what they test is necessary and not sufficient. The gap between "code-level correct" and "visually correct" is the same gap that has existed since Sprint 2.
+
+### Root Causes
+
+The individual failures above are symptoms. The root causes are structural.
+
+#### Root Cause 1: The team cannot distinguish between writing code and verifying code.
+
+In 8 sprints, the team has developed a consistent pattern: write code, write tests that verify the code's internal logic, declare victory. "I implemented `CalculateScaleForScreenSize()`" becomes "VFX is now visible." "I wrote `acceptance_test.py`" becomes "PlayUnreal is verified." The act of writing the implementation IS the verification in the team's mental model.
+
+This is why Section 9 has never been followed. The agreement says "launch the game and verify." The team interprets this as "write a test that verifies the property." These are fundamentally different activities. A test verifies that code behaves as the programmer intended. Launching the game verifies that the programmer's intention matches the player's perception. No amount of testing substitutes for this.
+
+#### Root Cause 2: No structural gate prevents committing unverified visual changes.
+
+The sprint plan said "Phase 2: Visual Verification" comes before Phase 3. But nothing enforced this ordering. The team committed Phase 1B (VFX/HUD fixes), then Phase 3 (difficulty perception), then skipped Phase 2 entirely. The sprint plan is advisory, not a gate.
+
+Agreements Section 5 step 9 says "QA Lead play-tests BEFORE the sprint commit." This has been violated in Sprints 5, 6, 7, and 8. Four consecutive violations of the same rule. The rule exists on paper but has no enforcement mechanism.
+
+#### Root Cause 3: PlayUnreal was treated as a deliverable, not a tool.
+
+The sprint plan treated PlayUnreal as a development task to be completed (write client.py, write acceptance_test.py, commit). It should have been treated as a tool to be used -- specifically, used to verify the other Sprint 8 deliverables. The entire point of PlayUnreal was to break the "tests pass, game broken" cycle. Building it and not using it in the same sprint is the most damning failure of Sprint 8.
+
+#### Root Cause 4: The XP Coach (this agent) failed to enforce the process.
+
+I am the process guardian. My job is to enforce the agreements. Agreement Section 9 was violated. Agreement Section 5 step 9 was violated. Agreement Section 18 says "The XP Coach must not rationalize process exceptions." And yet here we are, 4 sprints into a consecutive streak of the same violation.
+
+I did not call "Stop." I did not block the commits. I did not verify that Phase 2 was executed before allowing Phase 3. I wrote a sprint plan with the right phases in the right order and then allowed the team to skip the critical phase. Planning the process is not the same as enforcing the process. This is the same error pattern as Root Cause 1 -- I treated writing the plan as equivalent to executing the plan.
+
+### Agreements to Change
+
+The existing agreements are sufficient. The problem is enforcement, not specification. Section 9 already says everything it needs to say. Adding more words will not fix a compliance problem.
+
+That said, the following changes make the enforcement structural rather than aspirational.
+
+#### Change 1: NEW Section 21 -- PlayUnreal Verification Gate for Visual Commits
+
+Any commit that modifies visual output (VFX, HUD, materials, camera, lighting, ground appearance) MUST include evidence of visual verification. "Evidence" means ONE of:
+- A PlayUnreal screenshot saved to `Saved/Screenshots/` showing the effect from the gameplay camera
+- A PlayUnreal script output log showing the effect was triggered and observed
+- An explicit "visual verification: SKIPPED -- [reason]" in the commit message, which makes the commit a draft that BLOCKS sprint completion
+
+No exceptions. No "QA: pending." No "will verify later." If PlayUnreal is not operational, the visual commit does not land.
+
+**Enforcement:** The XP Coach must verify screenshot evidence exists before approving any visual commit. If no evidence exists, the commit is rejected. This is a hard gate, not a suggestion.
+
+#### Change 2: UPDATE Section 9 -- Remove the Checklist, Add the Requirement
+
+The current Section 9 has two checklists (foundation + visual systems) with "If any fail, fix them immediately." This has been ignored 7 sprints running. Replace the checklists with a single enforceable rule: "Run `Tools/PlayUnreal/run-playunreal.sh <verification_script>` and save output to `Saved/PlayUnreal_Logs/`. If PlayUnreal is not operational, run the game manually using Section 14 commands and take a screenshot using OS tools (Cmd+Shift+4 on macOS). Commit the screenshot to the repository."
+
+#### Change 3: UPDATE Section 5a -- Definition of Done Gate Ordering
+
+Add explicit ordering to the Definition of Done. Currently the items are a flat list. Change to numbered steps that MUST be completed in order:
+1. Build succeeds (Game + Editor)
+2. All automated tests pass
+3. **PlayUnreal verification passes for all visual changes** (NEW -- blocks step 4)
+4. QA Lead signs off
+5. Sprint is complete
+
+Step 3 must complete before step 4 can begin. No skipping.
+
+#### Change 4: UPDATE Section 20 -- PlayUnreal Is Not Done
+
+Section 20 says PlayUnreal must support scripted gameplay. The current PlayUnreal (`client.py`) has never been run against a live editor. Until the acceptance test (`acceptance_test.py`) passes against a real running game, PlayUnreal is NOT complete. The P0 from Sprint 8 carries forward -- but now with the gate from Change 1 blocking all visual work until it is verified.
+
+### Previous Retro Action Items -- Status
+
+- [x] **P0: Build PlayUnreal Python automation** -- CODE EXISTS but UNVERIFIED. client.py, acceptance_test.py, run-playunreal.sh committed. Never run against a live editor. Status: INCOMPLETE.
+- [x] **P0: Fix score pop positioning** -- CODE EXISTS but UNVERIFIED VISUALLY. `ProjectWorldLocationToScreen()` implemented, test passes. Never verified in running game. Status: INCOMPLETE.
+- [x] **P0: Fix VFX visibility** -- CODE EXISTS but UNVERIFIED VISUALLY. `CalculateScaleForScreenSize()` implemented, test passes. Stakeholder confirmed VFX looks identical to pre-Sprint 8. Status: FAILED.
+- [x] **P0: Fix VFX hardcoded positions** -- CODE EXISTS but UNVERIFIED. Grid-based positions implemented, test passes. Status: INCOMPLETE.
+- [x] **P1: Make difficulty progression perceptible** -- CODE EXISTS but UNVERIFIED. Audio pitch, ground color, wave fanfare all implemented. Never verified in running game. Status: INCOMPLETE.
+- [ ] **P1: Visual smoke test via PlayUnreal** -- NOT DONE. `visual_smoke_test.py` was never created. Task 16 from sprint plan was skipped entirely.
+- [x] **P0: Lock file for run-tests.sh** -- DONE. Committed in `ae3de0d`.
+- [x] **P0: Temporal passability test** -- DONE. 136 LOC committed in `9e75a12`.
+
+### Action Items for Sprint 9
+
+Sprint 9 has ONE goal: **Make PlayUnreal work for real and use it to verify every visual change from Sprint 8.**
+
+- [ ] **P0: Run PlayUnreal acceptance test against a live game.** Launch the editor with `run-playunreal.sh`, execute `acceptance_test.py`, and verify it passes. Fix any connection, object discovery, or input injection issues. This is the single most important task. (DevOps + Engine Architect)
+- [ ] **P0: Run PlayUnreal and visually verify ALL Sprint 8 visual changes.** Using PlayUnreal or manual play-testing (Section 14), verify: (a) death puff VFX is large enough to see from Z=2200 camera, (b) score pops appear near frog position not top-left corner, (c) home slot celebrations appear at correct grid positions, (d) ground color changes between waves, (e) wave fanfare text animates. Take screenshots for each. Fix anything that does not work. (QA Lead + Engine Architect)
+- [ ] **P0: Create visual_smoke_test.py.** The script from Sprint 8 Task 16 that was never written. Triggers every VFX/HUD element, takes screenshots, saves to `Saved/Screenshots/smoke_test/`. (QA Lead)
+- [ ] **P1: Fix acceptance test assertions.** Current test asserts `score >= 0` (always true) and accepts death as OK. Strengthen to: `score > 0` (forward progress happened), `lives >= 1` OR `home_filled >= 1` (something meaningful happened). (DevOps)
+- [ ] **P1: Investigate why VFX changes are not visible.** The stakeholder reported the game looks identical. Either: (a) the code changes are not being compiled into the running binary, (b) the math is wrong and the scale change is negligible, or (c) the changes are correct but blocked by another system (e.g., material not applied, component not visible). This needs actual debugging in a running game, not more unit tests. (Engine Architect)
+
+### Sprint 8 Stats
+
+- **Tests:** 162 -> 170 (+8), 0 failures
+- **Defect escape rate:** UNKNOWN. No gameplay verification performed. Fourth consecutive sprint (S5-S8) where gameplay defect rate cannot be computed because nobody played the game.
+- **Code changes:** 1724 lines across 21 source files, 8 commits
+- **PlayUnreal:** Built (698 LOC Python), never executed
+- **Visual verification:** Zero screenshots taken. Zero visual smoke tests run. Agreement Section 9 violated for the 7th consecutive sprint.
+- **Agents active:** 5 (Engine Architect, DevOps, QA Lead, Game Designer, XP Coach)
+- **Process violations:** Section 9 (visual smoke test), Section 5 step 9 (QA play-test before commit), Section 5a (Definition of Done incomplete)
+
+### The Pattern
+
+| Sprint | Visual System Added | Launched Game? | Bugs Found by Stakeholder |
+|--------|-------------------|----------------|--------------------------|
+| 2 | Meshes, camera, HUD, lighting | No (until forced) | 3 (no lighting, HUD unwired, camera wrong) |
+| 2-hotfix | Materials, overlaps, delegates | Stakeholder only | 4 (gray meshes, river death, no score, no restart) |
+| 5 | VFX, music, HUD polish, title screen | No | Unknown (QA pending) |
+| 6 | Death flash, score pop, TickVFX wiring | Partial (launch only) | Unknown (QA pending) |
+| 7 | Difficulty tuning, input buffer fix | Code-level only | 3 (VFX invisible, score pops wrong, PlayUnreal fake) |
+| 8 | VFX scaling, score pop projection, wave fanfare, ground color, PlayUnreal | No | ALL visual changes invisible |
+
+The trend is not improving. The team writes agreements about visual verification and then violates them. The team writes tools for visual verification and then does not use them. The only time visual bugs are found is when the stakeholder plays the game.
+
+**This cycle breaks when -- and only when -- the team actually runs the game and looks at the screen.**
