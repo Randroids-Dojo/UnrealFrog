@@ -11,12 +11,11 @@ import json
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from client import PlayUnreal
+import path_planner
 from path_planner import (
     navigate_to_home_slot, find_safe_road_column, find_platform_column,
     is_column_safe_for_hop, predict_hazard_x, _is_lateral_safe, _get_frog_pos,
     _get_frog_world_x, _find_platform_at_world_x, _find_current_platform,
-    CELL_SIZE, ROAD_ROWS, RIVER_ROWS, SAFE_ROWS, POST_HOP_WAIT, HOP_DURATION,
-    HOME_ROW, GRID_COLS, PLATFORM_INSET
 )
 
 
@@ -28,7 +27,7 @@ def log_hazards(hazards, row, label="hazard"):
     """Log hazard positions for a specific row."""
     row_h = [h for h in hazards if h.get("row") == row]
     for h in row_h:
-        half_w = h["width"] * CELL_SIZE * 0.5
+        half_w = h["width"] * path_planner.CELL_SIZE * 0.5
         rideable = h.get("rideable", False)
         kind = "platform" if rideable else label
         log(f"  Row {row} {kind}: center={h['x']:.0f} "
@@ -73,7 +72,7 @@ def logged_navigate(pu, target_col=6, max_deaths=8):
 
         frog_col, frog_row = _get_frog_pos(state)
 
-        if frog_row >= HOME_ROW:
+        if frog_row >= path_planner.HOME_ROW:
             log("Reached home row!")
             return True
 
@@ -81,22 +80,22 @@ def logged_navigate(pu, target_col=6, max_deaths=8):
         hazards = pu.get_hazards()
 
         # --- Safe row ahead: align or hop forward ---
-        if next_row in SAFE_ROWS or next_row >= HOME_ROW:
-            if frog_row in SAFE_ROWS and frog_col != target_col:
+        if next_row in path_planner.SAFE_ROWS or next_row >= path_planner.HOME_ROW:
+            if frog_row in path_planner.SAFE_ROWS and frog_col != target_col:
                 d = "right" if frog_col < target_col else "left"
                 log(f"  [{frog_col},{frog_row}] Safe — align {d} toward col {target_col}")
                 pu.hop(d)
                 total_hops += 1
-                time.sleep(POST_HOP_WAIT)
+                time.sleep(path_planner.POST_HOP_WAIT)
                 continue
             log(f"  [{frog_col},{frog_row}] -> row {next_row} (safe/home)")
             pu.hop("up")
             total_hops += 1
-            time.sleep(POST_HOP_WAIT)
+            time.sleep(path_planner.POST_HOP_WAIT)
             continue
 
         # --- Road row ahead ---
-        if next_row in ROAD_ROWS:
+        if next_row in path_planner.ROAD_ROWS:
             next_row_hazards = [h for h in hazards
                                 if h.get("row") == next_row
                                 and not h.get("rideable", False)]
@@ -105,7 +104,7 @@ def logged_navigate(pu, target_col=6, max_deaths=8):
                 log(f"  [{frog_col},{frog_row}] -> road row {next_row} (no hazards)")
                 pu.hop("up")
                 total_hops += 1
-                time.sleep(POST_HOP_WAIT)
+                time.sleep(path_planner.POST_HOP_WAIT)
                 continue
 
             log_hazards(hazards, next_row, "car")
@@ -119,7 +118,7 @@ def logged_navigate(pu, target_col=6, max_deaths=8):
                 t0 = time.time()
                 pu.hop("up")
                 total_hops += 1
-                time.sleep(POST_HOP_WAIT)
+                time.sleep(path_planner.POST_HOP_WAIT)
 
                 # Verify result
                 post = pu.get_state()
@@ -158,7 +157,7 @@ def logged_navigate(pu, target_col=6, max_deaths=8):
                 prev_row = frog_row - 1
                 if prev_row >= 0:
                     prev_safe = True
-                    if prev_row in ROAD_ROWS:
+                    if prev_row in path_planner.ROAD_ROWS:
                         prev_hazards = [h for h in hazards
                                         if h.get("row") == prev_row
                                         and not h.get("rideable", False)]
@@ -168,7 +167,7 @@ def logged_navigate(pu, target_col=6, max_deaths=8):
                         log(f"  Both sides blocked — hopping DOWN to row {prev_row}")
                         pu.hop("down")
                         total_hops += 1
-                        time.sleep(POST_HOP_WAIT)
+                        time.sleep(path_planner.POST_HOP_WAIT)
                         continue
                 log(f"  Stuck — waiting 50ms")
                 log_hazards(hazards, frog_row, "car")
@@ -180,11 +179,11 @@ def logged_navigate(pu, target_col=6, max_deaths=8):
             log(f"  [{frog_col},{frog_row}] -> col {step_col} ({d}, {best_reason})")
             pu.hop(d)
             total_hops += 1
-            time.sleep(POST_HOP_WAIT)
+            time.sleep(path_planner.POST_HOP_WAIT)
             continue
 
         # --- River row ahead ---
-        if next_row in RIVER_ROWS:
+        if next_row in path_planner.RIVER_ROWS:
             row_hazards = [h for h in hazards if h.get("row") == next_row]
             rideables = [h for h in row_hazards if h.get("rideable", False)]
 
@@ -192,7 +191,7 @@ def logged_navigate(pu, target_col=6, max_deaths=8):
                 f"{len(rideables)} platforms")
             log_hazards(hazards, next_row)
 
-            if frog_row in RIVER_ROWS:
+            if frog_row in path_planner.RIVER_ROWS:
                 # ON a log — use actual world X + drift prediction
                 frog_wx = _get_frog_world_x(state)
                 drift_spd, drift_dir = _find_current_platform(
@@ -247,7 +246,7 @@ def logged_navigate(pu, target_col=6, max_deaths=8):
                     log(f"  Safe row — align {d} to col {step_col}")
                     pu.hop(d)
                     total_hops += 1
-                    time.sleep(POST_HOP_WAIT)
+                    time.sleep(path_planner.POST_HOP_WAIT)
                     continue
 
                 # At the right column — wait for platform then hop
@@ -259,7 +258,7 @@ def logged_navigate(pu, target_col=6, max_deaths=8):
             t0 = time.time()
             pu.hop("up")
             total_hops += 1
-            time.sleep(POST_HOP_WAIT)
+            time.sleep(path_planner.POST_HOP_WAIT)
 
             # Check result and track drift
             post = pu.get_state()
@@ -277,7 +276,7 @@ def logged_navigate(pu, target_col=6, max_deaths=8):
         log(f"  [{frog_col},{frog_row}] -> row {next_row} (unknown type)")
         pu.hop("up")
         total_hops += 1
-        time.sleep(POST_HOP_WAIT)
+        time.sleep(path_planner.POST_HOP_WAIT)
 
     log(f"Ran out of iterations. Hops={total_hops}, deaths={deaths}")
     return False
@@ -288,6 +287,13 @@ def main():
     if not pu.is_alive():
         print("Cannot connect to RC API!")
         sys.exit(2)
+
+    # Sync game constants from the running game
+    try:
+        config = pu.get_config()
+        path_planner.init_from_config(config)
+    except Exception:
+        pass  # Proceed with defaults or fallback file
 
     log("=== One-Hop-At-A-Time Navigation Test ===")
     log(f"Timestamp: {time.strftime('%Y-%m-%d %H:%M:%S')}")

@@ -113,6 +113,51 @@ class PlayUnreal:
             pass
         return []
 
+    _cached_config = None
+
+    def get_config(self):
+        """Get game configuration constants as a dict.
+
+        Calls GetGameConfigJSON() on the live GameMode. Falls back to reading
+        game_constants.json from disk if the RC API is unavailable.
+
+        Returns:
+            dict with keys: cellSize, capsuleRadius, gridCols, hopDuration,
+            platformLandingMargin, gridRowCount, homeRow. Empty dict on failure.
+        """
+        if PlayUnreal._cached_config is not None:
+            return PlayUnreal._cached_config
+
+        # Try live RC API first
+        try:
+            gm_path = self._get_gm_path()
+            result = self._call_function(gm_path, "GetGameConfigJSON")
+            ret_val = result.get("ReturnValue", "")
+            if ret_val:
+                config = json.loads(ret_val)
+                PlayUnreal._cached_config = config
+                return config
+        except (CallError, RCConnectionError, json.JSONDecodeError):
+            pass
+
+        # Fallback: read from game_constants.json on disk
+        fallback_paths = [
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), "game_constants.json"),
+            os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                         "..", "..", "Saved", "game_constants.json"),
+        ]
+        for path in fallback_paths:
+            if os.path.exists(path):
+                try:
+                    with open(path) as f:
+                        config = json.loads(f.read())
+                    PlayUnreal._cached_config = config
+                    return config
+                except (json.JSONDecodeError, IOError):
+                    continue
+
+        return {}
+
     def navigate(self, target_col=6, max_attempts=5):
         """Navigate frog to a home slot using predictive path planning.
 

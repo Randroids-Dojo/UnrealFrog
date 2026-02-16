@@ -14,15 +14,7 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from client import PlayUnreal
-
-CELL_SIZE = 100.0
-GRID_COLS = 13
-HOP_DURATION = 0.15
-FROG_CAPSULE_RADIUS = 34.0
-
-ROAD_ROWS = {1, 2, 3, 4, 5}
-RIVER_ROWS = {7, 8, 9, 10, 11, 12}
-SAFE_ROWS = {0, 6, 13}
+import path_planner
 
 # Lane config for reference
 LANE_INFO = {
@@ -91,7 +83,7 @@ def log_hazard_state(hazards, target_row):
         f"speed={info.get('speed', '?')}, w={info.get('width', '?')}, "
         f"{'R' if info.get('right') else 'L'}): {len(row_h)} hazards")
     for h in row_h:
-        half_w = h["width"] * CELL_SIZE * 0.5
+        half_w = h["width"] * path_planner.CELL_SIZE * 0.5
         log(f"    x={h['x']:.0f} (extent {h['x']-half_w:.0f} to {h['x']+half_w:.0f}), "
             f"speed={h['speed']:.0f}, {'R' if h['movesRight'] else 'L'}, "
             f"rideable={h.get('rideable', False)}")
@@ -99,21 +91,13 @@ def log_hazard_state(hazards, target_row):
 
 
 def predict_hazard_x(hazard, dt):
-    """Predict hazard CENTER X after dt seconds."""
-    x0 = hazard["x"]
-    speed = hazard["speed"]
-    direction = 1.0 if hazard["movesRight"] else -1.0
-    world_width = hazard["width"] * CELL_SIZE
-    wrap_min = -world_width
-    wrap_max = GRID_COLS * CELL_SIZE + world_width
-    wrap_range = wrap_max - wrap_min
-    raw_x = x0 + speed * direction * dt
-    return ((raw_x - wrap_min) % wrap_range) + wrap_min
+    """Delegate to path_planner.predict_hazard_x."""
+    return path_planner.predict_hazard_x(hazard, dt)
 
 
 def find_gaps(hazards_in_row, frog_x):
     """Analyze when gaps pass frog_x in the next 5 seconds."""
-    danger_radius = FROG_CAPSULE_RADIUS + 40  # 74 units total
+    danger_radius = path_planner.FROG_CAPSULE_RADIUS + 40  # 74 units total
 
     log(f"  Scanning for gaps at frog_x={frog_x:.0f} "
         f"(danger zone ±{danger_radius:.0f} around hazard center + half_w)")
@@ -128,7 +112,7 @@ def find_gaps(hazards_in_row, frog_x):
             if h.get("rideable", False):
                 continue
             hx = predict_hazard_x(h, t)
-            half_w = h["width"] * CELL_SIZE * 0.5
+            half_w = h["width"] * path_planner.CELL_SIZE * 0.5
             if abs(frog_x - hx) < half_w + danger_radius:
                 all_clear = False
                 break
@@ -147,7 +131,7 @@ def find_gaps(hazards_in_row, frog_x):
     for start, end in safe_windows[:5]:
         log(f"    Gap: {start:.2f}s - {end:.2f}s (duration {end-start:.2f}s)")
     if not safe_windows:
-        log(f"    NO GAPS in 5s! (column {frog_x/CELL_SIZE:.0f} is blocked)")
+        log(f"    NO GAPS in 5s! (column {frog_x/path_planner.CELL_SIZE:.0f} is blocked)")
     return safe_windows
 
 
@@ -170,7 +154,7 @@ def find_platform_windows(hazards_in_row, frog_x):
         on_platform = False
         for h in rideables:
             hx = predict_hazard_x(h, t)
-            half_w = h["width"] * CELL_SIZE * 0.5
+            half_w = h["width"] * path_planner.CELL_SIZE * 0.5
             if abs(frog_x - hx) <= half_w - margin:
                 on_platform = True
                 break
@@ -194,7 +178,7 @@ def find_platform_windows(hazards_in_row, frog_x):
         for h in rideables:
             for check_t in [0.0, 1.0, 2.0, 3.0, 4.0]:
                 hx = predict_hazard_x(h, check_t)
-                half_w = h["width"] * CELL_SIZE * 0.5
+                half_w = h["width"] * path_planner.CELL_SIZE * 0.5
                 log(f"    t={check_t:.0f}s: platform center={hx:.0f}, "
                     f"extent={hx-half_w:.0f} to {hx+half_w:.0f}")
     return windows
@@ -203,7 +187,7 @@ def find_platform_windows(hazards_in_row, frog_x):
 def attempt_road_crossing(pu, frog_row, frog_col, api_latency):
     """Cross one road row with detailed logging."""
     next_row = frog_row + 1
-    frog_x = frog_col * CELL_SIZE
+    frog_x = frog_col * path_planner.CELL_SIZE
 
     log(f"\n=== Crossing road row {next_row} from ({frog_col},{frog_row}) ===")
 
@@ -213,7 +197,7 @@ def attempt_road_crossing(pu, frog_row, frog_col, api_latency):
     if not row_h:
         log("  No hazards — hopping immediately")
         pu.hop("up")
-        time.sleep(HOP_DURATION + 0.04)
+        time.sleep(path_planner.HOP_DURATION + 0.04)
         return True
 
     gaps = find_gaps(row_h, frog_x)
@@ -222,11 +206,11 @@ def attempt_road_crossing(pu, frog_row, frog_col, api_latency):
         return False
 
     # Pick the first gap that starts after now + API latency
-    # Need gap to last at least HOP_DURATION
+    # Need gap to last at least path_planner.HOP_DURATION
     chosen = None
     for start, end in gaps:
         duration = end - start
-        if duration >= HOP_DURATION and start >= 0:
+        if duration >= path_planner.HOP_DURATION and start >= 0:
             chosen = (start, end)
             break
 
@@ -245,7 +229,7 @@ def attempt_road_crossing(pu, frog_row, frog_col, api_latency):
     # Hop and measure
     t_hop = time.time()
     pu.hop("up")
-    time.sleep(HOP_DURATION + 0.04)
+    time.sleep(path_planner.HOP_DURATION + 0.04)
 
     state = pu.get_state()
     gs = state.get("gameState", "")
@@ -262,7 +246,7 @@ def attempt_road_crossing(pu, frog_row, frog_col, api_latency):
         row_after = [h for h in hazards_after if h.get("row") == next_row]
         log(f"  Hazards at death time (approx):")
         for h in row_after:
-            half_w = h["width"] * CELL_SIZE * 0.5
+            half_w = h["width"] * path_planner.CELL_SIZE * 0.5
             log(f"    x={h['x']:.0f} (extent {h['x']-half_w:.0f} to {h['x']+half_w:.0f})")
         return False
 
@@ -272,7 +256,7 @@ def attempt_road_crossing(pu, frog_row, frog_col, api_latency):
 def attempt_river_crossing(pu, frog_row, frog_col, api_latency):
     """Cross one river row with detailed logging."""
     next_row = frog_row + 1
-    frog_x = frog_col * CELL_SIZE
+    frog_x = frog_col * path_planner.CELL_SIZE
 
     log(f"\n=== Crossing river row {next_row} from ({frog_col},{frog_row}) ===")
 
@@ -289,31 +273,31 @@ def attempt_river_crossing(pu, frog_row, frog_col, api_latency):
     if not windows:
         log("  No platform window at this column — trying adjacent columns")
         for offset in [-1, 1, -2, 2, -3, 3]:
-            alt_x = (frog_col + offset) * CELL_SIZE
+            alt_x = (frog_col + offset) * path_planner.CELL_SIZE
             alt_windows = find_platform_windows(row_h, alt_x)
             if alt_windows:
                 log(f"  Found platform at col {frog_col + offset}, moving laterally")
                 # Only move laterally on safe rows
-                if frog_row in SAFE_ROWS:
+                if frog_row in path_planner.SAFE_ROWS:
                     direction = "right" if offset > 0 else "left"
                     for _ in range(abs(offset)):
                         pu.hop(direction)
-                        time.sleep(HOP_DURATION + 0.04)
+                        time.sleep(path_planner.HOP_DURATION + 0.04)
                     frog_col += offset
-                    frog_x = frog_col * CELL_SIZE
+                    frog_x = frog_col * path_planner.CELL_SIZE
                     windows = alt_windows
                     break
         if not windows:
             log("  Cannot find any reachable platform!")
             return False
 
-    # Pick first window — need arrival at (wait + HOP_DURATION)
+    # Pick first window — need arrival at (wait + path_planner.HOP_DURATION)
     chosen = windows[0]
     # We want the frog to arrive DURING the window
-    # Arrival time = wait + HOP_DURATION
-    # So wait = window_start - HOP_DURATION - api_latency
+    # Arrival time = wait + path_planner.HOP_DURATION
+    # So wait = window_start - path_planner.HOP_DURATION - api_latency
     target_arrival = chosen[0] + (chosen[1] - chosen[0]) / 2  # aim for center of window
-    wait_time = max(0, target_arrival - HOP_DURATION - api_latency)
+    wait_time = max(0, target_arrival - path_planner.HOP_DURATION - api_latency)
 
     log(f"  Chosen window: {chosen[0]:.2f}s - {chosen[1]:.2f}s")
     log(f"  Target arrival: {target_arrival:.3f}s")
@@ -325,7 +309,7 @@ def attempt_river_crossing(pu, frog_row, frog_col, api_latency):
 
     t_hop = time.time()
     pu.hop("up")
-    time.sleep(HOP_DURATION + 0.04)
+    time.sleep(path_planner.HOP_DURATION + 0.04)
 
     state = pu.get_state()
     gs = state.get("gameState", "")
@@ -346,6 +330,13 @@ def main():
     if not pu.is_alive():
         log("Cannot connect to RC API!")
         sys.exit(2)
+
+    # Sync constants from live game
+    try:
+        config = pu.get_config()
+        path_planner.init_from_config(config)
+    except Exception:
+        pass
 
     log("=== Navigation Diagnostics ===")
     log(f"Timestamp: {time.strftime('%Y-%m-%d %H:%M:%S')}")
@@ -370,7 +361,7 @@ def main():
 
     # Hop back to original position
     pu.hop("left")
-    time.sleep(HOP_DURATION + 0.04)
+    time.sleep(path_planner.HOP_DURATION + 0.04)
 
     # Phase 3: Full hazard layout dump
     log("\n--- Phase 3: Full Hazard Layout ---")
@@ -409,14 +400,14 @@ def main():
         frog_col = int(pos[0]) if isinstance(pos, list) else frog_col
         frog_row = int(pos[1]) if isinstance(pos, list) and len(pos) > 1 else frog_row
 
-        if target_row in SAFE_ROWS:
+        if target_row in path_planner.SAFE_ROWS:
             log(f"\n=== Row {target_row} is SAFE — hopping immediately ===")
             pu.hop("up")
-            time.sleep(HOP_DURATION + 0.04)
+            time.sleep(path_planner.HOP_DURATION + 0.04)
             frog_row = target_row
             continue
 
-        if target_row in ROAD_ROWS:
+        if target_row in path_planner.ROAD_ROWS:
             success = attempt_road_crossing(pu, frog_row, frog_col, api_latency)
             if success:
                 frog_row = target_row
@@ -424,7 +415,7 @@ def main():
                 log("Road crossing failed — stopping diagnostic")
                 break
 
-        elif target_row in RIVER_ROWS:
+        elif target_row in path_planner.RIVER_ROWS:
             success = attempt_river_crossing(pu, frog_row, frog_col, api_latency)
             if success:
                 frog_row = target_row
@@ -443,7 +434,7 @@ def main():
         elif target_row >= 14:
             log(f"\n=== Row {target_row} is HOME — hopping ===")
             pu.hop("up")
-            time.sleep(HOP_DURATION + 0.04)
+            time.sleep(path_planner.HOP_DURATION + 0.04)
             frog_row = target_row
 
     # Final state
