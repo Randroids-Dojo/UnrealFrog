@@ -382,4 +382,84 @@ bool FPlayUnreal_GetGameStateJSON::RunTest(const FString& Parameters)
 	return true;
 }
 
+// ===========================================================================
+// Scenario 7: GetObjectPath returns non-empty path for GameMode
+// ===========================================================================
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FPlayUnreal_GetObjectPath,
+	"UnrealFrog.PlayUnreal.Scenario7_GetObjectPath",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FPlayUnreal_GetObjectPath::RunTest(const FString& Parameters)
+{
+	AUnrealFrogGameMode* GM = NewObject<AUnrealFrogGameMode>();
+
+	UE_LOG(LogTemp, Display, TEXT("[PlayUnreal] === Scenario 7: GetObjectPath ==="));
+
+	FString Path = GM->GetObjectPath();
+	UE_LOG(LogTemp, Display, TEXT("[PlayUnreal] ObjectPath=%s"), *Path);
+
+	TestFalse(TEXT("GetObjectPath returns non-empty string"), Path.IsEmpty());
+	TestTrue(TEXT("Path contains UnrealFrogGameMode"), Path.Contains(TEXT("UnrealFrogGameMode")));
+
+	UE_LOG(LogTemp, Display, TEXT("[PlayUnreal] === Scenario 7: PASSED ==="));
+
+	return true;
+}
+
+// ===========================================================================
+// Scenario 8: GetPawnPath returns empty when no world/pawn
+// ===========================================================================
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FPlayUnreal_GetPawnPath,
+	"UnrealFrog.PlayUnreal.Scenario8_GetPawnPath",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FPlayUnreal_GetPawnPath::RunTest(const FString& Parameters)
+{
+	AUnrealFrogGameMode* GM = NewObject<AUnrealFrogGameMode>();
+
+	UE_LOG(LogTemp, Display, TEXT("[PlayUnreal] === Scenario 8: GetPawnPath ==="));
+
+	// Without a world, GetPawnPath should return an empty string
+	FString PawnPath = GM->GetPawnPath();
+	UE_LOG(LogTemp, Display, TEXT("[PlayUnreal] PawnPath=%s"), *PawnPath);
+
+	TestTrue(TEXT("GetPawnPath is empty without a world/pawn"), PawnPath.IsEmpty());
+
+	UE_LOG(LogTemp, Display, TEXT("[PlayUnreal] === Scenario 8: PASSED ==="));
+
+	return true;
+}
+
+// ===========================================================================
+// Scenario 9: GetLaneHazardsJSON returns valid JSON structure
+// ===========================================================================
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FPlayUnreal_GetLaneHazardsJSON,
+	"UnrealFrog.PlayUnreal.Scenario9_GetLaneHazardsJSON",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FPlayUnreal_GetLaneHazardsJSON::RunTest(const FString& Parameters)
+{
+	AUnrealFrogGameMode* GM = NewObject<AUnrealFrogGameMode>();
+
+	UE_LOG(LogTemp, Display, TEXT("[PlayUnreal] === Scenario 9: GetLaneHazardsJSON ==="));
+
+	// Without a world (no hazards spawned), should return valid JSON with empty array
+	FString JSON = GM->GetLaneHazardsJSON();
+	UE_LOG(LogTemp, Display, TEXT("[PlayUnreal] HazardsJSON=%s"), *JSON);
+
+	TestTrue(TEXT("Has hazards field"), JSON.Contains(TEXT("\"hazards\":")));
+	TestTrue(TEXT("Contains array brackets"), JSON.Contains(TEXT("[")));
+	TestTrue(TEXT("JSON is well-formed opening"), JSON.Contains(TEXT("{")));
+
+	// With no world, hazards array should be empty
+	TestTrue(TEXT("Empty hazards array when no world"), JSON.Contains(TEXT("\"hazards\":[]")));
+
+	UE_LOG(LogTemp, Display, TEXT("[PlayUnreal] === Scenario 9: PASSED ==="));
+
+	return true;
+}
+
 #endif // WITH_AUTOMATION_TESTS

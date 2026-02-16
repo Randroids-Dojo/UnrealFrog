@@ -3,6 +3,7 @@
 #include "Core/UnrealFrogGameMode.h"
 #include "Core/FrogCharacter.h"
 #include "Core/FrogPlayerController.h"
+#include "Core/HazardBase.h"
 #include "Core/FroggerCameraActor.h"
 #include "Core/FroggerHUD.h"
 #include "Core/GroundBuilder.h"
@@ -140,6 +141,63 @@ void AUnrealFrogGameMode::Tick(float DeltaTime)
 }
 
 // -- PlayUnreal ---------------------------------------------------------------
+
+FString AUnrealFrogGameMode::GetObjectPath() const
+{
+	return GetPathName();
+}
+
+FString AUnrealFrogGameMode::GetPawnPath() const
+{
+	if (const APawn* Pawn = UGameplayStatics::GetPlayerPawn(
+			const_cast<AUnrealFrogGameMode*>(this), 0))
+	{
+		return Pawn->GetPathName();
+	}
+	return FString();
+}
+
+FString AUnrealFrogGameMode::GetLaneHazardsJSON() const
+{
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return TEXT("{\"hazards\":[]}");
+	}
+
+	FString HazardEntries;
+	bool bFirst = true;
+
+	for (TActorIterator<AHazardBase> It(World); It; ++It)
+	{
+		const AHazardBase* Hazard = *It;
+		if (!Hazard)
+		{
+			continue;
+		}
+
+		if (!bFirst)
+		{
+			HazardEntries += TEXT(",");
+		}
+		bFirst = false;
+
+		FVector Loc = Hazard->GetActorLocation();
+		float GridCellSize = 100.0f;
+		int32 Row = FMath::RoundToInt(Loc.Y / GridCellSize);
+
+		HazardEntries += FString::Printf(
+			TEXT("{\"row\":%d,\"x\":%.1f,\"speed\":%.1f,\"width\":%d,\"movesRight\":%s,\"rideable\":%s}"),
+			Row,
+			Loc.X,
+			Hazard->Speed,
+			Hazard->HazardWidthCells,
+			Hazard->bMovesRight ? TEXT("true") : TEXT("false"),
+			Hazard->bIsRideable ? TEXT("true") : TEXT("false"));
+	}
+
+	return FString::Printf(TEXT("{\"hazards\":[%s]}"), *HazardEntries);
+}
 
 FString AUnrealFrogGameMode::GetGameStateJSON() const
 {

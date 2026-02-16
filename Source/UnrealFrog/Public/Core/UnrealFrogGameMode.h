@@ -152,6 +152,18 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "PlayUnreal")
 	FString GetGameStateJSON() const;
 
+	/** Returns this GameMode's object path for RC API discovery. */
+	UFUNCTION(BlueprintCallable, Category = "PlayUnreal")
+	FString GetObjectPath() const;
+
+	/** Returns the player pawn's object path for RC API discovery. Empty if no pawn. */
+	UFUNCTION(BlueprintCallable, Category = "PlayUnreal")
+	FString GetPawnPath() const;
+
+	/** Returns all hazard positions and properties as JSON for PlayUnreal navigation. */
+	UFUNCTION(BlueprintCallable, Category = "PlayUnreal")
+	FString GetLaneHazardsJSON() const;
+
 	// -- Home slots -------------------------------------------------------
 
 	/** Attempt to fill a home slot at the given column. Returns true on success. */
