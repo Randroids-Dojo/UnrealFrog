@@ -290,7 +290,7 @@ FIntPoint AFrogCharacter::DirectionToGridDelta(FVector Direction) const
 
 void AFrogCharacter::Die(EDeathType DeathType)
 {
-	if (bIsDead)
+	if (bIsDead || bInvincible)
 	{
 		return;
 	}
@@ -318,6 +318,11 @@ void AFrogCharacter::Die(EDeathType DeathType)
 			);
 		}
 	}
+}
+
+void AFrogCharacter::SetInvincible(bool bEnable)
+{
+	bInvincible = bEnable;
 }
 
 void AFrogCharacter::Respawn()

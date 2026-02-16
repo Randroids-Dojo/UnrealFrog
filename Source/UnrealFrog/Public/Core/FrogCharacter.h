@@ -78,6 +78,10 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "State")
 	EDeathType LastDeathType = EDeathType::None;
 
+	/** When true, Die() is a no-op. Used by PlayUnreal for visual verification. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "State")
+	bool bInvincible = false;
+
 	/** The river platform the frog is currently riding (nullptr if none) */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "State")
 	TWeakObjectPtr<AHazardBase> CurrentPlatform;
@@ -118,9 +122,13 @@ public:
 
 	// -- Death and respawn ------------------------------------------------
 
-	/** Kill the frog with the given death type. Broadcasts OnFrogDied. */
+	/** Kill the frog with the given death type. Broadcasts OnFrogDied. No-op when bInvincible. */
 	UFUNCTION(BlueprintCallable, Category = "Death")
 	void Die(EDeathType DeathType);
+
+	/** Enable or disable invincibility. When invincible, Die() is a no-op. */
+	UFUNCTION(BlueprintCallable, Category = "Death")
+	void SetInvincible(bool bEnable);
 
 	/** Reset frog to start position and clear dead state. */
 	UFUNCTION(BlueprintCallable, Category = "Death")

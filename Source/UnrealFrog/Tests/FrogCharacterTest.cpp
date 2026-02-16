@@ -202,4 +202,85 @@ bool FFrogCharacter_GridBounds::RunTest(const FString& Parameters)
 	return true;
 }
 
+// ---------------------------------------------------------------------------
+// Test: SetInvincible(true) prevents death from all death types
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FFrogCharacter_InvinciblePreventsDeath,
+	"UnrealFrog.Character.InvinciblePreventsDeath",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FFrogCharacter_InvinciblePreventsDeath::RunTest(const FString& Parameters)
+{
+	AFrogCharacter* Frog = NewObject<AFrogCharacter>();
+
+	// Enable invincibility
+	Frog->SetInvincible(true);
+	TestTrue(TEXT("bInvincible is true"), Frog->bInvincible);
+
+	// Try every death type — frog should survive all of them
+	Frog->Die(EDeathType::Squish);
+	TestFalse(TEXT("Survived Squish"), Frog->bIsDead);
+
+	Frog->Die(EDeathType::Splash);
+	TestFalse(TEXT("Survived Splash"), Frog->bIsDead);
+
+	Frog->Die(EDeathType::Timeout);
+	TestFalse(TEXT("Survived Timeout"), Frog->bIsDead);
+
+	Frog->Die(EDeathType::OffScreen);
+	TestFalse(TEXT("Survived OffScreen"), Frog->bIsDead);
+
+	return true;
+}
+
+// ---------------------------------------------------------------------------
+// Test: SetInvincible(false) allows normal death
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FFrogCharacter_InvincibleOffAllowsDeath,
+	"UnrealFrog.Character.InvincibleOffAllowsDeath",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FFrogCharacter_InvincibleOffAllowsDeath::RunTest(const FString& Parameters)
+{
+	AFrogCharacter* Frog = NewObject<AFrogCharacter>();
+
+	// Invincible OFF (default)
+	TestFalse(TEXT("bInvincible defaults to false"), Frog->bInvincible);
+
+	Frog->Die(EDeathType::Squish);
+	TestTrue(TEXT("Died with invincibility off"), Frog->bIsDead);
+	TestEqual(TEXT("Death type is Squish"), Frog->LastDeathType, EDeathType::Squish);
+
+	return true;
+}
+
+// ---------------------------------------------------------------------------
+// Test: SetInvincible can be toggled off to restore mortality
+// ---------------------------------------------------------------------------
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FFrogCharacter_InvincibleToggle,
+	"UnrealFrog.Character.InvincibleToggle",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+
+bool FFrogCharacter_InvincibleToggle::RunTest(const FString& Parameters)
+{
+	AFrogCharacter* Frog = NewObject<AFrogCharacter>();
+
+	// Turn on, survive
+	Frog->SetInvincible(true);
+	Frog->Die(EDeathType::Squish);
+	TestFalse(TEXT("Survived with invincibility on"), Frog->bIsDead);
+
+	// Turn off, die
+	Frog->SetInvincible(false);
+	TestFalse(TEXT("bInvincible is false after toggle"), Frog->bInvincible);
+
+	Frog->Die(EDeathType::Splash);
+	TestTrue(TEXT("Died after invincibility toggled off"), Frog->bIsDead);
+
+	return true;
+}
+
 #endif // WITH_AUTOMATION_TESTS
