@@ -9,6 +9,7 @@
 #   ./Tools/PlayUnreal/run-tests.sh --e2e                  # Run PlayUnreal E2E tests only
 #   ./Tools/PlayUnreal/run-tests.sh --integration          # Run integration tests only
 #   ./Tools/PlayUnreal/run-tests.sh --wiring               # Run delegate wiring tests only
+#   ./Tools/PlayUnreal/run-tests.sh --spatial              # Run spatial position assertion tests only
 #   ./Tools/PlayUnreal/run-tests.sh "UnrealFrog.Wiring"    # Run custom filter (any UE test path)
 #   ./Tools/PlayUnreal/run-tests.sh --list                 # List available tests
 #   ./Tools/PlayUnreal/run-tests.sh --report               # Generate JSON test report
@@ -47,12 +48,13 @@ resolve_category_filter() {
         --integration)  echo "UnrealFrog.Integration" ;;
         --wiring)       echo "UnrealFrog.Wiring" ;;
         --vfx)          echo "UnrealFrog.VFX" ;;
+        --spatial)      echo "UnrealFrog.Spatial" ;;
         *)              echo "" ;;
     esac
 }
 
 # Known category names for per-category reporting
-KNOWN_CATEGORIES="Character Collision Ground Input Score LaneSystem HUD Mesh Camera Orchestration GameState Wiring Integration Seam Audio PlayUnreal VFX"
+KNOWN_CATEGORIES="Character Collision Ground Input Score LaneSystem HUD Mesh Camera Orchestration GameState Wiring Integration Seam Audio PlayUnreal VFX Spatial"
 
 # -- Parse arguments ---------------------------------------------------------
 
@@ -81,7 +83,7 @@ while [[ $# -gt 0 ]]; do
             TIMEOUT_SECONDS="$2"
             shift 2
             ;;
-        --all|--seam|--audio|--e2e|--integration|--wiring|--vfx)
+        --all|--seam|--audio|--e2e|--integration|--wiring|--vfx|--spatial)
             CATEGORY_NAME="$1"
             TEST_FILTER="$(resolve_category_filter "$1")"
             shift
