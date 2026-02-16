@@ -201,14 +201,16 @@ FString AUnrealFrogGameMode::GetLaneHazardsJSON() const
 
 FString AUnrealFrogGameMode::GetGameStateJSON() const
 {
-	// Frog position
+	// Frog position (grid + actual world X for platform drift)
 	double FrogX = 0.0;
 	double FrogY = 0.0;
+	double FrogWorldX = 0.0;
 	if (const AFrogCharacter* Frog = Cast<AFrogCharacter>(
 			UGameplayStatics::GetPlayerPawn(const_cast<AUnrealFrogGameMode*>(this), 0)))
 	{
 		FrogX = static_cast<double>(Frog->GridPosition.X);
 		FrogY = static_cast<double>(Frog->GridPosition.Y);
+		FrogWorldX = static_cast<double>(Frog->GetActorLocation().X);
 	}
 
 	// Score and lives
@@ -232,8 +234,8 @@ FString AUnrealFrogGameMode::GetGameStateJSON() const
 	}
 
 	return FString::Printf(
-		TEXT("{\"score\":%d,\"lives\":%d,\"wave\":%d,\"frogPos\":[%.0f,%.0f],\"gameState\":\"%s\",\"timeRemaining\":%.1f,\"homeSlotsFilledCount\":%d}"),
-		Score, Lives, CurrentWave, FrogX, FrogY, *StateName, RemainingTime, HomeSlotsFilledCount);
+		TEXT("{\"score\":%d,\"lives\":%d,\"wave\":%d,\"frogPos\":[%.0f,%.0f],\"frogWorldX\":%.1f,\"gameState\":\"%s\",\"timeRemaining\":%.1f,\"homeSlotsFilledCount\":%d}"),
+		Score, Lives, CurrentWave, FrogX, FrogY, FrogWorldX, *StateName, RemainingTime, HomeSlotsFilledCount);
 }
 
 // -- State transitions --------------------------------------------------------
