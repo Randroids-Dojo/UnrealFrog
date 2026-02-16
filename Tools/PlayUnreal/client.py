@@ -113,6 +113,24 @@ class PlayUnreal:
             pass
         return []
 
+    def navigate(self, target_col=6, max_attempts=5):
+        """Navigate frog to a home slot using predictive path planning.
+
+        Queries hazards once, computes a full safe path using linear
+        extrapolation, then executes with minimal API calls (one per hop,
+        no polling). Retries on death.
+
+        Args:
+            target_col: home slot column (1, 4, 6, 8, 11)
+            max_attempts: max retry cycles on death
+
+        Returns:
+            dict with success, total_hops, deaths, elapsed, state
+        """
+        from path_planner import navigate_to_home_slot
+        return navigate_to_home_slot(self, target_col=target_col,
+                                     max_attempts=max_attempts)
+
     def get_state(self):
         """Get current game state as a dict.
 

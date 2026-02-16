@@ -97,94 +97,17 @@ def ensure_playing(pu, gm_path):
         return None
 
 
-# Grid constants
-GRID_CELL_SIZE = 100.0  # UU per cell
-SAFE_ROWS = {0, 6, 13}  # No hazards on these rows
-HOME_ROW = 14
-HOME_COLUMNS = [1, 4, 6, 8, 11]
-ROAD_ROWS = {1, 2, 3, 4, 5}
-RIVER_ROWS = {7, 8, 9, 10, 11, 12}
-
-
-def _get_hazards_in_row(hazards, row):
-    """Filter hazards list to only those in the given row."""
-    return [h for h in hazards if h.get("row") == row]
-
-
-def _is_road_gap_clear(hazards_in_row, frog_x, cell_size=GRID_CELL_SIZE):
-    """Check if frog_x is clear of road hazards right now.
-
-    For road rows, a gap means no hazard overlaps the frog's X position.
-    Each hazard occupies [x, x + width*cell_size) along X.
-    Returns True if safe to hop into this position.
-    """
-    for h in hazards_in_row:
-        hx = h.get("x", 0)
-        hw = h.get("width", 1) * cell_size
-        # Frog occupies roughly one cell centered at frog_x
-        frog_left = frog_x - cell_size * 0.4
-        frog_right = frog_x + cell_size * 0.4
-        if frog_right > hx and frog_left < hx + hw:
-            return False
-    return True
-
-
-def _is_platform_present(hazards_in_row, frog_x, cell_size=GRID_CELL_SIZE):
-    """Check if a rideable platform overlaps frog_x.
-
-    For river rows, the frog must land ON a rideable hazard (log/turtle).
-    Returns True if there's a platform covering frog_x.
-    """
-    for h in hazards_in_row:
-        if not h.get("rideable", False):
-            continue
-        hx = h.get("x", 0)
-        hw = h.get("width", 1) * cell_size
-        if hx - cell_size * 0.3 <= frog_x <= hx + hw + cell_size * 0.3:
-            return True
-    return False
-
-
-def _wait_for_safe_moment(pu, target_row, frog_x, timeout=8.0):
-    """Poll hazard positions until the frog can safely hop into target_row.
-
-    For road rows: waits until no hazard overlaps frog_x.
-    For river rows: waits until a rideable platform overlaps frog_x.
-    For safe/home rows: returns immediately.
-
-    Returns True if a safe moment was found within timeout.
-    """
-    if target_row in SAFE_ROWS or target_row >= HOME_ROW:
-        return True
-
-    start = time.time()
-    is_river = target_row in RIVER_ROWS
-
-    while time.time() - start < timeout:
-        hazards = pu.get_hazards()
-        row_hazards = _get_hazards_in_row(hazards, target_row)
-
-        if not row_hazards:
-            return True  # No hazards in this row
-
-        if is_river:
-            if _is_platform_present(row_hazards, frog_x):
-                return True
-        else:
-            if _is_road_gap_clear(row_hazards, frog_x):
-                return True
-
-        time.sleep(0.05)  # Poll at 20Hz
-
-    return False
+from path_planner import plan_path, execute_path
 
 
 def hop_to_home_slot(pu, gm_path, max_deaths=10, label=""):
-    """Navigate frog from row 0 to a home slot using real-time hazard queries.
+    """Navigate frog to a home slot using predictive path planning.
 
-    Strategy per the user's request: query player position, find the next
-    row, query hazards in that row, wait for a safe gap (road) or platform
-    alignment (river), then hop.
+    Strategy: query hazards ONCE, compute a full safe path using linear
+    extrapolation of hazard positions, then execute the hop sequence with
+    minimal API calls (one per hop, no polling).
+
+    If the frog dies, re-queries hazards and re-plans from new position.
 
     Target column: 6 (center home slot).
 
@@ -239,33 +162,47 @@ def hop_to_home_slot(pu, gm_path, max_deaths=10, label=""):
                     "home_filled": home_filled}
 
         pos = state.get("frogPos", [6, 0])
-        col = int(pos[0]) if isinstance(pos, list) and len(pos) > 0 else 6
-        row = int(pos[1]) if isinstance(pos, list) and len(pos) > 1 else 0
+        frog_col = int(pos[0]) if isinstance(pos, list) and len(pos) > 0 else 6
+        frog_row = int(pos[1]) if isinstance(pos, list) and len(pos) > 1 else 0
 
-        # Target column 6 (center home slot)
-        target_col = 6
-        frog_x = col * GRID_CELL_SIZE
-        target_x = target_col * GRID_CELL_SIZE
+        # Query hazards ONCE (single API call)
+        hazards = pu.get_hazards()
 
-        # Align laterally on safe rows before crossing dangerous rows
-        if row in SAFE_ROWS and col != target_col:
-            direction = "right" if col < target_col else "left"
-            pu.hop(direction)
-            time.sleep(0.25)
+        # Compute full safe path (pure math, no API calls)
+        path = plan_path(hazards, frog_col=frog_col, frog_row=frog_row,
+                         target_col=6)
+        log(f"  {label}Planned {len(path)}-hop path from ({frog_col},{frog_row})")
+
+        # Execute the computed path (one API call per hop, no polling)
+        result = execute_path(pu, path)
+        log(f"  {label}Executed {result['hops']} hops in {result['elapsed']:.1f}s")
+
+        if result["aborted"]:
+            log(f"  {label}Path aborted: {result.get('reason', 'unknown')}")
+            deaths += 1
+            time.sleep(2.0)
             continue
 
-        next_row = row + 1
-        if next_row > HOME_ROW:
-            time.sleep(0.5)
+        # Check if we succeeded
+        final_state = pu.get_state()
+        final_gs = final_state.get("gameState", "")
+        final_filled = final_state.get("homeSlotsFilledCount", 0)
+
+        if final_filled > (initial_filled or 0):
+            return {"success": True, "state": final_state, "deaths": deaths,
+                    "home_filled": final_filled}
+        if final_gs == "RoundComplete":
+            return {"success": True, "state": final_state, "deaths": deaths,
+                    "home_filled": final_state.get("homeSlotsFilledCount", 0)}
+
+        # Didn't reach home — frog may have died during path execution
+        if final_gs in ("Dying", "Spawning", "GameOver"):
+            deaths += 1
+            time.sleep(2.0)
             continue
 
-        # Query hazards and wait for a safe moment to hop
-        safe = _wait_for_safe_moment(pu, next_row, target_x, timeout=8.0)
-        if not safe:
-            log(f"  {label}Timeout waiting for safe gap at row {next_row}, hopping anyway")
-
-        pu.hop("up")
-        time.sleep(0.25)  # Wait for hop to complete (HopDuration=0.15s)
+        # Still playing but didn't fill a slot — re-plan
+        log(f"  {label}Path completed but no home slot filled, re-planning...")
 
     return {"success": False, "state": pu.get_state(), "deaths": deaths,
             "home_filled": 0}
@@ -302,6 +239,14 @@ def main():
         return 1
 
     os.makedirs(SCREENSHOT_DIR, exist_ok=True)
+
+    # Remove stale .mov files — screencapture cannot overwrite existing videos
+    import glob
+    for old_mov in glob.glob(os.path.join(SCREENSHOT_DIR, "*.mov")):
+        try:
+            os.remove(old_mov)
+        except OSError:
+            pass
 
     # -- Step 1: Reset game and verify title state ---------------------------
     log("")
@@ -552,7 +497,7 @@ def main():
     log("")
     log("--- Step 9: Home slot fill + celebration VFX ---")
     log("  Scripts frog across road and river into a home slot.")
-    log("  Queries hazard positions in real-time to time safe crossings.")
+    log("  Uses predictive path planning — queries hazards once, computes safe path.")
     log("  Layout: row 0=start, 1-5=road, 6=median, 7-12=river, 13-14=goal")
     log("  Home slots at columns 1, 4, 6, 8, 11 on row 14")
     try:
