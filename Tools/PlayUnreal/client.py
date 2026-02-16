@@ -23,9 +23,12 @@ class PlayUnrealError(Exception):
     pass
 
 
-class ConnectionError(PlayUnrealError):
+class RCConnectionError(PlayUnrealError):
     """Editor is not running or Remote Control API is not responding."""
     pass
+
+# Keep backward-compatible alias (shadows builtin, but existing code uses it)
+ConnectionError = RCConnectionError
 
 
 class CallError(PlayUnrealError):
@@ -40,6 +43,9 @@ _DIRECTIONS = {
     "left":  {"X": -1.0, "Y": 0.0, "Z": 0.0},
     "right": {"X": 1.0, "Y": 0.0, "Z": 0.0},
 }
+
+# Map name from Config/DefaultEngine.ini
+_DEFAULT_MAP = "FroggerMain"
 
 
 class PlayUnreal:
@@ -119,31 +125,66 @@ class PlayUnreal:
     def screenshot(self, path=None):
         """Take a screenshot of the current frame.
 
+        Uses the RC API's HTTP endpoint to send a console command.
+        HighResShot triggers the engine screenshot pipeline.
+
         Args:
             path: Optional file path. If None, uses engine default location.
+
+        Returns:
+            True if the command was sent (does not guarantee file was written).
         """
-        gm_path = self._get_gm_path()
-        # Use console command via RC API to trigger screenshot
-        cmd = "HighResShot 1"
+        # Build console command — HighResShot saves to Saved/Screenshots/
+        cmd = "HighResShot 1920x1080"
         if path:
-            cmd = f"HighResShot 1 filename={path}"
+            cmd = f"HighResShot 1920x1080 filename=\"{path}\""
+
+        # Try sending via the PlayerController (most reliable in -game mode)
+        frog_path = self._get_frog_path()
+        # The controller owns the viewport — use the GameMode to run a command
+        gm_path = self._get_gm_path()
+
+        # RC API /remote/object/call can invoke console commands through any
+        # UObject that has a world context.  We try the GameMode first.
+        for target in [gm_path, frog_path]:
+            try:
+                # UE RC API does not have a dedicated "console command" endpoint.
+                # Instead, use the /remote/object/property endpoint to run
+                # ScreenshotRequested or use a custom UFUNCTION.
+                # For now, use a direct HTTP call via the engine's HTTP router.
+                self._put("/remote/object/call", {
+                    "ObjectPath": target,
+                    "FunctionName": "ConsoleCommand",
+                    "Parameters": {"Command": cmd},
+                    "GenerateTransaction": False
+                })
+                return True
+            except CallError:
+                continue
+
+        # Last resort: try undocumented batch endpoint
         try:
-            self._call_function(
-                "/Engine/Transient.GameEngine",
-                "ConsoleCommand",
-                {"Command": cmd}
-            )
+            self._put("/remote/object/call", {
+                "ObjectPath": "/Engine/Transient.GameEngine",
+                "FunctionName": "ConsoleCommand",
+                "Parameters": {"Command": cmd}
+            })
+            return True
         except CallError:
-            # Fallback: try via the game mode's world
-            # The screenshot might not work through RC API — document limitation
-            pass
+            return False
 
     def reset_game(self):
-        """Reset the game to title screen and start a new game."""
+        """Reset the game to title screen and start a new game.
+
+        Calls ReturnToTitle, waits for Title state, then StartGame.
+        After StartGame the game goes Spawning->Playing (SpawningDuration=1s).
+        """
         gm_path = self._get_gm_path()
         self._call_function(gm_path, "ReturnToTitle")
         time.sleep(0.5)
         self._call_function(gm_path, "StartGame")
+        # Wait for Playing state — StartGame enters Spawning first
+        time.sleep(1.5)
 
     def wait_for_state(self, target_state, timeout=10):
         """Poll get_state() until gameState matches target.
@@ -188,6 +229,193 @@ class PlayUnreal:
         except ConnectionError:
             return False
 
+    def diagnose(self):
+        """Probe every aspect of the RC API connection and report findings.
+
+        Returns a dict with detailed diagnostic information suitable for
+        remote debugging.  Each section reports what was tested, what worked,
+        and what failed.
+        """
+        report = {
+            "connection": {},
+            "routes": [],
+            "gamemode_discovery": {},
+            "frog_discovery": {},
+            "get_game_state": {},
+            "hop_test": {},
+            "property_reads": {},
+            "screenshot": {},
+        }
+
+        # 1. Connection check
+        try:
+            info = self._get("/remote/info")
+            report["connection"] = {
+                "status": "OK",
+                "url": self.base_url,
+                "response_keys": list(info.keys()) if isinstance(info, dict) else str(type(info)),
+            }
+            # Extract route list
+            routes = info.get("Routes", info.get("routes", []))
+            report["routes"] = [
+                {"verb": r.get("Verb", r.get("verb", "?")),
+                 "path": r.get("Path", r.get("path", "?"))}
+                for r in (routes[:30] if isinstance(routes, list) else [])
+            ]
+        except RCConnectionError as e:
+            report["connection"] = {"status": "FAILED", "error": str(e)}
+            return report
+
+        # 2. GameMode object path discovery — try every candidate
+        gm_results = []
+        found_gm = None
+        for path in self._gm_candidates():
+            try:
+                result = self._describe_object(path)
+                if result:
+                    funcs = [f.get("Name", "?") for f in result.get("Functions", [])]
+                    props = [p.get("Name", "?") for p in result.get("Properties", [])]
+                    entry = {
+                        "path": path,
+                        "status": "FOUND",
+                        "functions_count": len(funcs),
+                        "properties_count": len(props),
+                        "sample_functions": funcs[:10],
+                        "has_GetGameStateJSON": "GetGameStateJSON" in funcs,
+                        "has_StartGame": "StartGame" in funcs,
+                        "has_ReturnToTitle": "ReturnToTitle" in funcs,
+                        "has_HandleHopCompleted": "HandleHopCompleted" in funcs,
+                    }
+                    gm_results.append(entry)
+                    if found_gm is None and "Default__" not in path:
+                        found_gm = path
+                    elif found_gm is None:
+                        found_gm = path
+                else:
+                    gm_results.append({"path": path, "status": "NOT_FOUND (describe returned None)"})
+            except CallError as e:
+                gm_results.append({"path": path, "status": "ERROR", "error": str(e)})
+            except RCConnectionError as e:
+                gm_results.append({"path": path, "status": "CONN_ERROR", "error": str(e)})
+
+        report["gamemode_discovery"] = {
+            "candidates_tested": len(gm_results),
+            "selected": found_gm,
+            "results": gm_results,
+        }
+
+        # 3. Frog object path discovery
+        frog_results = []
+        found_frog = None
+        for path in self._frog_candidates():
+            try:
+                result = self._describe_object(path)
+                if result:
+                    funcs = [f.get("Name", "?") for f in result.get("Functions", [])]
+                    entry = {
+                        "path": path,
+                        "status": "FOUND",
+                        "functions_count": len(funcs),
+                        "has_RequestHop": "RequestHop" in funcs,
+                        "has_GridToWorld": "GridToWorld" in funcs,
+                    }
+                    frog_results.append(entry)
+                    if found_frog is None and "Default__" not in path:
+                        found_frog = path
+                    elif found_frog is None:
+                        found_frog = path
+                else:
+                    frog_results.append({"path": path, "status": "NOT_FOUND"})
+            except CallError as e:
+                frog_results.append({"path": path, "status": "ERROR", "error": str(e)})
+            except RCConnectionError as e:
+                frog_results.append({"path": path, "status": "CONN_ERROR", "error": str(e)})
+
+        report["frog_discovery"] = {
+            "candidates_tested": len(frog_results),
+            "selected": found_frog,
+            "results": frog_results,
+        }
+
+        # 4. Test GetGameStateJSON
+        if found_gm:
+            try:
+                result = self._call_function(found_gm, "GetGameStateJSON")
+                ret_val = result.get("ReturnValue", "")
+                if ret_val:
+                    try:
+                        parsed = json.loads(ret_val)
+                        report["get_game_state"] = {
+                            "status": "OK",
+                            "raw_return": ret_val,
+                            "parsed": parsed,
+                            "has_expected_keys": all(
+                                k in parsed for k in
+                                ["score", "lives", "wave", "frogPos", "gameState"]
+                            ),
+                        }
+                    except json.JSONDecodeError as e:
+                        report["get_game_state"] = {
+                            "status": "JSON_PARSE_ERROR",
+                            "raw_return": ret_val,
+                            "error": str(e),
+                        }
+                else:
+                    report["get_game_state"] = {
+                        "status": "EMPTY_RETURN",
+                        "raw_result": result,
+                    }
+            except CallError as e:
+                report["get_game_state"] = {"status": "CALL_FAILED", "error": str(e)}
+
+        # 5. Test RequestHop parameter format (dry probe — check if function accepts params)
+        if found_frog and "Default__" not in found_frog:
+            try:
+                # Send a zero-vector hop — should be rejected by game logic (no direction)
+                # but the RC API call itself should succeed (200 OK)
+                result = self._call_function(found_frog, "RequestHop", {
+                    "Direction": {"X": 0.0, "Y": 0.0, "Z": 0.0}
+                })
+                report["hop_test"] = {
+                    "status": "OK",
+                    "note": "RequestHop accepted FVector parameter format",
+                    "result": result,
+                }
+            except CallError as e:
+                report["hop_test"] = {
+                    "status": "CALL_FAILED",
+                    "error": str(e),
+                    "note": "FVector format {X,Y,Z} may be wrong. Try nested format.",
+                }
+        else:
+            report["hop_test"] = {
+                "status": "SKIPPED",
+                "note": "No live FrogCharacter found (CDO only). Cannot test hop.",
+            }
+
+        # 6. Test property reads on live objects
+        prop_tests = {}
+        if found_gm and "Default__" not in found_gm:
+            for prop in ["CurrentState", "CurrentWave", "RemainingTime", "HomeSlotsFilledCount"]:
+                try:
+                    val = self._read_property(found_gm, prop)
+                    prop_tests[f"GM.{prop}"] = {"status": "OK", "value": val}
+                except CallError as e:
+                    prop_tests[f"GM.{prop}"] = {"status": "FAILED", "error": str(e)}
+        if found_frog and "Default__" not in found_frog:
+            for prop in ["GridPosition", "bIsHopping", "bIsDead", "HopDuration"]:
+                try:
+                    val = self._read_property(found_frog, prop)
+                    prop_tests[f"Frog.{prop}"] = {"status": "OK", "value": val}
+                except CallError as e:
+                    prop_tests[f"Frog.{prop}"] = {"status": "FAILED", "error": str(e)}
+        report["property_reads"] = prop_tests
+
+        # 7. Screenshot test (just check if the call is accepted)
+        report["screenshot"] = {"status": "SKIPPED", "note": "Screenshot test requires visual verification"}
+
+        return report
+
     # -- Object path discovery -----------------------------------------------
 
     def _get_gm_path(self):
@@ -204,56 +432,72 @@ class PlayUnreal:
         self._frog_path = self._discover_frog_path()
         return self._frog_path
 
-    def _discover_gm_path(self):
-        """Discover the GameMode object path by trying known patterns.
-
-        In -game mode, actors live under the persistent level of the loaded map.
-        Since SearchActor is not implemented in UE 5.7, we try common paths.
-        The project's default map is FroggerMain (Config/DefaultEngine.ini).
-        """
-        # Try live instance paths first (these reflect runtime state)
-        # then CDO as fallback (always exists but won't reflect runtime state)
+    @staticmethod
+    def _gm_candidates():
+        """Return all candidate object paths for the GameMode, ordered by likelihood."""
         candidates = []
-
-        # FroggerMain is the project's default map — try it first
-        # Other map names as fallback in case the config changes
-        for map_name in ["FroggerMain", "FroggerMap", "TestMap", "DefaultMap"]:
-            candidates.append(
-                f"/Game/Maps/{map_name}.{map_name}:PersistentLevel.UnrealFrogGameMode_0"
-            )
-            candidates.append(
-                f"/Game/Maps/{map_name}.{map_name}:PersistentLevel.UnrealFrogGameMode_C_0"
-            )
-
-        # CDO fallback — works for function calls but state reads return defaults
+        # In -game mode the GameMode is auto-spawned by the engine into the
+        # persistent level.  The naming convention differs based on whether
+        # the class is native C++ (_0 suffix) or Blueprint-derived (_C_0).
+        # The AuthorityGameMode sub-object path is another common pattern.
+        for map_name in [_DEFAULT_MAP, "FroggerMap", "TestMap", "DefaultMap"]:
+            prefix = f"/Game/Maps/{map_name}.{map_name}:PersistentLevel"
+            candidates.append(f"{prefix}.UnrealFrogGameMode_0")
+            candidates.append(f"{prefix}.UnrealFrogGameMode_C_0")
+            # Some UE versions use the AuthorityGameMode sub-object
+            candidates.append(f"{prefix}.UnrealFrogGameMode_0.AuthorityGameMode")
+        # CDO — always exists for describe/call but state reads return defaults
         candidates.append("/Script/UnrealFrog.Default__UnrealFrogGameMode")
+        return candidates
 
-        for path in candidates:
+    @staticmethod
+    def _frog_candidates():
+        """Return all candidate object paths for the FrogCharacter."""
+        candidates = []
+        for map_name in [_DEFAULT_MAP, "FroggerMap", "TestMap", "DefaultMap"]:
+            prefix = f"/Game/Maps/{map_name}.{map_name}:PersistentLevel"
+            candidates.append(f"{prefix}.FrogCharacter_0")
+            candidates.append(f"{prefix}.FrogCharacter_C_0")
+            # Default pawn spawned by GameMode may use a numbered suffix > 0
+            candidates.append(f"{prefix}.FrogCharacter_1")
+        # CDO
+        candidates.append("/Script/UnrealFrog.Default__FrogCharacter")
+        return candidates
+
+    def _discover_gm_path(self):
+        """Discover the GameMode object path by probing candidates."""
+        for path in self._gm_candidates():
             try:
                 result = self._describe_object(path)
                 if result:
                     return path
-            except (CallError, ConnectionError):
+            except (CallError, RCConnectionError):
                 continue
-
-        # Last resort: use CDO
         return "/Script/UnrealFrog.Default__UnrealFrogGameMode"
 
     def _discover_frog_path(self):
-        """Discover the FrogCharacter object path."""
-        # FroggerMain is the project's default map
-        for map_name in ["FroggerMain", "FroggerMap", "TestMap", "DefaultMap"]:
-            for suffix in ["FrogCharacter_0", "FrogCharacter_C_0"]:
-                path = f"/Game/Maps/{map_name}.{map_name}:PersistentLevel.{suffix}"
-                try:
-                    result = self._describe_object(path)
-                    if result:
-                        return path
-                except (CallError, ConnectionError):
-                    continue
-
-        # CDO fallback
+        """Discover the FrogCharacter object path by probing candidates."""
+        for path in self._frog_candidates():
+            try:
+                result = self._describe_object(path)
+                if result:
+                    return path
+            except (CallError, RCConnectionError):
+                continue
         return "/Script/UnrealFrog.Default__FrogCharacter"
+
+    def _verify_live_path(self, path):
+        """Check if a path points to a live instance (not CDO).
+
+        Returns True if the path responds to describe and is not a CDO path.
+        """
+        if "Default__" in path:
+            return False
+        try:
+            result = self._describe_object(path)
+            return result is not None
+        except (CallError, RCConnectionError):
+            return False
 
     # -- Low-level RC API calls ----------------------------------------------
 
@@ -374,8 +618,14 @@ if __name__ == "__main__":
         sys.exit(1)
 
     print("Remote Control API is alive.")
-    print(f"GameMode path: {pu._get_gm_path()}")
-    print(f"Frog path: {pu._get_frog_path()}")
+
+    # Quick path discovery
+    gm = pu._get_gm_path()
+    frog = pu._get_frog_path()
+    print(f"GameMode path: {gm}")
+    print(f"  (live instance: {'Default__' not in gm})")
+    print(f"Frog path: {frog}")
+    print(f"  (live instance: {'Default__' not in frog})")
     print()
 
     try:
