@@ -1,5 +1,13 @@
 # UnrealFrog - 3D Frogger Arcade Game
 
+## Mission
+
+**Prove that AI agents can build real games in real engines as effectively as they build web apps.** The game (Frogger) is the proving ground. The tools (PlayUnreal, auto-screenshot, spatial assertions, feedback loop infrastructure) are the product.
+
+The benchmark: [WebFrogger](/Users/randroid/Documents/Dev/WebFrogger/) — a complete 3D Frogger built with Three.js in a single prompt. One file, 1,311 lines, instant result. Road with vehicles, river with logs, home slots, HUD, title screen, touch controls. All working, all visible, all playable. That is what "good" looks like for agentic game development.
+
+UnrealFrog exists to close the gap between that experience and Unreal Engine 5. Every process improvement and tooling investment should be evaluated against one question: **does this close the gap between agentic web development and agentic Unreal development?**
+
 ## Project
 Unreal Engine 5.7 C++ project. 3D arcade Frogger with procedurally generated assets.
 Low-poly stylized aesthetic. Mob programming workflow with agent team coordination.

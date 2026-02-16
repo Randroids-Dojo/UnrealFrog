@@ -1067,3 +1067,332 @@ Sprint 9 has ONE goal: **Make PlayUnreal work for real and use it to verify ever
 The trend is not improving. The team writes agreements about visual verification and then violates them. The team writes tools for visual verification and then does not use them. The only time visual bugs are found is when the stakeholder plays the game.
 
 **This cycle breaks when -- and only when -- the team actually runs the game and looks at the screen.**
+
+---
+
+## Retrospective 9 -- Sprint 8 Hotfix: VFX Root Cause Fix + PlayUnreal Verified
+
+### Context
+
+Post-Sprint 8 hotfix session. After the Sprint 8 retrospective identified that ALL visual changes were invisible in the running game, the team investigated the root cause, fixed it, hardened PlayUnreal's screenshot and video capture capabilities, and -- for the first time in 8 sprints -- actually ran the visual verification script against a live game and examined the results.
+
+7 post-retro commits (68b615b..8f62490). 3 code commits, 4 docs commits. 591 lines changed in Source/ and Tools/. Most critically: **screenshots now exist in `Saved/Screenshots/verify_visuals/`** and **the death VFX is visually confirmed working** via video capture.
+
+### What Was Done
+
+| Change | Commit | Impact |
+|--------|--------|--------|
+| VFX root component fix | `902d1b8` | **Root cause of 7-sprint VFX invisibility.** `SpawnActor<AActor>` silently discards `FTransform` when the actor has no `RootComponent`. All VFX spawned at world origin (0,0,0) instead of at the frog. Fix: set RootComponent before RegisterComponent, then explicit SetActorLocation/SetActorScale3D. Also increased death puff duration 0.75s to 2.0s. |
+| Zero-direction hop guard | `fa25554` | `DirectionToGridDelta` produced unintended +X cardinal direction from zero-length input. Added `IsNearlyZero` guard. Fixed double-precision comparison (0.0 vs 0.0f). |
+| PlayUnreal screencapture + video | `199dede` | Replaced HighResShot-based screenshots (which require UE console commands) with macOS `screencapture` (which captures the actual window). Added `record_video()` for 3-second window capture. verify_visuals.py now uses safe row-0 hops and captures death video. |
+| PlayUnreal README | `ef469c6` | 381-line comprehensive usage guide covering full toolchain. |
+| CLAUDE.md reference index | `21a3b8d` | Added references to all PlayUnreal tools, design specs, test matrix, and sprint plans. |
+| Agent profile updates | `8f62490` | All 5 agent profiles updated with PlayUnreal tooling knowledge, Sprint 8 lessons, and visual verification workflows. |
+
+### What Went Well
+
+1. **The VFX root cause was found and fixed.** The 7-sprint mystery of "VFX pass all tests but are invisible" was caused by a single UE5 behavior: `SpawnActor<AActor>` with an `FTransform` parameter silently discards the transform when the actor has no `RootComponent`. The mesh component then registered at world origin (0,0,0). Every VFX actor -- death puff, hop dust, home sparkle -- has been spawning at the bottom-left corner of the screen since Sprint 5. The fix is 13 lines in `FroggerVFXManager.cpp`: set `RootComponent` before `RegisterComponent`, then call `SetActorLocation`/`SetActorScale3D` explicitly. This is now documented in agent profiles as gotcha #7.
+
+2. **PlayUnreal was used as a tool, not just built as a deliverable.** For the first time, `verify_visuals.py` was run against a live game via `run-playunreal.sh`. It produced 5 screenshots and a 3-second death video with extracted frames. The diagnostic report (`Saved/PlayUnreal/diagnostic_report.json`) confirms: RC API connection OK, GameMode discovered at the correct object path, `GetGameStateJSON` returns valid data, `RequestHop` accepts FVector parameters, Frog properties readable. PlayUnreal is OPERATIONAL.
+
+3. **Visual evidence now exists.** `Saved/Screenshots/verify_visuals/` contains:
+   - `01_title_1.png` -- Title screen ("UNREAL FROG / A MOB PROGRAMMING PRODUCTION")
+   - `02_playing_1.png` -- Gameplay with frog visible, hazards moving, HUD showing SCORE/LIVES/WAVE
+   - `03_after_hops_1.png` -- Frog has moved (position changed), game state still Playing
+   - `04_death_video.mov` -- 3-second video capture of death sequence
+   - `05_after_forward_1.png` -- Post-forward-hop into traffic
+   - `06_final_1.png` -- Final state verification
+   - `frames/frame_005_at_2.0s.png` -- **Death puff VFX clearly visible** as a large pink sphere, confirming camera-relative scaling + root component fix ARE working
+
+4. **The cycle broke.** The pattern table from the Sprint 8 retro listed 6 sprints where visual systems were added and the game was not launched. This hotfix session launched the game, captured screenshots, captured video, and visually confirmed the VFX fix. Section 9 of the agreements was followed for the first time.
+
+### What Caused Friction
+
+1. **HighResShot screenshots did not work.** (TECHNICAL) The original `client.py` screenshot implementation used UE5's `HighResShot` console command via Remote Control API. This produced no output -- likely because the `-game` mode does not process console commands the same way as PIE mode. The fix was pragmatic: use macOS `screencapture` to capture the game window directly. This is platform-specific but functional.
+   - **Lesson:** When the engine's internal screenshot mechanism does not work, OS-level window capture is a reliable fallback. The screenshots capture exactly what the player sees, which is the point.
+
+2. **verify_visuals.py initially hopped forward into traffic.** (DESIGN) The movement verification step (Step 3) originally sent forward hops, which immediately killed the frog in traffic lanes. The fix was to use safe row-0 left/right hops for movement verification, then intentionally hop into traffic for the death VFX capture step. This is a better test design: verify basic functionality safely first, then trigger the dangerous scenario deliberately.
+
+3. **No automated assertion on visual output.** (GAP) verify_visuals.py captures screenshots and checks game state changes (position, score, gameState), but does not programmatically verify that VFX are visible in the captured images. The death puff visibility was confirmed by a human looking at the screenshot. This is acceptable for now -- human review of screenshots is infinitely better than no review at all -- but automated visual assertions (pixel sampling, bounding box detection) would catch regressions without human intervention.
+
+4. **Score pops still unverified.** (INCOMPLETE) The screenshots show the HUD (SCORE, LIVES, WAVE) at the top of the screen, but no "+50" or "+100" score pop is visible near the frog. This could mean: (a) the `ProjectWorldLocationToScreen` fix is working but the pop duration is too short to capture, (b) the pop is not triggering, or (c) the projection is off-screen. This needs a targeted test with multiple rapid screenshots after a scoring hop.
+
+5. **Ground color change unverified.** (INCOMPLETE) All screenshots are from Wave 1. The ground color temperature change (cool-to-warm across waves) has not been verified because verify_visuals.py does not progress through multiple waves. Needs a multi-wave test script.
+
+6. **Wave fanfare unverified.** (INCOMPLETE) No wave transition was captured. Same reason as above.
+
+### Sprint 8 Retro Action Items -- Status
+
+- [x] **P0: Run PlayUnreal acceptance test against a live game.** -- DONE. `diagnose.py` ran successfully. `verify_visuals.py` ran against a live game. RC API connection verified. Object discovery works. Hop commands accepted. State queries return valid JSON. Screenshots captured. PlayUnreal is OPERATIONAL.
+- [~] **P0: Run PlayUnreal and visually verify ALL Sprint 8 visual changes.** -- PARTIALLY DONE.
+  - [x] (a) Death puff VFX is large enough to see from Z=2200 camera -- **YES.** `frame_005_at_2.0s.png` shows a large pink sphere filling ~8% of the screen. Camera-relative scaling + root component fix confirmed working.
+  - [ ] (b) Score pops appear near frog position not top-left corner -- **UNVERIFIED.** No score pop visible in any screenshot. Needs targeted test.
+  - [ ] (c) Home slot celebrations appear at correct grid positions -- **UNVERIFIED.** No home slot reached during verify_visuals run.
+  - [ ] (d) Ground color changes between waves -- **UNVERIFIED.** Only Wave 1 tested.
+  - [ ] (e) Wave fanfare text animates -- **UNVERIFIED.** No wave transition captured.
+- [ ] **P0: Create visual_smoke_test.py.** -- NOT DONE as a separate script. `verify_visuals.py` covers Steps 1-5 of what visual_smoke_test.py would do. However, it does not trigger every VFX/HUD element. Needs expansion or a companion script for wave transitions and home slot fills.
+- [ ] **P1: Fix acceptance test assertions.** -- NOT DONE. `acceptance_test.py` still asserts `score >= 0` and accepts death as OK.
+- [x] **P1: Investigate why VFX changes are not visible.** -- DONE. **Root cause found and fixed.** `SpawnActor<AActor>` discards FTransform without RootComponent. All VFX were spawning at world origin. Fix committed in `902d1b8`. Visually confirmed via `frame_005_at_2.0s.png`.
+
+### Agreements to Change
+
+No new agreement sections needed. The existing agreements (especially Sections 9, 20, and 21) are correct and were actually followed in this session for the first time. The changes needed are enforcement consistency, not rule creation.
+
+**One observation for the record:** The root cause of 7 sprints of invisible VFX was a 13-line bug in `SpawnVFXActor`. Not a design problem, not a process problem, not a testing philosophy problem. A concrete C++ bug where UE5 silently discards a constructor parameter. This is the kind of bug that launching the game once would have caught instantly. Every word written in Sections 9, 20, and 21 about "launch the game and look at the screen" was correct. The team just needed to do it.
+
+### Action Items for Sprint 9
+
+- [ ] **P0: Verify score pop positioning in running game.** Take rapid burst screenshots immediately after a scoring hop. Confirm "+50" text appears near the frog, not at top-left corner. If broken, fix the projection math. (Engine Architect + QA Lead)
+- [ ] **P0: Verify home slot celebrations.** Script that hops the frog across road + river into a home slot. Screenshot the celebration effect. Confirm it appears at the correct grid position. (QA Lead)
+- [ ] **P0: Verify multi-wave visual changes.** Script that plays through Waves 1-3 (or uses `reset_game` + state manipulation). Screenshot ground color at each wave. Confirm wave fanfare text appears during transition. (QA Lead + Game Designer)
+- [ ] **P1: Strengthen acceptance_test.py assertions.** `score > 0`, not `>= 0`. `lives >= 1 OR home_filled >= 1`. Death-only runs should be flagged, not accepted. (DevOps)
+- [ ] **P1: Expand verify_visuals.py to cover all VFX/HUD elements.** Add steps for: home slot fill, wave transition, score pop burst capture, hop dust visibility. This replaces the unwritten `visual_smoke_test.py`. (QA Lead + DevOps)
+- [ ] **P1: Add UE5 SpawnActor RootComponent lesson to unreal-conventions skill.** `SpawnActor<AActor>` with FTransform silently discards transform if no RootComponent. This is a critical gotcha that should be in the team's shared knowledge. (Engine Architect)
+- [ ] **P2: Investigate automated visual assertions.** Can we sample pixels at expected VFX locations in screenshots to detect presence/absence without human review? Low priority -- human review is working now. (DevOps)
+- [ ] **Stretch: UFroggerGameCoordinator extraction.** GameMode is still a god object. Deferred from Sprint 6. Not urgent but growing. (Engine Architect)
+
+### Open Questions
+
+- [ ] Are score pops working correctly with `ProjectWorldLocationToScreen`, or is the projection producing off-screen coordinates? (Needs targeted test)
+- [ ] Is the ground color temperature change perceptible between Wave 1 and Wave 3, or is the gradient too subtle? (Needs multi-wave test)
+- [ ] Should verify_visuals.py become the standard pre-commit gate (run automatically), or remain a manual step? (Process question for Sprint 9 IPM)
+- [ ] What is the quality bar for final audio -- keep 8-bit procedural or invest in higher-fidelity? (Carried forward, 4th time)
+
+### Sprint 8 Hotfix Stats
+
+- **Tests:** 170 (unchanged -- hotfix was 2 code fixes + tooling, no new tests)
+- **Code commits:** 3 (VFX root component fix, zero-direction hop guard, PlayUnreal screencapture)
+- **Docs commits:** 4 (retro, transcripts, README, CLAUDE.md, agent profiles)
+- **Screenshots captured:** 6 images + 1 video + 6 extracted frames = **first visual evidence in project history**
+- **PlayUnreal status:** OPERATIONAL. RC API connection confirmed. State queries work. Hop commands work. Screenshots work. Video capture works.
+- **Visual verification:** Section 9 followed for the FIRST TIME (Sprint 2 through Sprint 8 hotfix = 7 consecutive violations, then compliance)
+- **VFX root cause:** `SpawnActor<AActor>` discards FTransform without RootComponent. All VFX spawning at world origin since Sprint 5. 13-line fix.
+- **Defect escape rate:** 1 critical bug found and fixed (VFX root component). 1 defensive fix (zero-direction hop). Both would have been caught by a single play-test session at any point in Sprints 5-8.
+
+### The Updated Pattern
+
+| Sprint | Visual System Added | Launched Game? | Bugs Found by Stakeholder |
+|--------|-------------------|----------------|--------------------------|
+| 2 | Meshes, camera, HUD, lighting | No (until forced) | 3 (no lighting, HUD unwired, camera wrong) |
+| 2-hotfix | Materials, overlaps, delegates | Stakeholder only | 4 (gray meshes, river death, no score, no restart) |
+| 5 | VFX, music, HUD polish, title screen | No | Unknown (QA pending) |
+| 6 | Death flash, score pop, TickVFX wiring | Partial (launch only) | Unknown (QA pending) |
+| 7 | Difficulty tuning, input buffer fix | Code-level only | 3 (VFX invisible, score pops wrong, PlayUnreal fake) |
+| 8 | VFX scaling, score pop projection, wave fanfare, ground color, PlayUnreal | No | ALL visual changes invisible |
+| **8-hotfix** | **VFX root component fix, PlayUnreal screencapture** | **YES -- verify_visuals.py + screenshots + video** | **0 (team found and fixed VFX root cause before stakeholder review)** |
+
+**The trend changed.** For the first time, the team found and fixed a visual bug before the stakeholder had to point it out. The mechanism that made this possible: running the game and looking at the screen. Not a new agreement. Not a new test. Just doing what the agreements have said to do since Sprint 2.
+
+---
+
+## Retrospective 9 — Strategic: Why Web Dev Works in One Prompt and UE Dev Takes 8 Sprints
+
+*Date: 2026-02-16*
+*Facilitator: XP Coach*
+*Participants: Engine Architect, DevOps Engineer, Game Designer, QA Lead*
+*Trigger: Stakeholder created WebFrogger (complete 3D Frogger in Three.js) in a single prompt*
+
+### 1. The Comparison
+
+| Metric | WebFrogger (Three.js) | UnrealFrog (UE 5.7) |
+|--------|----------------------|---------------------|
+| Total lines of code | 1,311 (1 file) | 11,393 (80+ files) |
+| Prompts / sprints | 1 | 8 sprints + 80 commits |
+| Tests written | 0 | 170+ |
+| Time from start to playable | ~2 minutes | ~8 sessions |
+| Visual bugs at first launch | 0 | 3 (Sprint 2), 4 (Sprint 2 hotfix) |
+| Sprints with unverified visuals | N/A (instant) | 7 consecutive |
+| Silent API failures encountered | 0 | 6 documented |
+| Feedback loop latency | <1 second | 2-5 minutes |
+| Assets required | 0 (geometry is code) | WAV files, .umap, runtime materials |
+| Build step | None (interpreted) | UBT compile, 45-90s per target |
+
+The ratio is not 10:1. It is closer to 100:1 in total effort for comparable gameplay output. The games have roughly equivalent mechanics: grid movement, scrolling hazards, river logs, home slots, lives, scoring.
+
+### 2. Why Web Dev Works
+
+Four analyses converge on the same root cause: **the web platform has zero distance between description and reality.**
+
+**Colors are values, not pipelines.** WebFrogger: `frog: 0x22cc22`. UnrealFrog: FlatColorMaterial.h -> runtime UMaterial -> CreateAndSetMaterialInstanceDynamic -> SetVectorParameterValue("Color") -- a 4-concept pipeline with a landmine (parameter name "Color" not "BaseColor"). The web version is 1 hex value. (Game Designer)
+
+**Meshes are geometry calls, not asset systems.** `new THREE.BoxGeometry(0.6, 0.35, 0.5)` creates a box. It IS its dimensions. In UE5, meshes are external concepts requiring LoadObject or ProceduralMeshComponent. Geometry IS code in web. Geometry REFERENCES code in UE. (Game Designer)
+
+**The DOM is the rendering model.** In web, the document IS the rendered output. `scene.add(mesh)` produces a visible mesh. In UE, there are 4 abstraction layers between code and pixels: UObject/Actor system, physics/collision, materials/rendering, world/level. Each layer has silent failure modes. (Engine Architect)
+
+**Verification is free.** Save index.html, open in browser, see the game. Total time: <1 second. The browser is simultaneously the authoring tool, the runtime, and the verifier. There is no separate verification step because rendering IS verification. (All four agents)
+
+**Sound is synthesis, not file I/O.** WebFrogger's hop sound: two oscillator calls, 2 lines. UnrealFrog's audio: UFroggerAudioManager subsystem + generate_sfx.py pipeline + 9 WAV files + USoundWaveProcedural + QueueAudio + native delegates + CI mute flag. The WebFrogger approach produces arguably better arcade audio. (Game Designer)
+
+**The web is a declarative game engine.** You describe what you want and it appears. UE5 is an imperative game engine. You must construct what you want through a sequence of API calls, each of which can fail silently. This is the deepest structural difference. (Game Designer)
+
+### 3. Why UE Dev Doesn't (Yet)
+
+The barriers fall into four categories:
+
+#### 3a. The Feedback Loop Is Open
+
+The team's most persistent failure -- 7 sprints of unverified visual output -- is a direct consequence of feedback loop latency. Web: write -> see (0.1s). UE current: write -> compile -> launch -> look (180+ seconds, and "look" is optional). When verification costs 2-5 minutes per cycle, rational agents skip it. (DevOps, Engine Architect)
+
+The agent operates through 4 layers of indirection: filesystem -> compiler -> editor process -> HTTP API -> screencapture. The web agent never leaves its process. The browser IS the runtime. (DevOps)
+
+#### 3b. Silent Failure Modes
+
+UE APIs are designed for maximum flexibility, which means they fail silently rather than loudly. Six documented silent failures across 8 sprints:
+
+| Silent Failure | Sprints Undetected | Web Equivalent |
+|---|---|---|
+| SetVectorParameterValue("BaseColor") no-op | S2 -> S2-hotfix | `color: red` works or errors |
+| SpawnActor discards FTransform without RootComponent | S5 -> S8-hotfix (3 sprints!) | `scene.add(mesh)` always works |
+| SetActorLocation defers overlaps | S2 -> S2-hotfix | Position is immediate |
+| Delegate declared but never bound | S2 -> S2-hotfix | Direct function calls, no wiring |
+| OverlapMultiByObjectType returns stale data | S2 -> S2-hotfix | No physics tick sync needed |
+| Broadcast() fails silently without world context | S3 -> S3 | Events fire or throw |
+
+In web, the browser DevTools show every property set, every event fired, every layout reflow. The feedback is immediate and visible. In UE, the feedback is *nothing*. The code compiles, runs, returns no error, and the visual output is wrong. (Engine Architect)
+
+#### 3c. The Verification Gap
+
+170 tests passed for 7 sprints while VFX actors spawned at world origin. The QA Lead's autopsy reveals why: every test verifies CODE LOGIC in isolation; zero tests verify RENDERED OUTPUT. VFXTest.cpp tests null safety, math formulas, disable flags, and delegate compatibility. Not a single test spawns a VFX actor into a world and checks where it ended up. (QA Lead)
+
+The gap is between "testing code logic" and "testing rendered output." Position assertions (checking actor location after spawn) would have caught the VFX bug at zero cost in Sprint 5. But the team's mental model equated "tests pass" with "code works." In web, there is no equivalent gap because the test framework (Jest + jsdom, or Playwright) renders the output. (QA Lead)
+
+#### 3d. The Abstraction Tax
+
+UE's Actor/Component model is powerful but has a large surface area of non-obvious behaviors. Components must be registered. Root components are implicit. Materials are not colors. Overlap events are deferred. Object paths are map-specific. Each is correct from UE's perspective, but each is a trap for an agent writing from first principles. (Engine Architect)
+
+The abstraction tax compounds. A VFX system in web: ~50 lines. In UE: ~350 lines (FroggerVFXManager.cpp). The semantic content is identical. The ceremony is 7x. (Game Designer)
+
+### 4. What Must Change
+
+Ordered by impact. Each proposal has a concrete deliverable, not just a principle.
+
+#### Change 1: Auto-Screenshot After Every Build (Sprint 9 P0)
+
+**Problem:** The agent cannot see what it built. The feedback loop is open.
+**Solution:** After every successful Editor build that touches visual code, automatically launch the game, take a screenshot, and save it. The agent reads the screenshot (Claude is multimodal) before committing.
+**Deliverable:** A `build-and-verify.sh` script: UBT build -> headless unit tests -> launch game -> screenshot -> print path for agent to Read.
+**Impact:** Cuts "write -> see" from "never" to "120 seconds, mandatory." Would have caught every visual bug in project history.
+**Effort:** ~100 LOC (bash + Python). (DevOps Proposal 2, Engine Architect Proposal A)
+
+#### Change 2: Position Assertions in Tests (Sprint 9 P0)
+
+**Problem:** 170 tests verify code logic but zero verify spatial correctness.
+**Solution:** For every system that spawns actors (VFX, HUD, LaneManager, GameMode), add at least one test that creates a UWorld, spawns the actor, and asserts `GetActorLocation()` matches the requested position.
+**Deliverable:** New test category `[Spatial]` in run-tests.sh. Minimum 5 tests covering VFX spawn, frog spawn, hazard spawn, camera position, HUD anchor.
+**Impact:** Zero-cost (runs in NullRHI headless), catches the entire class of "actor at wrong position" bugs. Would have caught VFX origin bug in Sprint 5.
+**Effort:** ~100 LOC C++ test code. (QA Lead Improvement 1)
+
+#### Change 3: Keep-Alive Editor with Live Coding (Sprint 9 P1)
+
+**Problem:** Every verification cycle requires a 30-60 second editor launch.
+**Solution:** Keep the editor running between agent actions. Use UE5's Live Coding to recompile without restarting. Add `--keep-alive` to run-playunreal.sh and `live_compile()` to client.py.
+**Impact:** Cuts iteration cycle from 2-5 minutes to 15-30 seconds for behavioral/tuning changes.
+**Limitation:** Live Coding cannot add new UPROPERTYs or classes. Structural changes still require full restart.
+**Effort:** ~50 LOC. (DevOps Proposal 1)
+
+#### Change 4: Screenshot-in-the-Loop Process (Sprint 9 P0)
+
+**Problem:** PlayUnreal takes screenshots but the agent never reads them. The loop is open.
+**Solution:** After every screenshot, print `[SCREENSHOT] /absolute/path/to/file.png` in a format the agent recognizes. Update agent profiles to include: "after running PlayUnreal, always Read the screenshot files."
+**Impact:** Closes the feedback loop that has been open for 7 sprints. The agent will SEE what it built.
+**Effort:** ~20 LOC script changes + agent profile updates. (DevOps Proposal 2)
+
+#### Change 5: Deterministic Object Paths (Sprint 9 P1)
+
+**Problem:** PlayUnreal brute-forces 13 candidate object paths to find the GameMode. If UE changes naming, all paths break silently.
+**Solution:** Add `GetObjectPath()` UFUNCTION to GameMode returning its own path. Add `GetPawnPath()` returning the frog's path. One RC API call instead of 13.
+**Impact:** Faster, more reliable RC API interactions. Eliminates a class of silent failures.
+**Effort:** ~30 LOC C++. (DevOps Proposal 3)
+
+#### Change 6: State-Diff Client (Sprint 9 P1)
+
+**Problem:** `get_state()` returns a flat JSON blob. The agent must mentally diff to understand what changed.
+**Solution:** Add state-diff tracking to client.py. Each call returns both current state and a delta from previous call. "Score: 0 -> 10, frog moved from [6,0] to [6,1], lives: 3 -> 2."
+**Impact:** Clearer agent reasoning about state changes. Reduces cognitive overhead.
+**Effort:** ~40 LOC Python. (DevOps Proposal 3)
+
+#### Change 7: Declarative Scene Description (Sprint 10+, Research)
+
+**Problem:** UE requires imperative C++ to construct scenes. Each API call is a potential silent failure.
+**Solution:** A JSON/YAML scene description format loaded by a runtime interpreter. The agent writes config, not C++. Covers 80% of Frogger's needs (camera, lighting, entities, lane configs).
+**Impact:** Eliminates the entire class of "imperative construction" bugs (component registration, root components, material pipelines). Approaches web-dev's "describe and it appears."
+**Limitation:** Research-grade. Covers prototyping, not full engine capability.
+**Effort:** ~500 LOC C++ runtime loader + schema definition. (Game Designer Lesson 1, Layer 1)
+
+### 5. The Vision
+
+#### What "One-Prompt Unreal" Looks Like
+
+It is not possible today. But here is the roadmap:
+
+**Phase 1 (Sprint 9): Close the feedback loop.**
+The agent can see what it builds. Auto-screenshots after every build. Position assertions in the test suite. PlayUnreal screenshots feed back into agent reasoning. The SpawnActor/RootComponent class of bugs is caught in the same sprint it is introduced. Iteration cycle drops from "never verified" to "verified every build."
+
+**Phase 2 (Sprint 10-11): Reduce the abstraction tax.**
+Data-driven scene descriptions replace imperative C++ for common patterns (spawning, positioning, coloring, lighting). Tunable values live in config files loaded at runtime, not in compiled C++. The agent writes a JSON file and sees the result in 30 seconds. The 7x ceremony gap (50 LOC web vs 350 LOC UE for equivalent VFX) shrinks to ~2x.
+
+**Phase 3 (Sprint 12+): Approach web-dev density.**
+Editor MCP server lets Claude Code treat the running editor as a tool provider. `call_ufunction`, `read_uproperty`, `screenshot`, `get_viewport_image` are first-class tools. The viewport framebuffer is captured via FScreenshotRequest (no OS screencapture needed). Hot reload works for most changes. The feedback loop approaches 10-15 seconds.
+
+**The honest assessment:** We will never achieve web-dev parity. The compilation step is an irreducible bottleneck. JavaScript is interpreted; C++ is compiled. The browser is 1 process; UE requires compiler + editor + renderer. But we can go from "the agent literally cannot see what it built" (current state) to "the agent sees a screenshot within 30 seconds" (Phase 1). That is a 10x improvement. Not parity, but enough to prevent 7 more sprints of invisible code. (DevOps)
+
+**The stakeholder's framing is correct:** This is not about one game. It is about proving that AI agents can build real games in real engines. The tools we build for UnrealFrog -- auto-screenshot, position assertions, PlayUnreal feedback loop, declarative scene descriptions -- are reusable for any UE5 project. The game is the proving ground. The tools are the product.
+
+### 6. Agreements to Change
+
+#### NEW Section 22: Position Assertions for Actor-Spawning Systems
+
+**Every system that spawns actors at runtime must have at least one test that creates a UWorld, spawns the actor, and asserts `GetActorLocation()` matches the requested position.** This test category (`[Spatial]`) runs in NullRHI headless mode and catches the entire class of "actor at wrong position" bugs that unit tests miss.
+
+Systems requiring spatial tests: VFXManager, LaneManager, GameMode (frog spawn, camera spawn, light spawn), HomeSlotManager, GroundBuilder.
+
+**Why:** 170 tests passed for 7 sprints while VFX actors spawned at world origin. Not a single test verified spatial correctness. Position assertions cost nothing and would have caught the bug in Sprint 5 instead of Sprint 8.
+
+#### NEW Section 23: Auto-Screenshot Build Gate
+
+**After every successful Editor build that modifies visual code, the build script must launch the game, take a screenshot, and save it to `Saved/Screenshots/auto/`.** The screenshot path is printed in a structured format. Agents must Read the screenshot before committing visual changes.
+
+"Visual code" is defined the same as in Section 21: VFX, HUD, materials, camera, lighting, ground appearance. If unsure, take the screenshot.
+
+**Why:** The feedback loop has been open for 7 sprints. Making screenshots automatic and mandatory -- not optional -- is the only change that has ever worked (Sprint 8 hotfix). This section makes that change structural.
+
+#### UPDATE Section 2: Add Spatial Testing Requirement
+
+Add to TDD is Mandatory:
+- **Spatial assertions for actor-spawning systems.** For every system that spawns actors at a specified position, write at least one test that verifies `GetActorLocation()` matches the requested spawn position. These tests run in NullRHI headless mode. Logic tests verify formulas; spatial tests verify the engine actually placed the actor where you asked. (Added: Strategic Retrospective 9 -- VFX origin bug survived 170 logic tests for 3 sprints.)
+
+#### UPDATE Section 9: Reference Auto-Screenshot
+
+Add to "How to verify":
+- **Automatic (preferred):** Run `build-and-verify.sh` which takes a post-build screenshot automatically. The agent Reads the screenshot file to confirm visual correctness. This is the default workflow for all visual changes.
+
+### 7. Agent Feedback — Key Quotes and Insights
+
+**Engine Architect** — "A successful UBT build tells you nothing about whether your actors are visible, positioned correctly, or behaving as intended. The web has no equivalent gap -- if `div.style.backgroundColor = 'red'` compiles, the div is red. Period." ... "The best verification is the verification that happens automatically. The agent should not have to choose to verify visual output. It should be unable to avoid it."
+
+**DevOps Engineer** — "We will never achieve web-dev parity. The compilation step alone is an irreducible bottleneck. But we can go from 'the agent literally cannot see what it built' to 'the agent sees a screenshot of its changes within 30 seconds.' That is a 10x improvement." ... "The root cause of every visual verification failure in Sprints 2-8 is the same: the feedback loop is open. We write code, we test code, we never look at the result."
+
+**Game Designer** — "WebFrogger has zero distance between description and reality. When the code says `color: 0x22cc22`, the thing IS green. There is no intermediate representation, no asset pipeline, no build step, no binary format, no material system, no component hierarchy." ... "The verification tax must be near-zero or it will be skipped. Our team is disciplined. We have 21 sections of agreements. We have a QA Lead. We have a definition of done. And we skipped visual verification for SEVEN SPRINTS. Why? Because it was expensive."
+
+**QA Lead** — "Every test is correct about what it tests. But not a single test spawns a VFX actor into a world and checks where it ended up." ... "The gap is not between 'no testing' and 'visual testing.' The gap is between 'testing code logic' and 'testing rendered output.' Position assertions bridge that gap without requiring screenshots, pixel diffs, or a running editor."
+
+### 8. Meta-Observation
+
+This retrospective is different from the previous 8. Those retrospectives asked: "What went wrong this sprint?" This one asks: "What is structurally wrong with how agents build games in Unreal Engine?"
+
+The answer is not "the team lacks discipline." The team has 21 sections of agreements, 170+ tests, 8 retrospectives, and a detailed retrospective log. The answer is: **the tools do not close the feedback loop.** Web development works in one prompt because the feedback loop is closed by default -- you cannot write web code without seeing the result. UE development fails in 8 sprints because the feedback loop is open by default -- you can write UE code for months without ever seeing the result.
+
+Every agreement we have written about visual verification (Sections 5a, 9, 21) is an attempt to manually close a loop that should be closed automatically. The Sprint 8 hotfix proved this: the moment someone actually ran the game and looked at the screen, the VFX bug was found and fixed in 13 lines. The 170 tests, 21 agreement sections, and 8 retrospectives did not find it. Running the game found it.
+
+The path forward is not more agreements. It is better tools. Tools that make "run the game and look at it" as effortless as "save and refresh." That is what Changes 1-4 deliver. That is what the stakeholder is asking for. That is what will make agentic Unreal development viable.
+
+### Action Items
+
+- [ ] **P0: Build `build-and-verify.sh`** — auto-screenshot after every visual build. (DevOps)
+- [ ] **P0: Write `[Spatial]` position assertion tests** — minimum 5 tests for VFX, frog, hazard, camera, light spawn positions. (QA Lead)
+- [ ] **P0: Screenshot-in-the-loop** — print structured paths after PlayUnreal screenshots; update agent profiles to Read screenshots. (DevOps)
+- [ ] **P1: Keep-alive editor + Live Coding** — `--keep-alive` flag for run-playunreal.sh, `live_compile()` for client.py. (DevOps)
+- [ ] **P1: Deterministic object paths** — `GetObjectPath()` and `GetPawnPath()` UFUNCTIONs on GameMode. (Engine Architect)
+- [ ] **P1: State-diff client** — delta tracking in client.py. (DevOps)
+- [ ] **P2: Declarative scene description** — Research spike for JSON/YAML scene format with runtime loader. (Engine Architect + Game Designer)
+- [ ] **P2: Use UE5 built-in screenshot APIs** — FScreenshotRequest, OnScreenshotCaptured instead of macOS screencapture. (Engine Architect)

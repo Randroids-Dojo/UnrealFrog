@@ -73,6 +73,27 @@ ScoreDelegate.AddDynamic(this, &AMyActor::HandleScoreChanged);
 - Use `TWeakObjectPtr<T>` for non-owning references
 - Use `UPROPERTY()` to prevent GC from collecting referenced objects
 
+## SpawnActor Transform Gotcha
+
+**`SpawnActor<AActor>` silently discards the FTransform parameter when the spawned actor has no RootComponent.** This means dynamically spawned actors with only a mesh component (no scene root) will always appear at world origin (0,0,0) regardless of the Location you pass.
+
+```cpp
+// WRONG — transform is silently discarded because AActor has no RootComponent
+AActor* VFX = World->SpawnActor<AActor>(AActor::StaticClass(), &SpawnTransform);
+UStaticMeshComponent* Mesh = NewObject<UStaticMeshComponent>(VFX);
+Mesh->RegisterComponent(); // Registers at origin, not at SpawnTransform
+
+// CORRECT — set RootComponent first, then attach and position explicitly
+AActor* VFX = World->SpawnActor<AActor>(AActor::StaticClass());
+UStaticMeshComponent* Mesh = NewObject<UStaticMeshComponent>(VFX);
+VFX->SetRootComponent(Mesh);          // Must come before RegisterComponent
+Mesh->RegisterComponent();
+VFX->SetActorLocation(DesiredLocation);
+VFX->SetActorScale3D(DesiredScale);
+```
+
+**Why this matters:** This bug caused 7 sprints of invisible VFX in UnrealFrog. All 170 unit tests passed because they verified the math (scale calculations, positions), not the actual rendered output. Only launching the game and looking at the screen revealed that every VFX actor was at world origin.
+
 ## Common Patterns
 
 - **BeginPlay()** for runtime initialization (not constructor)

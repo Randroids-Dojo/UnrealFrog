@@ -1,7 +1,7 @@
 # Team Working Agreements
 
 *This is a living document. Updated during retrospectives by the XP Coach.*
-*Last updated: Sprint 8 Retrospective*
+*Last updated: Strategic Retrospective 9*
 
 ## Day 0 Agreements
 
@@ -27,6 +27,7 @@ These are our starting agreements. They WILL evolve through retrospectives.
 - **Seam test coverage matrix.** Maintain a seam test matrix in `Docs/Testing/seam-matrix.md` listing all pairs of systems with runtime interactions. Each pair must have either a test case name or an explicit "deferred — low risk" acknowledgment. Review the matrix before marking a sprint complete and add tests for any new seams. (Added: Sprint 4 Retrospective — round restart bug was a missed seam between RoundComplete → OnSpawningComplete → Respawn.)
 - **Floating-point boundary testing.** When writing tests for threshold/boundary conditions, compute exact decimal values and pick test inputs with clear margin from the boundary. Never rely on mental arithmetic for floating-point comparisons (e.g., 5.0/30.0 = 0.1667 is BELOW 0.167, not above). (Added: Sprint 6 Retrospective — timer warning seam test had a boundary math error.)
 - **Tuning-resilient test design.** When writing tests for tunable values (difficulty curves, timing thresholds), read the actual parameter from the game object at test time instead of hardcoding expected values. Tests should verify the *formula* is correct, not specific magic numbers. (Added: Sprint 7 Retrospective — codifies QA Lead's Seam 16 refactor pattern.)
+- **Spatial assertions for actor-spawning systems.** For every system that spawns actors at a specified position, write at least one test that creates a UWorld, spawns the actor, and verifies `GetActorLocation()` matches the requested position. These tests run in NullRHI headless mode under the `[Spatial]` category. Logic tests verify formulas; spatial tests verify the engine actually placed the actor where you asked. (Added: Strategic Retrospective 9 — VFX origin bug survived 170 logic tests for 3 sprints because no test checked actor position after spawn.)
 
 ### 3. Communication Protocol
 
@@ -102,9 +103,10 @@ A sprint is NOT done until ALL of the following are completed **in order**. Each
 **The rule:** Any commit that modifies visual output MUST be accompanied by a screenshot or PlayUnreal log proving the change is visible in the running game. "Visual output" means: VFX effects, HUD elements, materials, camera, lighting, ground appearance, score pops, death flash, wave announcements, or any other change intended to be seen by the player.
 
 **How to verify:**
-1. **Preferred:** Run `Tools/PlayUnreal/run-playunreal.sh <script>` where `<script>` triggers the visual element and takes a screenshot. Save to `Saved/Screenshots/`.
-2. **Fallback (if PlayUnreal is not operational):** Launch the game manually per Section 14 commands. Take a macOS screenshot (Cmd+Shift+4). Save to `Saved/Screenshots/`.
-3. **Last resort:** If neither method works, the commit message MUST include `visual verification: SKIPPED -- [specific reason]`. This marks the commit as a draft that BLOCKS sprint completion (see Section 5a step 4).
+1. **Automatic (preferred):** Run `Tools/PlayUnreal/build-and-verify.sh` which takes a post-build screenshot automatically. The agent Reads the screenshot file to confirm visual correctness. See Section 23. (Added: Strategic Retrospective 9)
+2. **Manual PlayUnreal:** Run `Tools/PlayUnreal/run-playunreal.sh <script>` where `<script>` triggers the visual element and takes a screenshot. Save to `Saved/Screenshots/`.
+3. **Manual launch (if PlayUnreal is not operational):** Launch the game manually per Section 14 commands. Take a macOS screenshot (Cmd+Shift+4). Save to `Saved/Screenshots/`.
+4. **Last resort:** If no method works, the commit message MUST include `visual verification: SKIPPED -- [specific reason]`. This marks the commit as a draft that BLOCKS sprint completion (see Section 5a step 4).
 
 **XP Coach enforcement:** The XP Coach MUST verify that screenshot evidence exists before approving any visual commit. If no evidence exists and no "SKIPPED" note is in the commit message, the XP Coach rejects the commit. This is a hard gate.
 
@@ -244,7 +246,7 @@ Sprint 8 action: DevOps adds `mkdir`-based atomic lock file to run-tests.sh with
 
 Until PlayUnreal has been **verified working against a live game**, "QA: verified" in commit messages is only valid for code-level checks, not gameplay verification. **PlayUnreal is the team's highest priority.**
 
-**Current state (Sprint 8):** Code exists but is UNVERIFIED. `Tools/PlayUnreal/client.py` (385 LOC), `acceptance_test.py` (159 LOC), and `run-playunreal.sh` (154 LOC) were committed in Sprint 8. `GetGameStateJSON()` was added to GameMode. RemoteControl plugins are enabled in .uproject. However, **none of this has been run against a live editor.** The acceptance test has never been executed. No screenshots have been taken. The code may or may not work.
+**Current state (Sprint 8 hotfix):** PlayUnreal is OPERATIONAL. RC API connection confirmed. State queries work. Hop commands work. Screenshots work. Video capture works. `diagnose.py` verified live GameMode and FrogCharacter paths. `verify_visuals.py` ran successfully and produced the first visual evidence in project history (6 screenshots + 1 video). Acceptance test (`acceptance_test.py`) has NOT been run end-to-end. (Updated: Strategic Retrospective 9)
 
 **Implementation approach:** UE 5.7 Remote Control API plugin (localhost:30010) + Python client. `GetGameStateJSON()` UFUNCTION on GameMode for state queries.
 
@@ -275,6 +277,32 @@ Until PlayUnreal has been **verified working against a live game**, "QA: verifie
 - **Visual regression testing (7th deferral):** DROPPED. PlayUnreal screenshots provide screenshot-based verification naturally. Automated pixel-diff comparison is not needed when agents are not even taking screenshots.
 - **Packaging step in CI (7th deferral):** DROPPED. No packaging sprint on the roadmap. Re-create if shipping build becomes a goal.
 - **Rename PlayUnreal E2E (8th deferral):** DROPPED. Entire PlayUnreal architecture was rebuilt in Sprint 8. Naming is moot.
+
+### 22. Position Assertions for Actor-Spawning Systems (Added: Strategic Retrospective 9)
+
+**Every system that spawns actors at runtime must have at least one test that creates a UWorld, spawns the actor, and asserts `GetActorLocation()` matches the requested position.** These tests use the `[Spatial]` category in run-tests.sh and run in NullRHI headless mode.
+
+Systems requiring spatial tests: VFXManager, LaneManager, GameMode (frog spawn, camera spawn, light spawn), HomeSlotManager, GroundBuilder.
+
+The purpose of spatial tests is distinct from logic tests:
+- **Logic tests** verify formulas, state machines, and code paths (e.g., "does CalculateScaleForScreenSize return the right number?")
+- **Spatial tests** verify the engine placed the actor where you asked (e.g., "after SpawnDeathPuff(FVector(600,400,0)), is the actor at (600,400,0)?")
+
+Both are necessary. Logic tests pass when the math is right. Spatial tests fail when the engine silently discards your transform (e.g., SpawnActor without RootComponent).
+
+**Why:** VFX actors spawned at world origin (0,0,0) instead of the frog's position for 3 sprints (S5-S8). 170 logic tests passed because they tested math and null safety. Zero tests checked where the actor actually ended up. A single spatial assertion would have caught this in Sprint 5.
+
+### 23. Auto-Screenshot Build Gate (Added: Strategic Retrospective 9)
+
+**After every successful Editor build that modifies visual code, the build-and-verify script must launch the game, take a screenshot, and save it to `Saved/Screenshots/auto/`.** The screenshot path is printed in a structured format (`[SCREENSHOT] /absolute/path`). Agents must Read the screenshot before committing visual changes.
+
+"Visual code" is defined the same as in Section 21: VFX, HUD, materials, camera, lighting, ground appearance. If unsure, take the screenshot.
+
+The auto-screenshot is the UE equivalent of "save and refresh" in web development. It is the minimum viable feedback loop. The goal is to make visual verification automatic and mandatory rather than optional and manual.
+
+**Deliverable:** `Tools/PlayUnreal/build-and-verify.sh` — UBT build -> unit tests -> launch game -> screenshot -> print path.
+
+**Why:** The team skipped visual verification for 7 consecutive sprints because it was expensive and optional. The Sprint 8 hotfix proved that running the game and looking at the screen catches bugs that 170 tests miss. This section makes that step automatic. The agent should be unable to avoid seeing what it built.
 
 ## Things We Will Figure Out Together
 

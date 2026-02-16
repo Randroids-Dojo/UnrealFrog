@@ -2,7 +2,27 @@
 
 *Persistent knowledge accumulated across sessions. First 200 lines loaded automatically.*
 
-## Sprint 8 Retrospective (2026-02-15) -- LATEST
+## Strategic Retrospective 9 (2026-02-16) -- LATEST
+
+### The Core Insight
+The gap between web dev and UE dev is not effort or discipline -- it is feedback loop architecture. Web: write -> see (0.1s). UE: write -> compile -> launch -> look (180s, optional). When verification is expensive and optional, rational agents skip it. 7 sprints proved this.
+
+### What Changed in Agreements
+- NEW Section 22: Position assertions for actor-spawning systems (`[Spatial]` test category)
+- NEW Section 23: Auto-screenshot build gate (`build-and-verify.sh`)
+- UPDATE Section 2: Added spatial testing requirement
+- UPDATE Section 9: Added auto-screenshot as preferred verification method
+- UPDATE Section 20: PlayUnreal status updated to OPERATIONAL (Sprint 8 hotfix verified it)
+
+### The Roadmap
+- Phase 1 (Sprint 9): Close the feedback loop -- auto-screenshots, position assertions, screenshot-in-the-loop
+- Phase 2 (Sprint 10-11): Reduce abstraction tax -- declarative scene descriptions, config-driven tuning
+- Phase 3 (Sprint 12+): Approach web-dev density -- Editor MCP server, FScreenshotRequest, hot reload
+
+### Process Meta-Lesson
+More agreements do not fix structural problems. 21 sections of agreements could not close the feedback loop. Tools that make verification automatic and mandatory are the only reliable mechanism. The Sprint 8 hotfix proved it: running the game and looking at the screen found the bug. Not agreements, not tests, not retrospectives.
+
+## Sprint 8 Retrospective (2026-02-15)
 
 ### Critical Failure
 Sprint 8 wrote 888 lines of VFX/HUD code, built PlayUnreal (698 LOC Python), 170 tests pass -- and the stakeholder confirmed the game looks identical to before the sprint. NOBODY launched the game. PlayUnreal was built but never run. Section 9 has been violated for 7 consecutive sprints.
