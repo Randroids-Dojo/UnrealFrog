@@ -3,6 +3,7 @@
 #include "Core/FrogCharacter.h"
 #include "Core/FlatColorMaterial.h"
 #include "Core/HazardBase.h"
+#include "Core/ModelFactory.h"
 #include "Components/AudioComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -45,19 +46,15 @@ void AFrogCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// Create a bright green dynamic material for the frog placeholder
-	if (MeshComponent && MeshComponent->GetStaticMesh())
+	// Hide the constructor's placeholder sphere — multi-part model replaces it
+	if (MeshComponent)
 	{
-		if (UMaterial* FlatColor = GetOrCreateFlatColorMaterial())
-		{
-			MeshComponent->SetMaterial(0, FlatColor);
-		}
-		UMaterialInstanceDynamic* DynMat = MeshComponent->CreateAndSetMaterialInstanceDynamic(0);
-		if (DynMat)
-		{
-			DynMat->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.1f, 0.9f, 0.1f));
-		}
+		MeshComponent->SetVisibility(false);
+		MeshComponent->SetStaticMesh(nullptr);
 	}
+
+	// Build multi-part frog model (body, belly, eyes, pupils, legs)
+	FModelFactory::BuildFrogModel(this);
 
 	// Bind overlap events for collision detection
 	CollisionComponent->OnComponentBeginOverlap.AddDynamic(this, &AFrogCharacter::OnBeginOverlap);
@@ -425,8 +422,8 @@ void AFrogCharacter::FindPlatformAtCurrentPosition()
 		// so the frog's body doesn't visually hang off the edge into water.
 		float EffectiveHalfWidth = HalfWidth - PlatformLandingMargin;
 		if (EffectiveHalfWidth > 0.0f &&
-			FMath::Abs(FrogPos.X - HazardPos.X) <= HalfCell &&
-			FMath::Abs(FrogPos.Y - HazardPos.Y) <= EffectiveHalfWidth)
+			FMath::Abs(FrogPos.X - HazardPos.X) <= EffectiveHalfWidth &&
+			FMath::Abs(FrogPos.Y - HazardPos.Y) <= HalfCell)
 		{
 			CurrentPlatform = Hazard;
 			return;
@@ -454,8 +451,8 @@ void AFrogCharacter::HandleHazardOverlap(AHazardBase* Hazard)
 		float EffectiveHalfWidth = HalfWidth - PlatformLandingMargin;
 		float HalfCell = GridCellSize * 0.5f;
 		if (EffectiveHalfWidth > 0.0f &&
-			FMath::Abs(FrogPos.X - HazardPos.X) <= HalfCell &&
-			FMath::Abs(FrogPos.Y - HazardPos.Y) <= EffectiveHalfWidth)
+			FMath::Abs(FrogPos.X - HazardPos.X) <= EffectiveHalfWidth &&
+			FMath::Abs(FrogPos.Y - HazardPos.Y) <= HalfCell)
 		{
 			CurrentPlatform = Hazard;
 		}

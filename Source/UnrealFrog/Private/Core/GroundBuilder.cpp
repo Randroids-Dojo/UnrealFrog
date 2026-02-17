@@ -2,6 +2,7 @@
 
 #include "Core/GroundBuilder.h"
 #include "Core/FlatColorMaterial.h"
+#include "Core/ModelFactory.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -178,40 +179,67 @@ void AGroundBuilder::UpdateWaveColor(int32 WaveNumber)
 
 void AGroundBuilder::SpawnHomeSlotIndicator(int32 Column)
 {
-	if (!CubeMesh)
-	{
-		return;
-	}
-
-	UStaticMeshComponent* Indicator = NewObject<UStaticMeshComponent>(this);
-	if (!Indicator)
-	{
-		return;
-	}
-
-	Indicator->SetStaticMesh(CubeMesh);
-
-	// Position: center of the cell at (Column, HomeSlotRow)
+	// Position anchor for this home slot's lily pad model
 	float CenterX = static_cast<float>(Column) * GridCellSize + GridCellSize * 0.5f;
 	float CenterY = static_cast<float>(HomeSlotRow) * GridCellSize + GridCellSize * 0.5f;
-	float CenterZ = 1.0f;  // Slightly elevated above the row plane
 
-	Indicator->SetWorldLocation(FVector(CenterX, CenterY, CenterZ));
+	// Create a scene component as a position anchor, then spawn lily pad
+	// model components as children. The factory attaches to Owner->GetRootComponent(),
+	// so we create an anchor at the slot position and reparent the parts.
+	USceneComponent* Anchor = NewObject<USceneComponent>(this,
+		*FString::Printf(TEXT("HomeSlotAnchor_%d"), Column));
+	Anchor->SetupAttachment(GetRootComponent());
+	Anchor->SetWorldLocation(FVector(CenterX, CenterY, 1.0f));
+	Anchor->RegisterComponent();
 
-	// Scale: 80x80 UU plane (0.8 of a cell), thin
-	Indicator->SetWorldScale3D(FVector(0.8f, 0.8f, 0.05f));
+	// Spawn lily pad parts: cylinder pad + sphere flower
+	// We use the factory's mesh accessors and color palette directly
+	// rather than calling BuildLilyPadModel, since we need world positioning.
+	UStaticMesh* CylinderMesh = FModelFactory::GetCylinderMesh();
+	UStaticMesh* SphereMesh = FModelFactory::GetSphereMesh();
 
-	Indicator->RegisterComponent();
-	Indicator->AttachToComponent(GetRootComponent(), FAttachmentTransformRules::KeepWorldTransform);
+	if (!CylinderMesh || !SphereMesh)
+	{
+		return;
+	}
 
-	// Apply flat color material and set home slot color
+	// Pad: flattened cylinder (0.8 diameter, 0.05 height)
+	UStaticMeshComponent* Pad = NewObject<UStaticMeshComponent>(this,
+		*FString::Printf(TEXT("LilyPad_%d"), Column));
+	Pad->SetStaticMesh(CylinderMesh);
+	Pad->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	Pad->SetupAttachment(Anchor);
+	Pad->SetRelativeLocation(FVector(0, 0, 2));
+	Pad->SetRelativeScale3D(FVector(0.8f, 0.8f, 0.05f));
+	Pad->RegisterComponent();
+
 	if (UMaterial* FlatColor = GetOrCreateFlatColorMaterial())
 	{
-		Indicator->SetMaterial(0, FlatColor);
+		Pad->SetMaterial(0, FlatColor);
 	}
-	UMaterialInstanceDynamic* DynMat = Indicator->CreateAndSetMaterialInstanceDynamic(0);
-	if (DynMat)
+	UMaterialInstanceDynamic* PadMat = Pad->CreateAndSetMaterialInstanceDynamic(0);
+	if (PadMat)
 	{
-		DynMat->SetVectorParameterValue(TEXT("Color"), HomeSlotColor);
+		PadMat->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.067f, 0.467f, 0.067f));
+	}
+
+	// Flower: small sphere
+	UStaticMeshComponent* Flower = NewObject<UStaticMeshComponent>(this,
+		*FString::Printf(TEXT("LilyFlower_%d"), Column));
+	Flower->SetStaticMesh(SphereMesh);
+	Flower->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	Flower->SetupAttachment(Anchor);
+	Flower->SetRelativeLocation(FVector(15, -10, 8));
+	Flower->SetRelativeScale3D(FVector(0.24f, 0.24f, 0.24f));
+	Flower->RegisterComponent();
+
+	if (UMaterial* FlatColor = GetOrCreateFlatColorMaterial())
+	{
+		Flower->SetMaterial(0, FlatColor);
+	}
+	UMaterialInstanceDynamic* FlowerMat = Flower->CreateAndSetMaterialInstanceDynamic(0);
+	if (FlowerMat)
+	{
+		FlowerMat->SetVectorParameterValue(TEXT("Color"), FLinearColor(1.0f, 0.412f, 0.706f));
 	}
 }

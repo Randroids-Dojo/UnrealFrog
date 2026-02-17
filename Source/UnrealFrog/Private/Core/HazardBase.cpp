@@ -2,6 +2,7 @@
 
 #include "Core/HazardBase.h"
 #include "Core/FlatColorMaterial.h"
+#include "Core/ModelFactory.h"
 #include "Core/UnrealFrogGameMode.h"
 #include "Components/BoxComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -182,70 +183,37 @@ float AHazardBase::GetWrapMaxX() const
 
 void AHazardBase::SetupMeshForHazardType()
 {
-	if (!MeshComponent)
+	// Hide the constructor's placeholder mesh — multi-part model replaces it
+	if (MeshComponent)
 	{
-		return;
+		MeshComponent->SetVisibility(false);
+		MeshComponent->SetStaticMesh(nullptr);
 	}
 
-	// Determine if this is a river object (cylinder) or road object (cube)
-	bool bIsRiverObject = (HazardType == EHazardType::SmallLog
-		|| HazardType == EHazardType::LargeLog
-		|| HazardType == EHazardType::TurtleGroup);
+	// Car colors vary per lane. WebFrogger uses car1=red, car2=blue, car3=orange.
+	// We assign based on movement direction as a simple differentiator.
+	FLinearColor CarColor = bMovesRight
+		? FLinearColor(0.933f, 0.188f, 0.188f)   // Red (car1)
+		: FLinearColor(0.200f, 0.400f, 1.0f);     // Blue (car2)
 
-	// Assign the appropriate mesh
-	if (bIsRiverObject && CylinderMeshAsset)
-	{
-		MeshComponent->SetStaticMesh(CylinderMeshAsset);
-
-		// Rotate cylinder 90 degrees to lie flat along X axis
-		MeshComponent->SetRelativeRotation(FRotator(0.0f, 90.0f, 0.0f));
-	}
-	else if (!bIsRiverObject && CubeMeshAsset)
-	{
-		MeshComponent->SetStaticMesh(CubeMeshAsset);
-	}
-
-	// Scale based on HazardWidthCells
-	// Default cube/cylinder is 100 UU (1 cell) in each axis
-	// X: scale by width in cells
-	// Y: 1.0 (one cell deep)
-	// Z: 0.5 (half cell height so hazards don't look too tall)
-	float ScaleX = static_cast<float>(HazardWidthCells);
-	MeshComponent->SetWorldScale3D(FVector(ScaleX, 1.0f, 0.5f));
-
-	// Select color based on hazard type
-	FLinearColor HazardColor = FLinearColor::White;
 	switch (HazardType)
 	{
 	case EHazardType::Car:
-		HazardColor = FLinearColor(0.9f, 0.1f, 0.1f);  // Red
+	case EHazardType::Motorcycle:
+		FModelFactory::BuildCarModel(this, CarColor);
 		break;
 	case EHazardType::Truck:
-		HazardColor = FLinearColor(0.6f, 0.1f, 0.1f);  // Dark red
+		FModelFactory::BuildTruckModel(this);
 		break;
 	case EHazardType::Bus:
-		HazardColor = FLinearColor(0.9f, 0.5f, 0.1f);  // Orange
-		break;
-	case EHazardType::Motorcycle:
-		HazardColor = FLinearColor(0.9f, 0.9f, 0.1f);  // Yellow
+		FModelFactory::BuildBusModel(this);
 		break;
 	case EHazardType::SmallLog:
 	case EHazardType::LargeLog:
-		HazardColor = FLinearColor(0.5f, 0.3f, 0.1f);  // Brown
+		FModelFactory::BuildLogModel(this, HazardWidthCells);
 		break;
 	case EHazardType::TurtleGroup:
-		HazardColor = FLinearColor(0.1f, 0.5f, 0.2f);  // Dark green
+		FModelFactory::BuildTurtleGroupModel(this, HazardWidthCells);
 		break;
-	}
-
-	// Apply flat color material and set color
-	if (UMaterial* FlatColor = GetOrCreateFlatColorMaterial())
-	{
-		MeshComponent->SetMaterial(0, FlatColor);
-	}
-	UMaterialInstanceDynamic* DynMat = MeshComponent->CreateAndSetMaterialInstanceDynamic(0);
-	if (DynMat)
-	{
-		DynMat->SetVectorParameterValue(TEXT("Color"), HazardColor);
 	}
 }
