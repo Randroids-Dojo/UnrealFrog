@@ -41,6 +41,12 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VFX|Settings")
 	bool bDisabled = false;
 
+	/** Z offset added to all VFX spawn positions. Prevents Z-fighting with
+	 *  the ground plane when viewed from the top-down camera. Must be higher
+	 *  than any game geometry (ground=0, frog river=60, log top=55). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VFX|Settings")
+	float VFXZOffset = 200.0f;
+
 	/** Maximum active VFX actors. Oldest destroyed when cap reached. */
 	static constexpr int32 MaxActiveVFX = 10;
 

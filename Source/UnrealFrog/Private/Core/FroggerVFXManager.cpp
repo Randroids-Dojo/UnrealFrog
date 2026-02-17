@@ -64,14 +64,14 @@ void UFroggerVFXManager::SpawnDeathPuff(FVector Location, EDeathType DeathType)
 	{
 		float CamDist = CamMgr->GetCameraLocation().Z - Location.Z;
 		float FOV = CamMgr->GetFOVAngle();
-		StartScale = CalculateScaleForScreenSize(CamDist, FOV, 0.08f); // 8% of screen
-		EndScale = StartScale * 3.0f;
-		UE_LOG(LogFroggerVFX, Warning, TEXT("DeathPuff: Location=(%.0f, %.0f, %.0f) CamDist=%.0f FOV=%.1f Scale=%.2f->%.2f"),
+		StartScale = CalculateScaleForScreenSize(CamDist, FOV, 0.05f); // 5% of screen
+		EndScale = StartScale * 2.5f;
+		UE_LOG(LogFroggerVFX, Log, TEXT("DeathPuff: Location=(%.0f, %.0f, %.0f) CamDist=%.0f FOV=%.1f Scale=%.2f->%.2f"),
 			Location.X, Location.Y, Location.Z, CamDist, FOV, StartScale, EndScale);
 	}
 	else
 	{
-		UE_LOG(LogFroggerVFX, Warning, TEXT("DeathPuff: NO CAMERA MANAGER — using fallback scale %.2f"), StartScale);
+		UE_LOG(LogFroggerVFX, Log, TEXT("DeathPuff: NO CAMERA MANAGER — using fallback scale %.2f"), StartScale);
 	}
 
 	AActor* VFXActor = SpawnVFXActor(World, Location,
@@ -83,7 +83,7 @@ void UFroggerVFXManager::SpawnDeathPuff(FVector Location, EDeathType DeathType)
 		Effect.Actor = VFXActor;
 		Effect.SpawnLocation = Location;
 		Effect.SpawnTime = World->GetTimeSeconds();
-		Effect.Duration = 2.0f;
+		Effect.Duration = 0.5f;
 		Effect.StartScale = StartScale;
 		Effect.EndScale = EndScale;
 		ActiveEffects.Add(Effect);
@@ -104,15 +104,15 @@ void UFroggerVFXManager::SpawnHopDust(FVector Location)
 		return;
 	}
 
-	// Compute camera-relative scale for hop dust (3% of screen)
+	// Compute camera-relative scale for hop dust (4% of screen)
 	float DustStartScale = 0.15f;
 	float DustEndScale = 0.4f;
 	if (APlayerCameraManager* CamMgr = UGameplayStatics::GetPlayerCameraManager(World, 0))
 	{
 		float CamDist = CamMgr->GetCameraLocation().Z - Location.Z;
 		float FOV = CamMgr->GetFOVAngle();
-		DustStartScale = CalculateScaleForScreenSize(CamDist, FOV, 0.03f);
-		DustEndScale = DustStartScale * 2.5f;
+		DustStartScale = CalculateScaleForScreenSize(CamDist, FOV, 0.04f);
+		DustEndScale = DustStartScale * 2.0f;
 	}
 
 	// Spawn 3 small cubes around the hop origin
@@ -157,14 +157,14 @@ void UFroggerVFXManager::SpawnHomeSlotSparkle(FVector Location)
 		return;
 	}
 
-	// Compute camera-relative scale for sparkle (3% of screen)
+	// Compute camera-relative scale for sparkle (4% of screen)
 	float SparkleStartScale = 0.1f;
 	float SparkleEndScale = 0.3f;
 	if (APlayerCameraManager* CamMgr = UGameplayStatics::GetPlayerCameraManager(World, 0))
 	{
 		float CamDist = CamMgr->GetCameraLocation().Z - Location.Z;
 		float FOV = CamMgr->GetFOVAngle();
-		SparkleStartScale = CalculateScaleForScreenSize(CamDist, FOV, 0.03f);
+		SparkleStartScale = CalculateScaleForScreenSize(CamDist, FOV, 0.04f);
 		SparkleEndScale = SparkleStartScale * 2.0f;
 	}
 
@@ -253,6 +253,7 @@ void UFroggerVFXManager::TickVFX(float CurrentTime)
 		if (!Effect.RiseVelocity.IsNearlyZero())
 		{
 			FVector NewLocation = Effect.SpawnLocation + Effect.RiseVelocity * Elapsed;
+			NewLocation.Z += VFXZOffset;
 			Actor->SetActorLocation(NewLocation);
 		}
 	}
@@ -313,8 +314,11 @@ AActor* UFroggerVFXManager::SpawnVFXActor(UWorld* World, FVector Location,
 	Actor->SetRootComponent(MeshComp);
 	MeshComp->RegisterComponent();
 
-	// Now that we have a root component, set position and scale
-	Actor->SetActorLocation(Location);
+	// Now that we have a root component, set position and scale.
+	// Elevate above ground plane to prevent Z-fighting at top-down camera distance.
+	FVector ElevatedLocation = Location;
+	ElevatedLocation.Z += VFXZOffset;
+	Actor->SetActorLocation(ElevatedLocation);
 	Actor->SetActorScale3D(FVector(Scale));
 
 	// Apply flat color material
