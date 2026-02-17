@@ -40,6 +40,9 @@ PLATFORM_INSET = FROG_CAPSULE_RADIUS + 10.0  # 44 UU
 API_LATENCY = 0.01  # 9ms measured
 HOP_RESPONSE = 0.035  # 33ms until position changes
 POST_HOP_WAIT = HOP_DURATION + 0.04  # total wait after hop command
+# Total unaccounted delay between "decide to hop" and "frog arrives at destination":
+# API latency + hop response delay + Python sleep jitter
+HOP_ARRIVAL_OVERHEAD = API_LATENCY + HOP_RESPONSE + 0.02  # ~65ms total
 
 
 # -- Runtime config sync (Task #5) -------------------------------------------
@@ -179,7 +182,8 @@ def find_platform_column(hazards_in_row, current_col, max_wait=4.0):
 
         # Scan forward in time for a platform at this column
         for wait in _frange(0.0, max_wait, 0.02):
-            arrival = wait + HOP_DURATION
+            # Real arrival = wait + overhead (API latency, hop response, jitter) + hop animation
+            arrival = wait + HOP_ARRIVAL_OVERHEAD + HOP_DURATION
             on_platform = False
             for h in rideables:
                 hx = predict_hazard_x(h, arrival)
@@ -256,7 +260,8 @@ def _find_platform_at_world_x(next_row_hazards, frog_world_x, max_wait=4.0,
         return None
 
     for wait in _frange(0.0, max_wait, 0.02):
-        arrival = wait + HOP_DURATION
+        # Real arrival = wait + overhead (API latency, hop response, jitter) + hop animation
+        arrival = wait + HOP_ARRIVAL_OVERHEAD + HOP_DURATION
         # Where will the FROG be at arrival time? (drifting with current platform)
         frog_x_at_arrival = frog_world_x + drift_speed * drift_dir * arrival
         for h in rideables:
