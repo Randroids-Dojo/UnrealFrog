@@ -109,16 +109,19 @@ def predict_hazard_x(hazard, dt):
     return ((raw_x - wrap_min) % wrap_range) + wrap_min
 
 
-def is_column_safe_for_hop(hazards_in_row, col, duration=HOP_DURATION):
-    """Check if column `col` is safe for the frog for the full hop duration.
+def is_column_safe_for_hop(hazards_in_row, col, duration=None):
+    """Check if column `col` is safe for the frog for the full hop window.
 
-    Checks at 8 time samples across [0, duration] to catch fast movers.
-    A column is safe if no hazard's extent + margin overlaps the frog.
+    Checks at 10 time samples across [0, overhead + hop_duration] to cover
+    the entire period from hop command to landing. The frog occupies its
+    current column during API overhead, then traverses during hop animation.
     """
+    if duration is None:
+        duration = HOP_ARRIVAL_OVERHEAD + HOP_DURATION
     frog_x = col * CELL_SIZE
     danger = FROG_CAPSULE_RADIUS + SAFETY_MARGIN  # 114 units
 
-    check_times = [i * duration / 7 for i in range(8)]
+    check_times = [i * duration / 9 for i in range(10)]
 
     for h in hazards_in_row:
         if h.get("rideable", False):
@@ -260,10 +263,17 @@ def _find_platform_at_world_x(next_row_hazards, frog_world_x, max_wait=4.0,
         return None
 
     for wait in _frange(0.0, max_wait, 0.02):
-        # Real arrival = wait + overhead (API latency, hop response, jitter) + hop animation
-        arrival = wait + HOP_ARRIVAL_OVERHEAD + HOP_DURATION
-        # Where will the FROG be at arrival time? (drifting with current platform)
-        frog_x_at_arrival = frog_world_x + drift_speed * drift_dir * arrival
+        # Time until hop starts: wait + API overhead.
+        # Time until hop lands: wait + API overhead + hop animation.
+        hop_start_time = wait + HOP_ARRIVAL_OVERHEAD
+        arrival = hop_start_time + HOP_DURATION
+
+        # The frog drifts with its current platform ONLY until the hop starts.
+        # During the hop animation (HOP_DURATION), the frog follows a fixed arc
+        # from HopStartLocation to HopEndLocation — no platform drift.
+        # The hop is purely in Y (forward); X is preserved from hop start.
+        frog_x_at_arrival = frog_world_x + drift_speed * drift_dir * hop_start_time
+
         for h in rideables:
             hx = predict_hazard_x(h, arrival)
             half_w = h["width"] * CELL_SIZE * 0.5

@@ -174,7 +174,7 @@ class PlayUnreal:
         """
         from path_planner import navigate_to_home_slot
         return navigate_to_home_slot(self, target_col=target_col,
-                                     max_attempts=max_attempts)
+                                     max_deaths=max_attempts)
 
     def get_state(self):
         """Get current game state as a dict.
