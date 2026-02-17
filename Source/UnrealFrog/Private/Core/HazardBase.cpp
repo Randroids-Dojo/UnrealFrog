@@ -44,7 +44,10 @@ void AHazardBase::BeginPlay()
 {
 	Super::BeginPlay();
 
-	SetupMeshForHazardType();
+	// NOTE: SetupMeshForHazardType() is NOT called here.
+	// SpawnActor triggers BeginPlay immediately, but InitFromConfig
+	// (which sets HazardType) is called AFTER SpawnActor returns.
+	// SetupMeshForHazardType() is called at the end of InitFromConfig.
 }
 
 void AHazardBase::Tick(float DeltaTime)
@@ -140,6 +143,11 @@ void AHazardBase::InitFromConfig(const FLaneConfig& Config, float InGridCellSize
 	float HalfWidth = GetWorldWidth() * 0.5f;
 	float HalfCell = GridCellSize * 0.5f;
 	CollisionBox->SetBoxExtent(FVector(HalfWidth, HalfCell, HalfCell));
+
+	// Now that HazardType is set, build the correct visual model.
+	// This MUST happen here, not in BeginPlay — SpawnActor triggers
+	// BeginPlay before InitFromConfig is called.
+	SetupMeshForHazardType();
 }
 
 void AHazardBase::WrapPosition()
