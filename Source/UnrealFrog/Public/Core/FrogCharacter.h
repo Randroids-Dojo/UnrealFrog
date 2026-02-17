@@ -45,6 +45,13 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
 	float BackwardHopMultiplier = 1.0f;
 
+	/** Z offset when riding river platforms (logs/turtles).
+	  * Must be above the tallest river obstacle visual top (log top ~Z=55).
+	  * Prevents the frog from clipping through/behind platform meshes
+	  * when viewed from the top-down camera. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
+	float RidingZOffset = 60.0f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid")
 	int32 GridColumns = 13; // SYNC: Tools/PlayUnreal/path_planner.py:GRID_COLS
 

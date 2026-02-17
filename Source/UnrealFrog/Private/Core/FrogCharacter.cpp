@@ -81,9 +81,10 @@ void AFrogCharacter::Tick(float DeltaTime)
 		// XY: linear interpolation
 		FVector CurrentPos = FMath::Lerp(HopStartLocation, HopEndLocation, Alpha);
 
-		// Z: parabolic arc -- peak at Alpha=0.5
+		// Z: interpolate between start and end Z, plus parabolic arc
 		float ArcAlpha = 4.0f * Alpha * (1.0f - Alpha); // 0 at endpoints, 1 at midpoint
-		CurrentPos.Z = HopStartLocation.Z + HopArcHeight * ArcAlpha;
+		float BaseZ = FMath::Lerp(HopStartLocation.Z, HopEndLocation.Z, Alpha);
+		CurrentPos.Z = BaseZ + HopArcHeight * ArcAlpha;
 
 		SetActorLocation(CurrentPos);
 
@@ -199,6 +200,10 @@ void AFrogCharacter::StartHop(FVector Direction)
 	HopElapsed = 0.0f;
 	CurrentHopDuration = GetHopDurationForDirection(Direction);
 
+	// Elevated Z on river rows so the frog renders above log/turtle meshes
+	bool bTargetIsRiver = (TargetPos.Y >= RiverRowMin && TargetPos.Y <= RiverRowMax);
+	float TargetZ = bTargetIsRiver ? RidingZOffset : 0.0f;
+
 	// When riding a moving platform, use actual actor position as hop origin
 	// instead of grid-snapped position (the log may have carried us between cells)
 	FVector ActualPos = GetActorLocation();
@@ -209,12 +214,14 @@ void AFrogCharacter::StartHop(FVector Direction)
 		HopEndLocation = FVector(
 			ActualPos.X + static_cast<float>(Delta.X) * GridCellSize,
 			static_cast<float>(TargetPos.Y) * GridCellSize,
-			0.0f);
+			TargetZ);
 	}
 	else
 	{
 		HopStartLocation = GridToWorld(GridPosition);
+		HopStartLocation.Z = ActualPos.Z;  // Preserve current Z (may be elevated)
 		HopEndLocation = GridToWorld(TargetPos);
+		HopEndLocation.Z = TargetZ;
 	}
 
 	// Update logical grid position immediately so collision checks use the target
@@ -230,7 +237,7 @@ void AFrogCharacter::FinishHop()
 	// Snap to landing position. On river rows, update GridPosition.X to reflect
 	// where we actually land (we may have drifted while riding a log).
 	FVector LandingPos = HopEndLocation;
-	LandingPos.Z = 0.0f;
+	// Z set by HopEndLocation: RidingZOffset for river rows, 0 for ground
 	FIntPoint LandingGrid = WorldToGrid(LandingPos);
 	LandingGrid.X = FMath::Clamp(LandingGrid.X, 0, GridColumns - 1);
 	LandingGrid.Y = FMath::Clamp(LandingGrid.Y, 0, GridRows - 1);
