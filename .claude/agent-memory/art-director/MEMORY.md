@@ -125,3 +125,39 @@
 - road: 0x333333, roadLine: 0xffff00
 - grass: 0x226622, median: 0x337733
 - water: 0x1a3a5c, sidewalk: 0x777777, hedge: 0x0a440a
+
+## Sprint 12: Multi-Part Model Port Art Direction
+
+### Color Adjustments for UE PBR
+- Desaturate brightest colors ~10-15%: frog 0x22cc22->0x20b820, bus 0xffcc00->0xeebb00, car1 0xff3333->0xee3030
+- Road surface lighten from 0x333333 to 0x444444 for vehicle contrast
+- River objects and home zone colors: keep as-is (natural contrast on water)
+
+### Detail Scaling (1.5x for Readability)
+- Frog eyes 10->15 UU radius, pupils 5->8 UU, to read from Z=2200
+- Vehicle wheels 10->14 UU radius
+- Turtle heads 8->12 UU, lily pad flower 8->12 UU
+- Body volumes stay at 1.0x WebFrogger scale (no enlargement)
+
+### WebFrogger Deviations
+1. Bus windows: 7->3 (visual noise reduction at distance)
+2. Frog pupils: face UP toward camera (Z offset in UE), not forward
+3. Log end caps: 21->24 UU radius (visible bark ring at distance)
+4. Turtle shell: squished full sphere (Y scale 0.5) not hemisphere geometry
+
+### Material Recommendation
+- Add Roughness=0.9 scalar param to FlatColorMaterial (reduce PBR specular hotspots)
+- No emissive on any model (bloom destroys arcade aesthetic)
+- FlatColorMaterial is editor-only -- fine for Sprint 12, flag for packaging
+
+### Architecture
+- ModelFactory.h with static Build*Model() functions
+- Existing actors call factory in BeginPlay, replacing single-primitive setup
+- Collision volumes separate from visual mesh (standard UE practice)
+- ~255 mesh components worst case, well within performance budget
+
+### Visibility Math (Z=2200, FOV 50)
+- Visible width: 2052 UU
+- Grid cell (100 UU) = 4.87% screen width
+- Frog body (60 UU) = 2.9% screen width
+- Detail part (20 UU) = 0.97% screen width = ~13px at 1280 wide
