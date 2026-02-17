@@ -6,4 +6,4 @@
 
 ## Current Sprint Notes
 
-(Cleared after Sprint 11 retrospective. Notes incorporated into retro entry.)
+(Cleared after Sprint 12 retrospective. Notes incorporated into retro entry.)

@@ -1,7 +1,7 @@
 # Team Working Agreements
 
 *This is a living document. Updated during retrospectives by the XP Coach.*
-*Last updated: Sprint 11 Retrospective (with stakeholder addendum)*
+*Last updated: Sprint 12 Retrospective*
 
 ## Day 0 Agreements
 
@@ -31,7 +31,7 @@ These are our starting agreements. They WILL evolve through retrospectives.
 
 ### 3. Communication Protocol
 
-- **Design debate before implementation.** Before any code is written, at least 2 agents must propose approaches via mailbox. Proposals can be brief (3-5 sentences) but must present a distinct approach or tradeoff. The Team Lead synthesizes or picks the best. Disagreement is encouraged — if everyone agrees immediately, the challenger isn't doing their job. (Updated: replaces "post a 3-sentence plan and wait for acknowledgment" — that allowed solo thinking.)
+- **Design debate before implementation.** Before any code is written, at least 2 agents must propose approaches via mailbox. Proposals can be brief (3-5 sentences) but must present a distinct approach or tradeoff. The Team Lead synthesizes or picks the best. Disagreement is encouraged — if everyone agrees immediately, the challenger isn't doing their job. **Exception: reference port tasks.** When a task is porting an existing reference implementation (e.g., WebFrogger models → UE), the reference IS the design proposal. A solo driver can proceed directly without competing proposals. Cross-domain review (§18) still applies. (Updated: Sprint 12 Retrospective — ModelFactory had exactly one reasonable approach; requiring a competing proposal was overhead with zero design benefit.)
 - Use the shared task list for work coordination
 - Use direct messages for design discussions and active navigation
 - Disagreements are resolved by the domain expert (Engine Architect for C++, Game Designer for mechanics, etc.) but the dissenting opinion must be heard and acknowledged before resolution
@@ -338,9 +338,9 @@ cell_size = config["cellSize"]
 
 **Why:** Sprint 10's gameplay-breaking collision mismatch was caused by independently maintained constants: C++ `GetScaledCapsuleRadius()` (34 UU) vs Python `FROG_CAPSULE_RADIUS = 34` with `half_w - 20` inset. The C++ side changed; the Python side broke. Two commits were needed for what is fundamentally one parameter. A single source of truth eliminates this class of bug entirely.
 
-### 25. Retro Notes Living Document (Added: Sprint 10 Retrospective)
+### 25. Retro Notes Living Document (Updated: Sprint 12 Retrospective — downgraded to optional)
 
-**Agents should record observations in `.team/retro-notes.md` AS things happen during the sprint, not just at retrospective time.** Mid-sprint observations are fresher and more accurate than post-sprint recollections.
+**Agents are encouraged (but not required) to record observations in `.team/retro-notes.md` as things happen during the sprint.** Mid-sprint observations are fresher and more accurate than post-sprint recollections. However, this habit has not taken root after 3 sprints of non-compliance. Per §17, mandatory enforcement is dropped. The post-commit reminder remains as a gentle nudge.
 
 **Format:**
 ```
@@ -391,6 +391,24 @@ A post-commit reminder nudges agents when committing changes to `Source/` or `To
 - Scale factor: **100x** (Three.js uses 1.0 per cell, UE uses 100 UU per cell)
 
 **For future games with complex assets:** Three.js GLTFExporter → .glb → UE Interchange import is viable (~300 lines of tooling). Build that pipeline when models exceed primitive composition.
+
+### 28. Post-SpawnActor Initialization Pattern (Added: Sprint 12 Retrospective)
+
+**When spawning actors and then configuring them via a separate Init/Config method, visual setup (meshes, materials, model building) must happen in the Init method, NOT in BeginPlay.** `SpawnActor` triggers `BeginPlay` immediately, before the caller can set configuration properties. Any code in `BeginPlay` that depends on properties set after spawn will see default values.
+
+Pattern:
+```cpp
+// In BeginPlay: only Super, bind events, setup that doesn't depend on config
+void AMyActor::BeginPlay() { Super::BeginPlay(); }
+
+// In InitFromConfig: set properties, THEN build visuals
+void AMyActor::InitFromConfig(const FConfig& Config) {
+    MyProperty = Config.Value;
+    SetupVisuals();  // AFTER properties are set
+}
+```
+
+**Why:** Sprint 12's "logs look like cars" bug. `SetupMeshForHazardType()` in `BeginPlay()` ran before `InitFromConfig()` set `HazardType`. All river objects got the default enum value and no visual model was applied.
 
 ## Things We Will Figure Out Together
 

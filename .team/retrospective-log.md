@@ -1931,3 +1931,143 @@ The tooling investment was correct in kind but wrong in order. PlayUnreal, audio
 ### One-Line Summary
 
 **The sequencing was wrong: we built gameplay before we could see it. The process is right — it just needs to start with the visual feedback loop.**
+
+---
+
+## Retrospective 13 — Sprint 12: Multi-Part Model Factory
+
+### Context
+
+Sprint 12's goal: **"Match or exceed WebFrogger visual quality in 1 sprint. Every commit = player-visible."** This was the direct response to Sprint 11's finding that 4 consecutive sprints (8-11) shipped zero new player-visible features. WebFrogger — built in a single prompt — had 10+ multi-part 3D models while UnrealFrog had single-colored cubes and spheres.
+
+### What Was Built
+
+| Deliverable | Files | Lines | Tests |
+|------------|-------|-------|-------|
+| FModelFactory (7 Build* functions) | ModelFactory.h, ModelFactory.cpp | 554 | 10 |
+| Actor integration (frog, hazards, ground) | FrogCharacter.cpp, HazardBase.cpp, GroundBuilder.cpp | ~120 modified | 0 new |
+| Dispatch timing fix | HazardBase.cpp | 9 | 0 new |
+| Path planner fixes (drift + safety window) | path_planner.py, client.py | 27 | 0 new |
+| Frog riding Z offset | FrogCharacter.cpp/h | 18 | 0 new |
+| **Total** | **9 files** | **+1,064 / -101** | **10 new (212 total)** |
+
+### Models Ported from WebFrogger
+
+| Model | Components | UE Primitives | Notable |
+|-------|-----------|---------------|---------|
+| Frog | 10 | Cubes + Spheres | Body, belly, eyes, pupils, 4 legs |
+| Car | 7 | Cubes + Cylinders | Body, cabin, 4 wheels. Color param for lane variation |
+| Truck | 8 | Cubes + Cylinders | Cab, trailer, 6 wheels |
+| Bus | 8 | Cubes + Cylinders | Body, 3 windows (Art Dir: reduced from 7), 4 wheels |
+| Log | 1 | Cylinder | Single fat brown cylinder. End caps removed (looked like car wheels) |
+| Turtle Group | 3 per turtle | Spheres + Cylinders | Shell (flattened sphere), base, head. Scales with WidthCells |
+| Lily Pad | 2 | Cylinder + Sphere | Flat green disc + pink flower |
+
+### What Went Well
+
+1. **Visual feedback loop finally closed.** This is the first sprint where screenshots caught bugs that 212 unit tests missed. The stakeholder reported "logs look like cars" and "frog clips through logs" — both invisible to automated tests, both immediately obvious in screenshots. Section 9 compliance after 10 sprints of violation.
+
+2. **38 screenshots captured.** More visual evidence in one sprint than the previous 11 combined. The screenshots drove 3 of the 4 fix commits. The feedback loop isn't aspirational anymore — it's operational.
+
+3. **WebFrogger reference worked as intended.** The Three.js → UE translation approach (§27) was straightforward: `BoxGeometry(w,h,d)` → Cube scale `(w,h,d)`, 100x. The engine-arch ported all 7 model types in one commit without iteration on the translation math itself.
+
+4. **Sprint goal substantially achieved.** The game went from single-colored primitives (cubes, spheres) to multi-part 3D models matching WebFrogger's visual vocabulary. Road vehicles are visually distinct by type. River objects are distinguishable from road objects. The frog has eyes, legs, and a body.
+
+5. **Per-subsystem commits.** 8 commits with logical separation: feature, 3 fixes, 4 docs. §4 compliance.
+
+### Friction Points
+
+1. **BeginPlay vs InitFromConfig timing bug.** `SetupMeshForHazardType()` was placed in `BeginPlay()`, but `SpawnActor` triggers `BeginPlay` before the caller invokes `InitFromConfig()`. ALL river objects got no model because `HazardType` was still the default enum value. This is UE's well-known "constructor/BeginPlay runs before you set properties" pattern, but we didn't have it documented as a convention. **Root cause: no agreement or MEMORY.md entry about post-SpawnActor initialization ordering.**
+
+2. **Z-layering was a hidden dimension.** 11 sprints of development at Z=0 never needed Z-ordering because all actors were flat primitives at ground level. The moment we added visually thick models (log cylinder radius 40 UU), the frog disappeared behind them from the top-down camera. The fix (RidingZOffset=60, hop arc Z interpolation) works but is a band-aid. A proper visual layering system would handle this generically.
+
+3. **Fix commits had no new tests.** The dispatch timing fix and Z offset fix were both committed without new test coverage. The ModelFactory itself had 10 tests (component counts, null safety), but the integration seams — "does the correct model appear on the correct actor type?" and "is the frog visually above the log?" — have zero automated coverage. Visual bugs are inherently hard to unit-test, but the dispatch timing bug (wrong enum value) was testable.
+
+4. **Retro notes empty again.** §25 requires agents to write observations mid-sprint. The file was blank. Two possible reasons: (a) agents don't remember the agreement during active work, (b) the overhead of switching context to write a note is too high during implementation. This is the 3rd sprint where §25 was not followed.
+
+5. **Design debate skipped.** §3 requires 2+ agents to propose competing approaches before implementation. The engine-arch solo-drove the entire ModelFactory based on the WebFrogger reference, with art-dir reviewing the design after it was already built. For a reference-port task, this was arguably fine — there's only one obvious approach (translate the primitives). But the agreement doesn't have a "reference implementation" exception.
+
+### Process Compliance Review
+
+| Agreement | Status | Notes |
+|-----------|--------|-------|
+| §1 Collaboration (multi-perspective) | PARTIAL | Art-dir reviewed design; fix commits were solo |
+| §2 TDD | PARTIAL | ModelFactory had tests; fix commits did not |
+| §3 Design debate | SKIPPED | Solo approach from WebFrogger reference |
+| §4 Commit standards | FOLLOWED | 8 logical commits, conventional format |
+| §5 Feature workflow | PARTIAL | No QA play-test before commit (stakeholder was QA) |
+| §5a Definition of Done | FOLLOWED | Build ✓, tests ✓, visual verification ✓ |
+| §9 Visual verification | **FOLLOWED** | First time since creation. 38 screenshots. |
+| §18 Cross-domain review | PARTIAL | Art-dir reviewed feature; fixes self-reviewed |
+| §21 Visual evidence gate | FOLLOWED | Screenshots in Saved/Screenshots/ |
+| §25 Retro notes | NOT FOLLOWED | .team/retro-notes.md empty |
+| §27 WebFrogger reference | FOLLOWED | All 7 model types ported |
+
+### What the Bug Pattern Tells Us
+
+All 3 bugs found during Sprint 12 were **visual, not logical**:
+1. Wrong model on river actors (dispatch timing) — invisible to unit tests
+2. Path planner drift overshoot (animation model mismatch) — visible only during live navigation
+3. Frog clipping through logs (Z-ordering) — visible only from the game camera
+
+This validates the Sprint 11 retro's core thesis: **the visual feedback loop catches a class of bugs that unit tests fundamentally cannot.** The 212 existing tests verified logic, state machines, formulas, and wiring. They cannot verify "does the correct visual appear at the correct position from the correct camera angle." Screenshots can.
+
+The ratio is instructive: 212 automated tests caught 0 Sprint 12 bugs. 38 screenshots (+ stakeholder eyes) caught 3. For visual work, screenshots are the primary quality gate, not tests.
+
+### Proposed Changes
+
+#### §28. Post-SpawnActor Initialization Pattern (NEW)
+
+**When spawning actors and then configuring them via a separate Init/Config method, visual setup (meshes, materials, model building) must happen in the Init method, NOT in BeginPlay.** `SpawnActor` triggers `BeginPlay` immediately, before the caller can set configuration properties. Any code in `BeginPlay` that depends on properties set after spawn will see default values.
+
+Pattern:
+```cpp
+// In BeginPlay: only call Super, bind events, set up components that don't depend on config
+void AMyActor::BeginPlay() { Super::BeginPlay(); }
+
+// In InitFromConfig: set properties, THEN build visuals
+void AMyActor::InitFromConfig(const FConfig& Config) {
+    MyProperty = Config.Value;
+    SetupVisuals();  // AFTER properties are set
+}
+```
+
+**Why:** Sprint 12's "logs look like cars" bug. SetupMeshForHazardType in BeginPlay ran before InitFromConfig set HazardType.
+
+#### §25. Retro Notes — DOWNGRADE to optional reminder (CHANGE)
+
+**§25 has been violated for 3 consecutive sprints.** Per §17 (deferred item deadline), it must be resolved or dropped. The mid-sprint note-taking habit has not taken root despite the agreement and post-commit reminder.
+
+**Change:** Remove the mandatory language. Keep the post-commit reminder as a gentle nudge. Agents who naturally document observations should continue; agents who don't will surface insights at retro time (as has happened successfully for 13 retrospectives). The agreement was well-intentioned but the enforcement cost exceeds the value.
+
+#### §3. Design Debate — Add "reference port" exception (CHANGE)
+
+**When a task is porting an existing reference implementation (e.g., WebFrogger models → UE), the reference IS the design proposal.** A solo driver can proceed directly from the reference without waiting for competing proposals. Cross-domain review (§18) still applies.
+
+**Why:** Sprint 12's ModelFactory had exactly one reasonable approach: translate WebFrogger's primitives 1:1. Requiring a competing proposal would have been bureaucratic overhead with zero design benefit.
+
+### Action Items for Sprint 13
+
+| Priority | Item | Owner |
+|----------|------|-------|
+| P0 | **VFX visibility investigation** — VFX (death puff, hop dust, score pops, wave fanfare) have been "unverified visible" since Sprint 5. Now that the visual loop works, run verify_visuals.py and determine if VFX are actually rendering. If not, diagnose and fix. | Engine Architect + QA Lead |
+| P0 | **Wave completion verification** — Sprint 9 QA noted filling 5 home slots didn't trigger wave increment. Verify in live game. | QA Lead |
+| P0 | **End-to-end acceptance test** — Navigate frog across road, across river, into home slot with invincibility OFF. The path planner fixes from Sprint 12 should make this possible. Run acceptance_test.py for real. | DevOps |
+| P1 | **Dispatch timing test** — Add test that verifies HazardType is correctly set before SetupMeshForHazardType runs. Testable without visual verification. | Engine Architect |
+| P1 | **Z-ordering test** — Add spatial test verifying frog Z > log top Z when riding a river platform. | QA Lead |
+| P1 | **Demo recording** — Sprint 11 retro proposed "demo or it didn't happen." Capture a 30-second screen recording of the improved game. | Any agent |
+
+### Sprint 12 Stats
+
+- **Commits:** 8 (1 feat, 4 fix, 3 docs)
+- **Code delta:** +1,064 / -101 lines across 9 files (Source/ + Tools/)
+- **New files:** 3 (ModelFactory.cpp, ModelFactory.h, ModelFactoryTest.cpp)
+- **Tests:** 212 total (+10 new), 0 failures, 20 categories
+- **Screenshots:** 38 captured (vs 0 in Sprints 8-11 combined)
+- **Visual bugs found:** 3 (all caught by screenshots, none by tests)
+- **Player-visible commits:** 5 of 8 (62.5%) — vs 22% lifetime average
+- **Sprints since last player-visible feature:** 0 (streak broken after 4 sprints of zero)
+
+### One-Line Summary
+
+**The visual feedback loop works: 38 screenshots caught 3 bugs that 212 tests missed, and the game finally looks like a game.**
