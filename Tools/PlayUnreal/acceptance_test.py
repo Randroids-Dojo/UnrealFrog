@@ -4,12 +4,15 @@ This is the acceptance test defined in agreements Section 20:
   A Python script that hops the frog across the road, across the river,
   and into a home slot.
 
+Uses the path planner for intelligent navigation instead of blind hopping.
+Runs with invincibility OFF (real gameplay) and retries on death.
+
 Usage:
   python3 Tools/PlayUnreal/acceptance_test.py
+  ./Tools/PlayUnreal/run-playunreal.sh acceptance_test.py
 
 Prerequisites:
   - Editor running with Remote Control API enabled (use run-playunreal.sh)
-  - GetGameStateJSON() implemented on GameMode (Task 5)
 """
 
 import json
@@ -17,10 +20,9 @@ import os
 import sys
 import time
 
-# Add script directory to path so we can import client
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from client import PlayUnreal, PlayUnrealError, ConnectionError
-
+import path_planner
 
 SCREENSHOT_DIR = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
@@ -29,138 +31,98 @@ SCREENSHOT_DIR = os.path.join(
 
 
 def log(msg):
-    print(f"[PlayUnreal] {msg}")
+    print(f"[Acceptance] {msg}")
 
 
-def assert_true(condition, message):
-    if not condition:
-        log(f"ASSERTION FAILED: {message}")
-        sys.exit(1)
-    log(f"  OK: {message}")
+def screenshot(pu, name):
+    path = os.path.join(SCREENSHOT_DIR, f"{name}.png")
+    pu.screenshot(path)
+    log(f"  [SCREENSHOT] {os.path.abspath(path)}")
+    return path
 
 
 def main():
     log("=== PlayUnreal Acceptance Test ===")
     log("")
 
-    # -- Connect to running editor -------------------------------------------
+    # -- Connect --
     pu = PlayUnreal()
     if not pu.is_alive():
-        log("ERROR: Remote Control API is not responding on localhost:30010")
-        log("       Launch the editor with: ./Tools/PlayUnreal/run-playunreal.sh")
-        sys.exit(2)
-    log("Connected to Remote Control API.")
+        log("FATAL: RC API not responding on localhost:30010")
+        return 2
 
-    # Create screenshot directory
+    log("Connected to Remote Control API.")
     os.makedirs(SCREENSHOT_DIR, exist_ok=True)
 
-    # -- Reset game ----------------------------------------------------------
+    # Load game constants for path planner
+    try:
+        config = pu.get_config()
+        path_planner.init_from_config(config)
+        log(f"  Loaded config: cellSize={path_planner.CELL_SIZE}, cols={path_planner.GRID_COLS}")
+    except Exception as e:
+        log(f"  Config load failed ({e}), using defaults")
+
+    # -- Phase 1: Reset and start game --
     log("")
     log("--- Phase 1: Reset and start game ---")
-    pu.reset_game()
+    gm_path = pu._get_gm_path()
+    pu._call_function(gm_path, "ReturnToTitle")
     time.sleep(0.5)
-
-    # Wait for Playing state (may go through Spawning first)
-    try:
-        state = pu.wait_for_state("Playing", timeout=10)
-    except PlayUnrealError:
-        # Might already be in Playing from StartGame
-        state = pu.get_state()
-        log(f"  Current state: {state.get('gameState', 'unknown')}")
-
-    log(f"  Game state: {json.dumps(state, indent=2)}")
-    pu.screenshot(os.path.join(SCREENSHOT_DIR, "01_start.png"))
-
-    # -- Cross the safe zone and road (rows 0-6) -----------------------------
-    log("")
-    log("--- Phase 2: Cross safe zone + road (hop up x7) ---")
-    for i in range(7):
-        pu.hop("up")
-        time.sleep(0.3)  # Wait for hop to complete (HopDuration=0.15s + margin)
+    pu._call_function(gm_path, "StartGame")
+    time.sleep(2.0)
 
     state = pu.get_state()
-    frog_pos = state.get("frogPos", [0, 0])
-    log(f"  Frog position after road: {frog_pos}")
-    pu.screenshot(os.path.join(SCREENSHOT_DIR, "02_after_road.png"))
+    log(f"  State: {state.get('gameState')}, Lives: {state.get('lives')}")
+    log(f"  Frog: {state.get('frogPos')}")
+    screenshot(pu, "01_start")
 
-    # Frog should be at row >= 7 (entering river zone)
-    frog_row = frog_pos[1] if isinstance(frog_pos, list) and len(frog_pos) > 1 else 0
-    lives = state.get("lives", 3)
-    log(f"  Lives: {lives}, Row: {frog_row}")
-
-    # -- Cross the river (rows 7-13) ----------------------------------------
+    # -- Phase 2: Navigate to home slot using path planner --
     log("")
-    log("--- Phase 3: Cross river (hop up, timing with logs) ---")
-    # River crossing is tricky — need to land on moving logs.
-    # We'll hop forward and hope for the best. In a real scenario
-    # we'd wait for a safe gap, but for acceptance we just try.
-    for i in range(7):
-        pu.hop("up")
-        time.sleep(0.5)  # Longer wait to give logs time to align
+    log("--- Phase 2: Navigate to home slot (path planner, no invincibility) ---")
+
+    result = path_planner.navigate_to_home_slot(pu, target_col=6, max_deaths=5)
+
+    log(f"  Navigation result: success={result['success']}")
+    log(f"  Total hops: {result['total_hops']}, Deaths: {result['deaths']}")
+    log(f"  Elapsed: {result['elapsed']:.1f}s")
+
+    screenshot(pu, "02_after_navigation")
+
+    # -- Phase 3: Verify results --
+    log("")
+    log("--- Phase 3: Verify results ---")
 
     state = pu.get_state()
-    frog_pos = state.get("frogPos", [0, 0])
-    frog_row = frog_pos[1] if isinstance(frog_pos, list) and len(frog_pos) > 1 else 0
-    log(f"  Frog position after river: {frog_pos}")
-    log(f"  Lives: {state.get('lives', '?')}")
-
-    pu.screenshot(os.path.join(SCREENSHOT_DIR, "03_after_river.png"))
-
-    # -- Check results -------------------------------------------------------
-    log("")
-    log("--- Phase 4: Verify results ---")
-
-    state = pu.get_state()
-    log(f"  Final state: {json.dumps(state, indent=2)}")
-
     score = state.get("score", 0)
     lives = state.get("lives", 0)
     home_filled = state.get("homeSlotsFilledCount", 0)
+    game_state = state.get("gameState", "unknown")
 
-    # Assertions:
-    # 1. Hop commands were executed (score > 0 after hopping)
-    # 2. Game is still responsive
-    # 3. Either alive with progress OR died trying (partial pass)
+    log(f"  State: {game_state}")
+    log(f"  Score: {score}, Lives: {lives}, Home filled: {home_filled}")
 
+    screenshot(pu, "03_final")
+
+    # -- Determine result --
     log("")
-    log("=== Results ===")
-    assert_true(pu.is_alive(), "Remote Control API still responding")
-    assert_true(score > 0, f"Score increased after hops ({score} > 0)")
-
-    # Determine result tier based on outcome
-    if home_filled >= 1:
-        result_tier = "FULL PASS"
-        tier_detail = f"Home slot filled ({home_filled}), lives={lives}"
-    elif lives >= 1:
-        result_tier = "PARTIAL PASS"
-        tier_detail = f"Frog alive (lives={lives}) but no home slot filled"
+    if home_filled >= 1 or result["success"]:
+        log("=== ACCEPTANCE TEST: FULL PASS ===")
+        log(f"  Home slot filled! Score={score}, Lives={lives}")
+        return 0
+    elif score > 0:
+        log("=== ACCEPTANCE TEST: PARTIAL PASS ===")
+        log(f"  Hops executed, commands work, but no home slot reached.")
+        log(f"  Score={score}, Lives={lives}, Deaths={result['deaths']}")
+        return 0
     else:
-        result_tier = "PARTIAL PASS (death run)"
-        tier_detail = f"Frog died (lives={lives}), no home slot filled — commands were accepted but frog did not survive"
-
-    # Take final screenshot
-    pu.screenshot(os.path.join(SCREENSHOT_DIR, "04_final.png"))
-
-    log("")
-    log(f"=== ACCEPTANCE TEST: {result_tier} ===")
-    log(f"  {tier_detail}")
-    log(f"  Score: {score}")
-    log(f"  Lives: {lives}")
-    log(f"  Home slots filled: {home_filled}")
-    log(f"  Screenshots saved to: {SCREENSHOT_DIR}")
-
-    # A death-only run exits 0 (commands worked) but flags the result
-    if lives < 1 and home_filled < 1:
-        log("")
-        log("NOTE: The frog died without filling a home slot.")
-        log("      This is a PARTIAL pass — hop commands and state queries worked,")
-        log("      but the gameplay path (road -> river -> home) was not completed.")
-        log("      Re-run to attempt full path completion.")
+        log("=== ACCEPTANCE TEST: FAIL ===")
+        log(f"  No score gained. Commands may not be working.")
+        return 1
 
 
 if __name__ == "__main__":
     try:
-        main()
+        sys.exit(main())
     except ConnectionError as e:
         log(f"CONNECTION ERROR: {e}")
         sys.exit(2)
