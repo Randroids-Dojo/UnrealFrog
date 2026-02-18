@@ -95,6 +95,25 @@ class PlayUnreal:
             "bEnable": bool(enabled)
         })
 
+    def set_camera_position(self, x, y, z):
+        """Move the camera to a new world position.
+
+        Used by visual comparison tool for zoom/close-up shots.
+        Call reset_camera_position() to restore the default gameplay view.
+
+        Args:
+            x, y, z: World coordinates for the camera position.
+        """
+        gm_path = self._get_gm_path()
+        self._call_function(gm_path, "SetCameraPosition", {
+            "NewPosition": {"X": float(x), "Y": float(y), "Z": float(z)}
+        })
+
+    def reset_camera_position(self):
+        """Reset the camera to the default gameplay position (600, 700, 2200)."""
+        gm_path = self._get_gm_path()
+        self._call_function(gm_path, "ResetCameraPosition")
+
     def get_hazards(self):
         """Get all hazard positions and properties as a list of dicts.
 

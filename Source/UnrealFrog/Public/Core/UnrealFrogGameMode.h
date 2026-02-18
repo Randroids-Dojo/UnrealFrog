@@ -170,6 +170,14 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "PlayUnreal")
 	FString GetGameConfigJSON() const;
 
+	/** Move the camera to a new position. Used by visual comparison tool for zoom shots. */
+	UFUNCTION(BlueprintCallable, Category = "PlayUnreal")
+	void SetCameraPosition(FVector NewPosition);
+
+	/** Reset the camera to its default gameplay position. */
+	UFUNCTION(BlueprintCallable, Category = "PlayUnreal")
+	void ResetCameraPosition();
+
 	// -- Home slots -------------------------------------------------------
 
 	/** Attempt to fill a home slot at the given column. Returns true on success. */

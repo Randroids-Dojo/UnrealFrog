@@ -244,6 +244,23 @@ FString AUnrealFrogGameMode::GetGameConfigJSON() const
 	return JSON;
 }
 
+void AUnrealFrogGameMode::SetCameraPosition(FVector NewPosition)
+{
+	UWorld* World = GetWorld();
+	if (!World) return;
+
+	for (TActorIterator<AFroggerCameraActor> It(World); It; ++It)
+	{
+		It->SetActorLocation(NewPosition);
+		It->CameraPosition = NewPosition;
+	}
+}
+
+void AUnrealFrogGameMode::ResetCameraPosition()
+{
+	SetCameraPosition(FVector(600.0, 700.0, 2200.0));
+}
+
 FString AUnrealFrogGameMode::GetGameStateJSON() const
 {
 	// Frog position (grid + actual world X for platform drift)
