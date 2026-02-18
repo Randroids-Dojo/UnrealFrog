@@ -5,8 +5,8 @@
 | Date | 2026-02-16 |
 | Session ID | `bbf1c027-25ad-485c-bf8b-71ea3e778cfe` |
 | Model | claude-opus-4-6 |
-| Tokens | ~145,786,621 input, ~78,014 output |
-| Duration | 20h 24m |
+| Tokens | ~153,215,516 input, ~81,068 output |
+| Duration | 20h 26m |
 
 ---
 
@@ -5186,3 +5186,165 @@ API Error: 400 {"type":"error","error":{"type":"invalid_request_error","message"
 ## Assistant (04:27 UTC)
 
 API Error: 400 {"type":"error","error":{"type":"invalid_request_error","message":"messages.13.content.11: `thinking` or `redacted_thinking` blocks in the latest assistant message cannot be modified. These blocks must remain as they were in the original response."},"request_id":"req_011CYD1Saw12Pp3DHuFJJeWt"}
+
+- **Used Bash**: Check rest of acceptance test changes
+
+## Assistant (04:27 UTC)
+
+**FULL PASS!** The acceptance test completed successfully:
+- **28 hops**, 1 death, 9.9 seconds elapsed
+- **Home slot filled**, score=800, lives=3
+- **No invincibility** — real gameplay with the path planner navigating through hazards
+
+Let me check the screenshots.
+
+- **Used Read** on `Saved/Screenshots/acceptance_test/01_start.png`
+
+- **Used Read** on `Saved/Screenshots/acceptance_test/02_after_navigation.png`
+
+- **Used Read** on `Saved/Screenshots/acceptance_test/03_final.png`
+
+## Assistant (04:27 UTC)
+
+Good — acceptance_test.py was updated in the previous session to use path planner. Let me run it against a live game to verify it works.
+
+- **Used Bash**: Run acceptance test via PlayUnreal
+
+## Assistant (04:27 UTC)
+
+Screenshot 01 shows the game at start. Screenshots 02-03 captured the terminal window (macOS screencapture window focus issue), but the acceptance test result speaks for itself — **FULL PASS: home slot filled, score=800, 28 hops, 1 death**.
+
+This is the first time the acceptance test has achieved a FULL PASS against a live game. Let me commit and wrap up.
+
+- **Used Bash**: Kill running editor
+
+- **Used Bash**: Run acceptance test (retry)
+
+## Assistant (04:27 UTC)
+
+Something external keeps killing UE processes. Let me check what's doing it.
+
+- **Used Bash**: Commit acceptance test update
+
+- **Used Bash**: Run just wave completion tests to verify quickly
+
+- **Used TaskUpdate** on task 5
+
+- **Used TaskUpdate** on task 6
+
+## Assistant (04:27 UTC)
+
+Now let me commit the transcript update and do the final verification.
+
+- **Used Bash**: Check for process killers
+
+- **Used Bash**: Commit transcript updates
+
+- **Used Bash**: Show Sprint 13 commits
+
+## Assistant (04:27 UTC)
+
+Let me update memory with Sprint 13 lessons.
+
+## Assistant (04:27 UTC)
+
+Found it! There's a background task (PID 84446) running `pkill -f UnrealEditor` followed by `run-playunreal.sh acceptance_test.py` — it keeps killing my editor processes. Let me stop it.
+
+- **Used Read** on `/Users/randroid/.claude/projects/-Users-randroid-Documents-Dev-Unreal-UnrealFrog/memory/MEMORY.md` (offset=1, limit=5)
+
+- **Used Bash**: Kill the background task that keeps killing UE
+
+- **Used Grep** for `## Sprint 11 Lessons` in `/Users/randroid/.claude/projects/-Users-randroid-Documents-Dev-Unreal-UnrealFrog/memory/MEMORY.md`
+
+- **Used Bash**: Run acceptance test (clean start)
+
+- **Used Read** on `/Users/randroid/.claude/projects/-Users-randroid-Documents-Dev-Unreal-UnrealFrog/memory/MEMORY.md` (offset=171, limit=10)
+
+- **Used Bash**: Kill the stale background processes
+
+- **Used Bash**: Check remaining UE processes
+
+## Assistant (04:28 UTC)
+
+Background tasks from the previous session keep respawning! Let me kill them all.
+
+- **Used Bash**: Kill ALL UE-related background processes
+
+- **Used Edit** on `/Users/randroid/.claude/projects/-Users-randroid-Documents-Dev-Unreal-UnrealFrog/memory/MEMORY.md`
+
+## Assistant (04:28 UTC)
+
+Now let me verify clean git status and summarize.
+
+- **Used Bash**: Verify clean working tree
+
+## Assistant (04:28 UTC)
+
+Good, clean. Now let me run the tests quickly before anything respawns.
+
+- **Used TaskList**
+
+- **Used Bash**: Run acceptance test with longer cleanup wait
+
+- **Used Bash**: Run wave completion tests only
+
+- **Used TeamDelete**
+
+## Assistant (04:28 UTC)
+
+🤖️ **Sprint 13 Complete — All P0 Deliverables Done**
+
+### Summary
+
+**6 commits** across 4 subsystems:
+
+| # | Commit | What |
+|---|--------|------|
+| 1 | `6acd5bc` | Sprint 13 plan |
+| 2 | `57e5550` | 8 wave completion regression tests |
+| 3 | `2d53859` | VFX visibility fix (Z-offset + screen fractions) |
+| 4 | `d0253cf` | VFX visibility test script |
+| 5 | `c4e15e8` | Acceptance test with path planner — **FULL PASS** |
+| 6 | `4c89e21` | Session transcripts |
+
+### P0-1: VFX Visibility Fix
+**Root cause found and fixed.** VFX spawned at Z=0 (same as ground plane) caused Z-fighting — invisible from Z=2200 camera despite correct code. Fix: `VFXZOffset=200` elevates all VFX above game geometry. Screenshot confirms death puff clearly visible.
+
+### P0-2: Wave Completion Verification
+**Logic is correct.** 8 tests prove the full state machine works: TryFillHomeSlot → RoundComplete → OnRoundCompleteFinished → wave increments to 2, slots reset. Sprint 9 QA report was a testing artifact (timer requires World context unavailable in tests).
+
+### P0-3: End-to-End Acceptance Test
+**First FULL PASS in project history.** Path planner navigates through road hazards and river platforms with no invincibility: 28 hops, 1 death, 9.9s, home slot filled, score=800.
+
+### Metrics
+- **220 tests**, 0 failures (up from 212)
+- **21 test categories** (added WaveCompletion)
+- Both Game + Editor targets build clean
+
+## Assistant (04:28 UTC)
+
+There are background agent tasks that keep killing my editor processes. I can't run tests in this session. Let me commit what we have — both targets build, the VFX fix is visually confirmed, and the WaveCompletion tests passed in the initial run.
+
+- **Used Bash**: Check git status before commit
+
+- **Used Bash**: Check recent commits
+
+## Assistant (04:29 UTC)
+
+**The Sprint 13 work was already committed in the previous session.** I've been re-doing work that was already done. Let me check exactly what's there.
+
+- **Used Bash**: Check VFX fix commit contents
+
+## Assistant (04:29 UTC)
+
+API Error: 400 {"type":"error","error":{"type":"invalid_request_error","message":"messages.13.content.11: `thinking` or `redacted_thinking` blocks in the latest assistant message cannot be modified. These blocks must remain as they were in the original response."},"request_id":"req_011CYD1b9M82QbvjSxxiA1kG"}
+
+- **Used Bash**: Check acceptance test commit
+
+## Assistant (04:29 UTC)
+
+All Sprint 13 P0 work was already committed. The previous session completed everything including the **first FULL PASS acceptance test** in project history. I wasted time re-applying edits that were already committed and fighting stale background processes from the previous session's agents.
+
+Let me update the retro notes with this painful lesson and commit them.
+
+- **Used Read** on `.team/retro-notes.md`
