@@ -11,6 +11,7 @@
 #include "Core/ScoreSubsystem.h"
 #include "Core/FroggerAudioManager.h"
 #include "Core/FroggerVFXManager.h"
+#include "Core/ModelFactory.h"
 #include "Components/LightComponent.h"
 #include "Engine/DirectionalLight.h"
 #include "Components/CapsuleComponent.h"
@@ -402,6 +403,26 @@ bool AUnrealFrogGameMode::TryFillHomeSlot(int32 Column)
 	}
 
 	HomeSlotsFilledCount++;
+
+	// Spawn miniature frog indicator at the filled home slot
+	if (UWorld* World = GetWorld())
+	{
+		float CellSize = 100.0f;
+		float SlotX = static_cast<float>(HomeSlotColumns[SlotIndex]) * CellSize;
+		float SlotY = static_cast<float>(HomeSlotRow) * CellSize;
+		FVector SlotLocation(SlotX, SlotY, 50.0);
+
+		AActor* SmallFrog = World->SpawnActor<AActor>(AActor::StaticClass());
+		if (SmallFrog)
+		{
+			// Need a root component before setting location
+			USceneComponent* Root = NewObject<USceneComponent>(SmallFrog);
+			SmallFrog->SetRootComponent(Root);
+			Root->RegisterComponent();
+			SmallFrog->SetActorLocation(SlotLocation);
+			FModelFactory::BuildSmallFrogModel(SmallFrog);
+		}
+	}
 
 	OnHomeSlotFilled.Broadcast(SlotIndex, HomeSlotsFilledCount);
 

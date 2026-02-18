@@ -42,10 +42,13 @@ struct FModelFactory
 	/** Truck: cab, trailer, 6 wheels (8 components). */
 	static UStaticMeshComponent* BuildTruckModel(AActor* Owner);
 
-	/** Bus: body, 3 windows, 4 wheels (8 components). */
+	/** Bus: body, 7 windows, 4 wheels (12 components). */
 	static UStaticMeshComponent* BuildBusModel(AActor* Owner);
 
-	/** Log: single fat cylinder (1 component). End caps removed — looked like wheels from above. */
+	/** Race car: body, spoiler, cockpit, 4 wheels (7 components). */
+	static UStaticMeshComponent* BuildRaceCarModel(AActor* Owner);
+
+	/** Log: main cylinder + 2 end caps (3 components). */
 	static UStaticMeshComponent* BuildLogModel(AActor* Owner, int32 WidthCells);
 
 	/** Turtle group: per turtle -- shell (dome), base, head. Width in grid cells. */
@@ -53,6 +56,9 @@ struct FModelFactory
 
 	/** Lily pad: pad disc, flower (2 components). For home slot indicators. */
 	static UStaticMeshComponent* BuildLilyPadModel(AActor* Owner);
+
+	/** Small frog: miniature frog indicator for filled home slots (3 components). */
+	static UStaticMeshComponent* BuildSmallFrogModel(AActor* Owner);
 
 	// -- Mesh Accessors -------------------------------------------------------
 	// Cached LoadObject calls for engine primitives.

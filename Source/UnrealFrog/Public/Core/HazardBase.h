@@ -80,6 +80,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Grid")
 	float GridCellSize = 100.0f;
 
+	/** Row index in the grid. Used for car color variation. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Grid")
+	int32 RowIndex = 0;
+
 	// -- Public interface -------------------------------------------------
 
 	/** Moves the hazard along the X axis. Exposed for unit testing. */

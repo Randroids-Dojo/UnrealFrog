@@ -136,11 +136,11 @@ void ALaneManager::SetupDefaultLaneConfigs()
 		LaneConfigs.Add(C);
 	}
 
-	// Row 5: Motorcycle, 250 UU/s, width 1, gap 2, LEFT
+	// Row 5: RaceCar, 250 UU/s, width 1, gap 2, LEFT
 	{
 		FLaneConfig C;
 		C.LaneType = ELaneType::Road;
-		C.HazardType = EHazardType::Motorcycle;
+		C.HazardType = EHazardType::RaceCar;
 		C.Speed = 250.0f;
 		C.HazardWidth = 1;
 		C.MinGapCells = 2;

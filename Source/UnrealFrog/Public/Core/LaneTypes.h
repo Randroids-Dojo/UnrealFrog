@@ -30,7 +30,7 @@ enum class EHazardType : uint8
 	Car				UMETA(DisplayName = "Car"),
 	Truck			UMETA(DisplayName = "Truck"),
 	Bus				UMETA(DisplayName = "Bus"),
-	Motorcycle		UMETA(DisplayName = "Motorcycle"),
+	RaceCar			UMETA(DisplayName = "Race Car"),
 	SmallLog		UMETA(DisplayName = "Small Log"),
 	LargeLog		UMETA(DisplayName = "Large Log"),
 	TurtleGroup		UMETA(DisplayName = "Turtle Group")

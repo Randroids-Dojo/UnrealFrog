@@ -135,6 +135,7 @@ void AHazardBase::InitFromConfig(const FLaneConfig& Config, float InGridCellSize
 	HazardType = Config.HazardType;
 	GridCellSize = InGridCellSize;
 	GridColumns = InGridColumns;
+	RowIndex = Config.RowIndex;
 
 	// River objects are rideable (logs and turtles)
 	bIsRideable = (Config.LaneType == ELaneType::River);
@@ -198,17 +199,22 @@ void AHazardBase::SetupMeshForHazardType()
 		MeshComponent->SetStaticMesh(nullptr);
 	}
 
-	// Car colors vary per lane. WebFrogger uses car1=red, car2=blue, car3=orange.
-	// We assign based on movement direction as a simple differentiator.
-	FLinearColor CarColor = bMovesRight
-		? FLinearColor(0.933f, 0.188f, 0.188f)   // Red (car1)
-		: FLinearColor(0.200f, 0.400f, 1.0f);     // Blue (car2)
+	// Car colors vary by row. WebFrogger uses car1=red, car2=blue, car3=orange.
+	FLinearColor CarColor;
+	switch (RowIndex)
+	{
+	case 1:  CarColor = FLinearColor(0.933f, 0.188f, 0.188f); break; // Red
+	case 3:  CarColor = FLinearColor(1.0f, 0.667f, 0.0f);     break; // Orange
+	default: CarColor = FLinearColor(0.200f, 0.400f, 1.0f);   break; // Blue (fallback)
+	}
 
 	switch (HazardType)
 	{
 	case EHazardType::Car:
-	case EHazardType::Motorcycle:
 		FModelFactory::BuildCarModel(this, CarColor);
+		break;
+	case EHazardType::RaceCar:
+		FModelFactory::BuildRaceCarModel(this);
 		break;
 	case EHazardType::Truck:
 		FModelFactory::BuildTruckModel(this);

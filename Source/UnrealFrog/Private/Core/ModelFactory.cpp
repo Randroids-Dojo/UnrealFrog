@@ -17,13 +17,16 @@ namespace ModelColors
 	const FLinearColor FrogPupil(0.067f, 0.067f, 0.067f);
 
 	// Vehicles
-	const FLinearColor CarDefault(0.933f, 0.188f, 0.188f);
+	const FLinearColor CarRed(0.933f, 0.188f, 0.188f);    // 0xff3333
+	const FLinearColor CarBlue(0.200f, 0.400f, 1.0f);     // 0x3366ff
+	const FLinearColor CarOrange(1.0f, 0.667f, 0.0f);     // 0xffaa00
 	const FLinearColor Cabin(0.533f, 0.800f, 1.0f);
 	const FLinearColor Wheel(0.133f, 0.133f, 0.133f);
 	const FLinearColor Truck(0.533f, 0.267f, 0.533f);
 	const FLinearColor Trailer(0.667f, 0.400f, 0.667f);
 	const FLinearColor Bus(0.933f, 0.733f, 0.0f);
 	const FLinearColor BusWindow(0.533f, 0.800f, 1.0f);
+	const FLinearColor RaceCar(1.0f, 0.0f, 1.0f);         // 0xff00ff magenta
 
 	// River
 	const FLinearColor Log(0.545f, 0.271f, 0.075f);
@@ -284,7 +287,7 @@ UStaticMeshComponent* FModelFactory::BuildTruckModel(AActor* Owner)
 }
 
 // =============================================================================
-// Bus Model — 8 components (Art Dir: 3 windows, not 7)
+// Bus Model — 12 components (body + 7 windows + 4 wheels)
 // =============================================================================
 // WebFrogger reference: createBus() in index.html:367
 
@@ -303,27 +306,23 @@ UStaticMeshComponent* FModelFactory::BuildBusModel(AActor* Owner)
 	UStaticMeshComponent* Body = AddMeshComponent(Owner, TEXT("BusBody"),
 		Cube, FVector(0, 0, 30), FVector(1.8, 0.6, 0.5), ModelColors::Bus);
 
-	// Windows: Art Dir reduced from 7 to 3 for cleaner read at camera distance
-	// Evenly spaced across the bus body
-	for (int32 I = -1; I <= 1; ++I)
+	// 7 windows matching WebFrogger: i from -3 to +3, spacing 0.2 (20 UU)
+	// WebFrogger: BoxGeometry(0.15, 0.2, 0.62) at (i*0.2, 0.4, 0)
+	// -> Cube scale (0.15, 0.62, 0.2), pos (I*20, 0, 40)
+	for (int32 I = -3; I <= 3; ++I)
 	{
-		FString WinName = FString::Printf(TEXT("BusWindow_%d"), I + 1);
-		// WebFrogger: BoxGeometry(0.15, 0.2, 0.62) at (i*0.2, 0.4, 0)
-		// Adjusted spacing for 3 windows: i * 0.5 (wider apart)
-		// -> Cube scale (0.15, 0.62, 0.2), pos (I*50, 0, 40)
+		FString WinName = FString::Printf(TEXT("BusWindow_%d"), I + 3);
 		AddMeshComponent(Owner, *WinName,
-			Cube, FVector(I * 50, 0, 40), FVector(0.15, 0.62, 0.2), ModelColors::BusWindow);
+			Cube, FVector(I * 20, 0, 40), FVector(0.15, 0.62, 0.2), ModelColors::BusWindow);
 	}
 
-	// Wheels (Art Dir: 1.5x -> radius 0.18 -> scale 0.36, thickness 0.12)
-	// WebFrogger: sx in [-0.7, 0.7], sz in [-1, 1]
+	// Wheels: WebFrogger sx in [-0.7, 0.7], sz in [-1, 1]
 	int32 WheelIdx = 0;
 	for (int32 SX = -1; SX <= 1; SX += 2)
 	{
 		for (int32 SZ = -1; SZ <= 1; SZ += 2)
 		{
 			FString WheelName = FString::Printf(TEXT("BusWheel_%d"), WheelIdx++);
-			// WebFrogger pos: (sx*0.7, 0.12, sz*0.34)
 			// -> UE: (sx*70, -sz*34, 12)
 			AddMeshComponentRotated(Owner, *WheelName,
 				Cylinder,
@@ -338,11 +337,9 @@ UStaticMeshComponent* FModelFactory::BuildBusModel(AActor* Owner)
 }
 
 // =============================================================================
-// Log Model — 1 component (single fat cylinder, no end caps)
+// Log Model — 3 components (main cylinder + 2 end caps)
 // =============================================================================
 // WebFrogger reference: createLog(length) in index.html:439
-// End caps removed: from top-down camera they looked like car wheels, making
-// logs indistinguishable from cars. A single wide brown cylinder is unmistakable.
 
 UStaticMeshComponent* FModelFactory::BuildLogModel(AActor* Owner, int32 WidthCells)
 {
@@ -353,18 +350,30 @@ UStaticMeshComponent* FModelFactory::BuildLogModel(AActor* Owner, int32 WidthCel
 
 	UStaticMesh* Cylinder = GetCylinderMesh();
 
-	// Single log cylinder laid along X axis (direction of travel).
+	// Main log cylinder laid along X axis (direction of travel).
 	// Pitch 90 rotates the cylinder's Z-height toward X.
-	// Diameter 0.8 (80 UU) fills 80% of the lane — visually fat and platform-like,
-	// clearly distinct from narrow car bodies (50 UU wide).
 	float LogLength = static_cast<float>(WidthCells) * 0.9f;
+	float LogWorldHalfLength = LogLength * 100.0f * 0.5f;
 
 	UStaticMeshComponent* MainLog = AddMeshComponentRotated(Owner, TEXT("LogMain"),
 		Cylinder,
 		FVector(0, 0, 15),       // Raised so the log sits visibly above water
 		FRotator(90, 0, 0),      // Pitch 90: cylinder height along X
-		FVector(0.8, 0.8, LogLength),  // 80 UU diameter — fat, obviously a log
+		FVector(0.8, 0.8, LogLength),  // 80 UU diameter
 		ModelColors::Log);
+
+	// End caps: slightly larger radius (0.84 vs 0.8), short length, lighter brown
+	// WebFrogger: CylinderGeometry(0.21, 0.21, 0.05) — radius 5% larger than main
+	for (int32 Side = -1; Side <= 1; Side += 2)
+	{
+		FString CapName = FString::Printf(TEXT("LogCap_%s"), Side < 0 ? TEXT("L") : TEXT("R"));
+		AddMeshComponentRotated(Owner, *CapName,
+			Cylinder,
+			FVector(Side * LogWorldHalfLength, 0, 15),
+			FRotator(90, 0, 0),
+			FVector(0.84, 0.84, 0.05f),  // Slightly wider, very short
+			ModelColors::LogCap);
+	}
 
 	return MainLog;
 }
@@ -455,4 +464,87 @@ UStaticMeshComponent* FModelFactory::BuildLilyPadModel(AActor* Owner)
 		Sphere, FVector(15, -10, 8), FVector(0.24, 0.24, 0.24), ModelColors::LilyFlower);
 
 	return Pad;
+}
+
+// =============================================================================
+// Race Car Model — 7 components (body, spoiler, cockpit, 4 wheels)
+// =============================================================================
+// WebFrogger reference: createRaceCar() in index.html
+
+UStaticMeshComponent* FModelFactory::BuildRaceCarModel(AActor* Owner)
+{
+	if (!Owner)
+	{
+		return nullptr;
+	}
+
+	UStaticMesh* Cube = GetCubeMesh();
+	UStaticMesh* Sphere = GetSphereMesh();
+	UStaticMesh* Cylinder = GetCylinderMesh();
+
+	// Body: BoxGeometry(0.9, 0.2, 0.4) at y=0.15
+	// -> Cube scale (0.9, 0.4, 0.2), pos (0, 0, 15)
+	UStaticMeshComponent* Body = AddMeshComponent(Owner, TEXT("RaceCarBody"),
+		Cube, FVector(0, 0, 15), FVector(0.9, 0.4, 0.2), ModelColors::RaceCar);
+
+	// Spoiler: BoxGeometry(0.05, 0.15, 0.5) at (0.4, 0.3, 0)
+	// -> Cube scale (0.05, 0.5, 0.15), pos (40, 0, 30)
+	AddMeshComponent(Owner, TEXT("RaceCarSpoiler"),
+		Cube, FVector(40, 0, 30), FVector(0.05, 0.5, 0.15), ModelColors::RaceCar);
+
+	// Cockpit: SphereGeometry(0.15) at (-0.1, 0.3, 0), scale (1.5, 0.8, 1)
+	// -> Sphere scale (0.15*1.5, 0.15*1, 0.15*0.8) = (0.225, 0.15, 0.12), pos (-10, 0, 30)
+	AddMeshComponent(Owner, TEXT("RaceCarCockpit"),
+		Sphere, FVector(-10, 0, 30), FVector(0.225, 0.15, 0.12), ModelColors::Cabin);
+
+	// Wheels: CylinderGeometry(0.09, 0.09, 0.06) at (sx*0.35, 0.09, sz*0.24)
+	// -> UE: (sx*35, -sz*24, 9), scale (0.18, 0.18, 0.06)
+	int32 WheelIdx = 0;
+	for (int32 SX = -1; SX <= 1; SX += 2)
+	{
+		for (int32 SZ = -1; SZ <= 1; SZ += 2)
+		{
+			FString WheelName = FString::Printf(TEXT("RaceCarWheel_%d"), WheelIdx++);
+			AddMeshComponentRotated(Owner, *WheelName,
+				Cylinder,
+				FVector(SX * 35, -SZ * 24, 9),
+				FRotator(0, 0, 90),
+				FVector(0.18, 0.18, 0.06),
+				ModelColors::Wheel);
+		}
+	}
+
+	return Body;
+}
+
+// =============================================================================
+// Small Frog Model — 3 components (miniature for filled home slots)
+// =============================================================================
+// WebFrogger reference: createSmallFrog() in index.html
+
+UStaticMeshComponent* FModelFactory::BuildSmallFrogModel(AActor* Owner)
+{
+	if (!Owner)
+	{
+		return nullptr;
+	}
+
+	UStaticMesh* Cube = GetCubeMesh();
+	UStaticMesh* Sphere = GetSphereMesh();
+
+	// Body: BoxGeometry(0.3, 0.18, 0.25) at y=0.15
+	// -> Cube scale (0.3, 0.25, 0.18), pos (0, 0, 15)
+	UStaticMeshComponent* Body = AddMeshComponent(Owner, TEXT("SmallFrogBody"),
+		Cube, FVector(0, 0, 15), FVector(0.3, 0.25, 0.18), ModelColors::FrogBody);
+
+	// Eyes: SphereGeometry(0.05) at (side*0.1, 0.28, -0.08)
+	// -> Sphere scale (0.1, 0.1, 0.1), pos (side*10, 8, 28)
+	for (int32 Side = -1; Side <= 1; Side += 2)
+	{
+		FString EyeName = FString::Printf(TEXT("SmallFrogEye_%s"), Side < 0 ? TEXT("L") : TEXT("R"));
+		AddMeshComponent(Owner, *EyeName,
+			Sphere, FVector(Side * 10, 8, 28), FVector(0.1, 0.1, 0.1), ModelColors::FrogEye);
+	}
+
+	return Body;
 }

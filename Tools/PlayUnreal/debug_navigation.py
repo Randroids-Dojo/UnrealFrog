@@ -22,7 +22,7 @@ LANE_INFO = {
     2: {"type": "Truck",      "speed": 100, "width": 2, "gap": 4, "right": True},
     3: {"type": "Car",        "speed": 200, "width": 1, "gap": 2, "right": False},
     4: {"type": "Bus",        "speed": 175, "width": 2, "gap": 3, "right": True},
-    5: {"type": "Motorcycle", "speed": 250, "width": 1, "gap": 2, "right": False},
+    5: {"type": "RaceCar",    "speed": 250, "width": 1, "gap": 2, "right": False},
     7: {"type": "SmallLog",   "speed": 100, "width": 2, "gap": 2, "right": True},
     8: {"type": "TurtleGrp",  "speed":  80, "width": 3, "gap": 2, "right": False},
     9: {"type": "LargeLog",   "speed": 120, "width": 4, "gap": 2, "right": True},

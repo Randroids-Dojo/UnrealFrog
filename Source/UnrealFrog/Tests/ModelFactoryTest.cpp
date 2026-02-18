@@ -205,8 +205,8 @@ bool FModelFactory_TruckComponentCount::RunTest(const FString& Parameters)
 }
 
 // ---------------------------------------------------------------------------
-// Bus: BuildBusModel creates 8 visual components
-// (body, 3 windows, 4 wheels)
+// Bus: BuildBusModel creates 12 visual components
+// (body, 7 windows, 4 wheels)
 // ---------------------------------------------------------------------------
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FModelFactory_BusComponentCount,
@@ -229,8 +229,8 @@ bool FModelFactory_BusComponentCount::RunTest(const FString& Parameters)
 		FModelFactory::BuildBusModel(Hazard);
 		int32 AddedCount = ModelFactoryTestHelper::CountMeshComponents(Hazard) - PreCount;
 
-		// body, 3 windows, 4 wheels = 8
-		TestEqual(TEXT("BuildBusModel adds 8 mesh components"), AddedCount, 8);
+		// body, 7 windows, 4 wheels = 12
+		TestEqual(TEXT("BuildBusModel adds 12 mesh components"), AddedCount, 12);
 	}
 
 	ModelFactoryTestHelper::DestroyTestWorld(World);
@@ -238,8 +238,8 @@ bool FModelFactory_BusComponentCount::RunTest(const FString& Parameters)
 }
 
 // ---------------------------------------------------------------------------
-// Log: BuildLogModel creates 1 visual component
-// (single fat cylinder, no end caps — caps looked like car wheels from above)
+// Log: BuildLogModel creates 3 visual components
+// (main cylinder + 2 end caps)
 // ---------------------------------------------------------------------------
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FModelFactory_LogComponentCount,
@@ -262,8 +262,8 @@ bool FModelFactory_LogComponentCount::RunTest(const FString& Parameters)
 		FModelFactory::BuildLogModel(Hazard, 3);  // 3-cell log
 		int32 AddedCount = ModelFactoryTestHelper::CountMeshComponents(Hazard) - PreCount;
 
-		// single fat cylinder, no end caps = 1
-		TestEqual(TEXT("BuildLogModel adds 1 mesh component"), AddedCount, 1);
+		// main cylinder + 2 end caps = 3
+		TestEqual(TEXT("BuildLogModel adds 3 mesh components"), AddedCount, 3);
 	}
 
 	ModelFactoryTestHelper::DestroyTestWorld(World);
