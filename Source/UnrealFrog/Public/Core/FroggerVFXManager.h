@@ -45,7 +45,7 @@ public:
 	 *  the ground plane when viewed from the top-down camera. Must be higher
 	 *  than any game geometry (ground=0, frog river=60, log top=55). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "VFX|Settings")
-	float VFXZOffset = 200.0f;
+	float VFXZOffset = 80.0f;
 
 	/** Maximum active VFX actors. Oldest destroyed when cap reached. */
 	static constexpr int32 MaxActiveVFX = 10;

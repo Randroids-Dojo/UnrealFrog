@@ -64,8 +64,8 @@ void UFroggerVFXManager::SpawnDeathPuff(FVector Location, EDeathType DeathType)
 	{
 		float CamDist = CamMgr->GetCameraLocation().Z - Location.Z;
 		float FOV = CamMgr->GetFOVAngle();
-		StartScale = CalculateScaleForScreenSize(CamDist, FOV, 0.05f); // 5% of screen
-		EndScale = StartScale * 2.5f;
+		StartScale = CalculateScaleForScreenSize(CamDist, FOV, 0.02f); // 2% of screen
+		EndScale = StartScale * 2.0f;
 		UE_LOG(LogFroggerVFX, Log, TEXT("DeathPuff: Location=(%.0f, %.0f, %.0f) CamDist=%.0f FOV=%.1f Scale=%.2f->%.2f"),
 			Location.X, Location.Y, Location.Z, CamDist, FOV, StartScale, EndScale);
 	}
@@ -104,15 +104,15 @@ void UFroggerVFXManager::SpawnHopDust(FVector Location)
 		return;
 	}
 
-	// Compute camera-relative scale for hop dust (4% of screen)
+	// Compute camera-relative scale for hop dust (1.5% of screen)
 	float DustStartScale = 0.15f;
 	float DustEndScale = 0.4f;
 	if (APlayerCameraManager* CamMgr = UGameplayStatics::GetPlayerCameraManager(World, 0))
 	{
 		float CamDist = CamMgr->GetCameraLocation().Z - Location.Z;
 		float FOV = CamMgr->GetFOVAngle();
-		DustStartScale = CalculateScaleForScreenSize(CamDist, FOV, 0.04f);
-		DustEndScale = DustStartScale * 2.0f;
+		DustStartScale = CalculateScaleForScreenSize(CamDist, FOV, 0.015f);
+		DustEndScale = DustStartScale * 1.5f;
 	}
 
 	// Spawn 3 small cubes around the hop origin
@@ -157,15 +157,15 @@ void UFroggerVFXManager::SpawnHomeSlotSparkle(FVector Location)
 		return;
 	}
 
-	// Compute camera-relative scale for sparkle (4% of screen)
+	// Compute camera-relative scale for sparkle (1.5% of screen)
 	float SparkleStartScale = 0.1f;
 	float SparkleEndScale = 0.3f;
 	if (APlayerCameraManager* CamMgr = UGameplayStatics::GetPlayerCameraManager(World, 0))
 	{
 		float CamDist = CamMgr->GetCameraLocation().Z - Location.Z;
 		float FOV = CamMgr->GetFOVAngle();
-		SparkleStartScale = CalculateScaleForScreenSize(CamDist, FOV, 0.04f);
-		SparkleEndScale = SparkleStartScale * 2.0f;
+		SparkleStartScale = CalculateScaleForScreenSize(CamDist, FOV, 0.015f);
+		SparkleEndScale = SparkleStartScale * 1.5f;
 	}
 
 	// 4 small spheres that rise upward
