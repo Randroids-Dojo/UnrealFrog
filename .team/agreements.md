@@ -1,7 +1,7 @@
 # Team Working Agreements
 
 *This is a living document. Updated during retrospectives by the XP Coach.*
-*Last updated: Sprint 12 Retrospective*
+*Last updated: Sprint 14 Retrospective*
 
 ## Day 0 Agreements
 
@@ -409,6 +409,45 @@ void AMyActor::InitFromConfig(const FConfig& Config) {
 ```
 
 **Why:** Sprint 12's "logs look like cars" bug. `SetupMeshForHazardType()` in `BeginPlay()` ran before `InitFromConfig()` set `HazardType`. All river objects got the default enum value and no visual model was applied.
+
+### 29. Verify Before Commit: git diff Is Mandatory After Batch Edits (Added: Sprint 14 Retrospective)
+
+**Before any commit that involves 3+ file edits in a single session, run `git diff` to verify edits are persisted to disk.** Context compaction can silently discard in-memory edits that were never written to disk. `git diff` is the only reliable confirmation that `Edit` calls actually persisted.
+
+```bash
+# After a batch of edits, before committing:
+git diff --stat
+# If a file you edited shows no changes, re-read and re-apply.
+```
+
+**When this is especially important:**
+- After any session involving context compaction warnings
+- After editing files larger than ~500 lines
+- After any multi-step `Read → Edit → Edit → ...` chain
+
+**Why:** Sprint 13 lost ~45 minutes re-applying VFX changes that appeared to succeed but were discarded at compaction time. A `git diff` before committing would have revealed the files unchanged and triggered immediate re-application.
+
+### 30. Anti-Hallucination Rule for Visual Claims (Added: Sprint 14 Retrospective)
+
+**When claiming a visual improvement, agents must describe ONLY what they can observe in a screenshot — not what they know from code or commit messages.**
+
+**Required behavior:**
+1. Take a screenshot after the change (or run `visual_compare.py` for model/VFX changes)
+2. Compare it to a screenshot from before the change
+3. Describe what you can SEE in the comparison
+
+**Prohibited behavior:**
+- "The bus now has 7 windows" (inferred from code)
+- "The death puff is now smaller" (inferred from a changed constant)
+- "The race car model is now visible" (inferred from reading the commit)
+
+**Required format when reporting:**
+- "In the road close-up screenshot, I can see [specific observable description]"
+- "I cannot confirm [claimed change] is visible at gameplay distance (Z=2200)"
+
+**The `visual_compare.py` tool in Tools/PlayUnreal/ automates the before/after workflow.** Use it for any commit that modifies model geometry, materials, VFX, or HUD. The SKILL.md at `.claude/skills/visual-comparison/SKILL.md` documents zoom levels and reporting format.
+
+**Why:** Sprint 13 committed "VFX improvements" that were actually a regression (oversized death puff covering the frog). The agent described what it wrote, not what appeared on screen. This agreement makes the distinction explicit and mandatory.
 
 ## Things We Will Figure Out Together
 
