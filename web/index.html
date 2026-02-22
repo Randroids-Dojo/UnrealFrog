@@ -3,1203 +3,1312 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Agent Interaction Replay — UnrealFrog</title>
+<title>Unreal Frog - 3D Frogger</title>
 <style>
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-:root {
-  --bg: #0f172a;
-  --surface: #1e293b;
-  --surface2: #273549;
-  --border: #334155;
-  --text: #f1f5f9;
-  --text2: #94a3b8;
-  --accent: #3b82f6;
-  --glow: rgba(59, 130, 246, 0.4);
-}
-
-body {
-  font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
-  background: var(--bg);
-  color: var(--text);
-  height: 100vh;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-
-/* --- Header --- */
-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 20px;
-  border-bottom: 1px solid var(--border);
-  background: var(--surface);
-  flex-shrink: 0;
-  gap: 16px;
-}
-header h1 {
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  color: var(--text2);
-  white-space: nowrap;
-}
-header h1 span { color: var(--accent); }
-#session-info {
-  font-size: 11px;
-  color: var(--text2);
-  white-space: nowrap;
-}
-#transcript-select {
-  background: var(--surface2);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 6px 12px;
-  font-family: inherit;
-  font-size: 12px;
-  max-width: 500px;
-  flex: 1;
-  cursor: pointer;
-}
-
-/* --- Main Layout --- */
-main {
-  display: flex;
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-}
-
-/* --- Arena --- */
-#arena-wrap {
-  flex: 1;
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-}
-#arena-canvas {
-  position: absolute;
-  top: 0; left: 0;
-  width: 100%; height: 100%;
-  pointer-events: none;
-}
-.agent-node {
-  position: absolute;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  transform: translate(-50%, -50%);
-  transition: opacity 0.3s, filter 0.3s;
-  z-index: 2;
-}
-.agent-node.inactive { opacity: 0.25; filter: grayscale(0.8); }
-.agent-avatar {
-  width: 60px; height: 60px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 3px solid transparent;
-  transition: border-color 0.3s, box-shadow 0.3s;
-  position: relative;
-  overflow: hidden;
-}
-.agent-avatar svg {
-  width: 34px; height: 34px;
-}
-.agent-node.sender .agent-avatar {
-  box-shadow: 0 0 20px var(--agent-color), 0 0 40px var(--agent-color);
-  border-color: #fff;
-}
-.agent-node.receiver .agent-avatar {
-  box-shadow: 0 0 14px var(--agent-color);
-  border-color: var(--agent-color);
-}
-.agent-label {
-  font-size: 10px;
-  color: var(--text2);
-  text-align: center;
-  white-space: nowrap;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-.agent-role {
-  font-size: 9px;
-  color: var(--text2);
-  opacity: 0.6;
-  text-align: center;
-  white-space: nowrap;
-}
-
-/* --- Speech Bubble --- */
-#speech-bubble {
-  position: absolute;
-  max-width: 280px;
-  padding: 10px 14px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--text);
-  opacity: 0;
-  transform: translate(-50%, -50%) scale(0.9);
-  transition: opacity 0.25s, transform 0.25s;
-  pointer-events: none;
-  z-index: 10;
-  box-shadow: 0 4px 24px rgba(0,0,0,0.5);
-}
-#speech-bubble.visible {
-  opacity: 1;
-  transform: translate(-50%, -50%) scale(1);
-}
-#speech-bubble .bubble-from {
-  font-size: 10px;
-  font-weight: 600;
-  margin-bottom: 4px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-#speech-bubble .bubble-text {
-  color: var(--text2);
-  word-break: break-word;
-  max-height: 120px;
-  overflow: hidden;
-}
-
-/* --- Drop Zone --- */
-#drop-zone {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  z-index: 5;
-  background: rgba(15, 23, 42, 0.92);
-  border: 2px dashed var(--border);
-  border-radius: 12px;
-  margin: 20px;
-}
-#drop-zone.hidden { display: none; }
-#drop-zone p { color: var(--text2); font-size: 14px; }
-#drop-zone .hint { font-size: 11px; color: var(--text2); opacity: 0.6; }
-#drop-zone.dragover { border-color: var(--accent); background: rgba(59,130,246,0.08); }
-#file-input { display: none; }
-#drop-zone button {
-  padding: 8px 20px;
-  background: var(--accent);
-  color: #fff;
-  border: none;
-  border-radius: 6px;
-  font-family: inherit;
-  font-size: 12px;
-  cursor: pointer;
-}
-
-/* --- Side Panel --- */
-#panel {
-  width: 340px;
-  border-left: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  background: var(--surface);
-  flex-shrink: 0;
-}
-#msg-detail {
-  padding: 16px;
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
-}
-#msg-detail .detail-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
-}
-#msg-detail .detail-counter {
-  font-size: 11px;
-  color: var(--text2);
-}
-#msg-detail .detail-time {
-  font-size: 11px;
-  color: var(--accent);
-  font-weight: 600;
-}
-#msg-detail .detail-route {
-  font-size: 13px;
-  font-weight: 600;
-  margin-bottom: 8px;
-}
-#msg-detail .detail-route .arrow { color: var(--text2); margin: 0 6px; }
-#msg-detail .detail-type {
-  display: inline-block;
-  font-size: 9px;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  padding: 2px 8px;
-  border-radius: 4px;
-  margin-bottom: 10px;
-  font-weight: 600;
-}
-#msg-detail .detail-content {
-  font-size: 12px;
-  line-height: 1.6;
-  color: var(--text2);
-  max-height: 200px;
-  overflow-y: auto;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-#msg-detail .detail-content::-webkit-scrollbar { width: 4px; }
-#msg-detail .detail-content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-
-/* --- Message List --- */
-#msg-list-wrap {
-  flex: 1;
-  overflow-y: auto;
-  min-height: 0;
-}
-#msg-list-wrap::-webkit-scrollbar { width: 6px; }
-#msg-list-wrap::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-.msg-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 8px 16px;
-  cursor: pointer;
-  border-bottom: 1px solid rgba(51,65,85,0.3);
-  transition: background 0.15s;
-  font-size: 11px;
-}
-.msg-item:hover { background: var(--surface2); }
-.msg-item.active { background: rgba(59,130,246,0.12); border-left: 2px solid var(--accent); }
-.msg-dot {
-  width: 8px; height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  margin-top: 4px;
-}
-.msg-item-route { font-weight: 600; white-space: nowrap; }
-.msg-item-time { color: var(--text2); margin-left: auto; white-space: nowrap; flex-shrink: 0; }
-.msg-item-summary {
-  color: var(--text2);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  flex: 1;
-  min-width: 0;
-}
-.msg-self-badge {
-  font-size: 8px;
-  background: rgba(99,102,241,0.2);
-  color: #a5b4fc;
-  padding: 1px 5px;
-  border-radius: 3px;
-  margin-left: 4px;
-  flex-shrink: 0;
-}
-
-/* --- Controls --- */
-footer {
-  border-top: 1px solid var(--border);
-  background: var(--surface);
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #000; overflow: hidden; font-family: 'Courier New', monospace; }
+canvas { display: block; }
+#hud {
+  position: absolute; top: 0; left: 0; width: 100%; pointer-events: none;
   padding: 10px 20px;
-  flex-shrink: 0;
 }
-#timeline {
-  width: 100%;
-  height: 6px;
-  background: var(--surface2);
-  border-radius: 3px;
-  cursor: pointer;
-  margin-bottom: 10px;
-  position: relative;
+#hud-top {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 16px; text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
 }
-#timeline-fill {
-  height: 100%;
-  background: var(--accent);
-  border-radius: 3px;
-  transition: width 0.15s;
+#score { color: #00FF64; }
+#hiscore { color: #FFFF00; }
+#lives-wave { color: #FF6464; }
+#timer-bar-container {
+  margin-top: 6px; height: 8px; background: #141414DD;
+  border-radius: 4px; overflow: hidden;
 }
-#timeline-thumb {
-  position: absolute;
-  top: 50%;
-  width: 14px; height: 14px;
-  background: #fff;
-  border-radius: 50%;
-  transform: translate(-50%, -50%);
-  box-shadow: 0 1px 4px rgba(0,0,0,0.4);
-  transition: left 0.15s;
+#timer-bar { height: 100%; width: 100%; transition: background-color 0.1s; border-radius: 4px; }
+#overlay {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  pointer-events: none;
 }
-#controls {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+#overlay-bg {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0,0,0,0); transition: background 0.3s;
 }
-#controls button {
-  background: none;
-  border: 1px solid var(--border);
-  color: var(--text);
-  border-radius: 6px;
-  padding: 6px 14px;
-  font-family: inherit;
-  font-size: 14px;
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+.overlay-text {
+  position: relative; z-index: 1; text-align: center;
+  text-shadow: 2px 2px 4px rgba(0,0,0,0.9);
 }
-#controls button:hover { background: var(--surface2); border-color: var(--text2); }
-#controls button.playing { background: var(--accent); border-color: var(--accent); }
-#counter-label {
-  font-size: 12px;
-  color: var(--text2);
-  min-width: 80px;
-  text-align: center;
+#title-text {
+  font-size: 64px; font-weight: bold; letter-spacing: 4px;
 }
-.speed-control {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-left: auto;
-  font-size: 11px;
-  color: var(--text2);
+#subtitle-text {
+  font-size: 24px; color: #fff; margin-top: 20px;
 }
-.speed-control input[type=range] {
-  width: 100px;
-  accent-color: var(--accent);
+#hiscore-text {
+  font-size: 20px; color: #FFFF00; margin-top: 10px;
 }
-#speed-label { min-width: 32px; text-align: right; font-weight: 600; color: var(--text); }
-
-/* --- Empty State --- */
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  color: var(--text2);
-  font-size: 13px;
-  gap: 8px;
+#credits-text {
+  font-size: 12px; color: #646464; margin-top: 60px;
 }
-.empty-state .big { font-size: 36px; opacity: 0.3; margin-bottom: 8px; }
+#state-text {
+  font-size: 48px; font-weight: bold; color: #FFFF00;
+  padding: 15px 40px; background: rgba(0,0,0,0.7); border-radius: 8px;
+}
+#death-flash {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(255,0,0,0); pointer-events: none;
+}
+#wave-announce {
+  position: absolute; top: 30%; left: 50%; transform: translate(-50%,-50%);
+  font-size: 48px; font-weight: bold; color: #FFFF00;
+  text-shadow: 2px 2px 6px rgba(0,0,0,0.9);
+  pointer-events: none; opacity: 0;
+}
+.score-pop {
+  position: absolute; font-size: 20px; font-weight: bold;
+  text-shadow: 1px 1px 3px rgba(0,0,0,0.9);
+  pointer-events: none;
+}
+#touch-controls {
+  position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+  display: none; pointer-events: auto; opacity: 0.5;
+}
+#touch-controls button {
+  width: 60px; height: 60px; font-size: 24px; border: 2px solid #fff;
+  background: rgba(255,255,255,0.15); color: #fff; border-radius: 12px;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+#touch-controls button:active { background: rgba(255,255,255,0.4); }
+.touch-row { display: flex; justify-content: center; gap: 4px; }
 </style>
 </head>
 <body>
-
-<header>
-  <h1><span>Agent Interaction</span> Replay</h1>
-  <select id="transcript-select"><option value="">-- Loading... --</option></select>
-  <span id="session-info"></span>
-</header>
-
-<main>
-  <div id="arena-wrap">
-    <canvas id="arena-canvas"></canvas>
-    <div id="speech-bubble">
-      <div class="bubble-from"></div>
-      <div class="bubble-text"></div>
-    </div>
-    <div id="drop-zone" class="hidden">
-      <p>Drop transcript .md files here</p>
-      <button onclick="document.getElementById('file-input').click()">Browse Files</button>
-      <input type="file" id="file-input" multiple accept=".md,.json">
-      <span class="hint">Or load pre-built data from data/transcripts.json</span>
-    </div>
+<div id="hud">
+  <div id="hud-top">
+    <span id="score">SCORE: 00000</span>
+    <span id="hiscore">HI: 00000</span>
+    <span id="lives-wave">LIVES: 3  WAVE: 1</span>
   </div>
-
-  <div id="panel">
-    <div id="msg-detail">
-      <div class="detail-header">
-        <span class="detail-counter" id="detail-counter">No messages</span>
-        <span class="detail-time" id="detail-time"></span>
-      </div>
-      <div class="detail-route" id="detail-route"></div>
-      <div class="detail-type" id="detail-type"></div>
-      <div class="detail-content" id="detail-content">Select a session to begin.</div>
-    </div>
-    <div id="msg-list-wrap"></div>
+  <div id="timer-bar-container"><div id="timer-bar"></div></div>
+</div>
+<div id="overlay">
+  <div id="overlay-bg"></div>
+  <div id="title-text" class="overlay-text"></div>
+  <div id="subtitle-text" class="overlay-text"></div>
+  <div id="hiscore-text" class="overlay-text"></div>
+  <div id="credits-text" class="overlay-text"></div>
+  <div id="state-text" class="overlay-text" style="display:none;"></div>
+</div>
+<div id="death-flash"></div>
+<div id="wave-announce"></div>
+<div id="touch-controls">
+  <div class="touch-row"><button id="btn-up">&#9650;</button></div>
+  <div class="touch-row">
+    <button id="btn-left">&#9664;</button>
+    <button id="btn-down">&#9660;</button>
+    <button id="btn-right">&#9654;</button>
   </div>
-</main>
+</div>
 
-<footer>
-  <div id="timeline" onclick="handleTimelineClick(event)">
-    <div id="timeline-fill"></div>
-    <div id="timeline-thumb"></div>
-  </div>
-  <div id="controls">
-    <button id="btn-prev" onclick="stepPrev()" title="Previous message">&lt;</button>
-    <button id="btn-play" onclick="togglePlay()" title="Play / Pause">Play</button>
-    <button id="btn-next" onclick="stepNext()" title="Next message">&gt;</button>
-    <span id="counter-label">0 / 0</span>
-    <div class="speed-control">
-      <span>Speed</span>
-      <input type="range" id="speed-slider" min="0.25" max="4" step="0.25" value="1" oninput="updateSpeed()">
-      <span id="speed-label">1x</span>
-    </div>
-  </div>
-</footer>
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js" } }
+</script>
+<script type="module">
+import * as THREE from 'three';
 
-<script>
-// ─── SVG Icons for Agent Avatars ─────────────────────────────────
-// Each icon is an SVG path string drawn in a 24x24 viewBox
-const AGENT_ICONS = {
-  "engine-architect": // Gear
-    '<path d="M12 15.5A3.5 3.5 0 1 0 12 8.5a3.5 3.5 0 0 0 0 7zm7.43-2.53l1.57-.27V11.3l-1.57-.27a7.04 7.04 0 0 0-.6-1.46l.93-1.27-1.06-1.06-1.27.93a7.04 7.04 0 0 0-1.46-.6L16.7 6h-1.4l-.27 1.57a7.04 7.04 0 0 0-1.46.6l-1.27-.93-1.06 1.06.93 1.27a7.04 7.04 0 0 0-.6 1.46L10 11.3v1.4l1.57.27c.14.52.34 1.01.6 1.46l-.93 1.27 1.06 1.06 1.27-.93c.45.26.94.46 1.46.6L15.3 18h1.4l.27-1.57a7.04 7.04 0 0 0 1.46-.6l1.27.93 1.06-1.06-.93-1.27c.26-.45.46-.94.6-1.46z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>',
-  "game-designer": // Gamepad
-    '<path d="M6 11h4M8 9v4M15 12h.01M18 10h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M17.32 5H6.68a2 2 0 0 0-1.95 1.55L3 14a3 3 0 0 0 5.83 1l.34-1h5.66l.34 1A3 3 0 0 0 21 14l-1.73-7.45A2 2 0 0 0 17.32 5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>',
-  "xp-coach": // Clipboard with check
-    '<path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="9" y="3" width="6" height="4" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M9 14l2 2 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
-  "devops-engineer": // Wrench
-    '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>',
-  "qa-lead": // Magnifying glass with bug
-    '<circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M21 21l-4.35-4.35" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="11" cy="11" r="2.5" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M11 8.5v-1M9 10h-1M13 10h1M11 13.5v1" stroke="currentColor" stroke-width="1" stroke-linecap="round"/>',
-  "level-designer": // Grid/Map
-    '<rect x="3" y="3" width="18" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18" stroke="currentColor" stroke-width="1" opacity="0.6"/><path d="M6 6l3 3M15 6l3 3M6 15l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>',
-  "art-director": // Palette
-    '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-1 0-.83.67-1.5 1.5-1.5H16c3.31 0 6-2.69 6-6 0-4.97-4.48-9-10-9z" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="7.5" cy="11.5" r="1.5" fill="currentColor"/><circle cx="10.5" cy="7.5" r="1.5" fill="currentColor"/><circle cx="14.5" cy="7.5" r="1.5" fill="currentColor"/><circle cx="17.5" cy="11.5" r="1.5" fill="currentColor"/>',
-  "sound-engineer": // Waveform
-    '<path d="M12 3v18M8 7v10M4 10v4M16 7v10M20 10v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
-  "team-lead": // Crown/Star
-    '<path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8l-6.2 4.5 2.4-7.4L2 9.4h7.6z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>',
-  "user": // Person
-    '<circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M20 21a8 8 0 0 0-16 0" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>',
-};
-// Fallback for unknown agents
-const FALLBACK_ICON = '<circle cx="12" cy="12" r="6" fill="none" stroke="currentColor" stroke-width="1.5"/><text x="12" y="15" text-anchor="middle" font-size="8" fill="currentColor">?</text>';
+// ─── CONSTANTS ───────────────────────────────────────────────────────────────
+const GRID_COLS = 13, GRID_ROWS = 15, CELL = 1.0;
+const HOP_DURATION = 0.15, HOP_ARC = 0.30;
+const INPUT_BUFFER = 0.1;
+const RESPAWN_DELAY = 1.0, DYING_DUR = 0.5, ROUND_DUR = 2.0, GAMEOVER_DELAY = 3.0;
+const TIME_PER_LEVEL = 30.0;
+const HOME_COLS = [1, 4, 6, 8, 11], HOME_ROW = 14;
+const START_LIVES = 3, MAX_LIVES = 9;
+const PTS_HOP = 10, PTS_HOME = 200, PTS_ROUND = 1000, PTS_TIME = 10;
+const EXTRA_LIFE_THRESHOLD = 10000;
+const MAX_MULTIPLIER = 5;
+const SPEED_INC = 0.15, MAX_SPEED_MULT = 2.0;
+const FROG_RADIUS = 0.34;
+const RIVER_MIN = 7, RIVER_MAX = 12;
 
-// ─── Agent Definitions ───────────────────────────────────────────
-const AGENTS = {
-  "engine-architect": { initials: "EA", color: "#10B981", label: "Engine Architect", role: "C++ Systems" },
-  "game-designer":    { initials: "GD", color: "#F59E0B", label: "Game Designer",    role: "Mechanics" },
-  "xp-coach":         { initials: "XP", color: "#3B82F6", label: "XP Coach",         role: "Process" },
-  "devops-engineer":  { initials: "DE", color: "#8B5CF6", label: "DevOps Engineer",  role: "Build & CI" },
-  "qa-lead":          { initials: "QA", color: "#06B6D4", label: "QA Lead",           role: "Quality" },
-  "level-designer":   { initials: "LD", color: "#EF4444", label: "Level Designer",   role: "Spatial" },
-  "art-director":     { initials: "AD", color: "#EC4899", label: "Art Director",     role: "Visuals" },
-  "sound-engineer":   { initials: "SE", color: "#F97316", label: "Sound Engineer",   role: "Audio" },
-  "team-lead":        { initials: "TL", color: "#6366F1", label: "Team Lead",        role: "Coordinator" },
-  "user":             { initials: "U",  color: "#94A3B8", label: "Stakeholder",      role: "Direction" },
-};
+// ─── GAME STATE ──────────────────────────────────────────────────────────────
+const State = { TITLE: 0, SPAWNING: 1, PLAYING: 2, DYING: 3, ROUND_COMPLETE: 4, GAME_OVER: 5, PAUSED: 6 };
+let gameState = State.TITLE;
+let score = 0, hiScore = 0, lives = START_LIVES, wave = 1;
+let timer = TIME_PER_LEVEL, timerWarningPlayed = false;
+let stateTimer = 0;
+let multiplier = 1, maxRowReached = 0;
+let nextExtraLife = EXTRA_LIFE_THRESHOLD;
+let homeSlotsFilled = [false, false, false, false, false];
 
-// ─── State ───────────────────────────────────────────────────────
-const state = {
-  transcripts: [],
-  current: null,
-  messages: [],
-  index: -1,
-  playing: false,
-  speed: 1,
-  baseDelay: 2500,
-  animFrame: null,
-  timeout: null,
-  agentNodes: {},
-  agentPositions: {},
-  participants: [],
-};
+// Frog state
+let frogGrid = { x: 6, y: 0 };
+let frogWorldPos = new THREE.Vector3(0, 0, 0);
+let isHopping = false, hopElapsed = 0;
+let hopStart = new THREE.Vector3(), hopEnd = new THREE.Vector3();
+let bufferedDir = null;
+let currentPlatform = null;
+let deathFlashAlpha = 0;
 
-// ─── Canvas Setup ────────────────────────────────────────────────
-const canvas = document.getElementById('arena-canvas');
-const ctx = canvas.getContext('2d');
-let dpr = window.devicePixelRatio || 1;
+// ─── THREE.JS SETUP ─────────────────────────────────────────────────────────
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setClearColor(0x0a0a14);
+document.body.prepend(renderer.domElement);
 
-function resizeCanvas() {
-  const rect = canvas.parentElement.getBoundingClientRect();
-  canvas.width = rect.width * dpr;
-  canvas.height = rect.height * dpr;
-  canvas.style.width = rect.width + 'px';
-  canvas.style.height = rect.height + 'px';
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  if (state.current) layoutAgents();
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x0a0a14, 0.02);
+
+// Camera: top-down perspective
+const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100);
+camera.position.set(6.5 * CELL, 7.0 * CELL, 22 * CELL);
+camera.lookAt(6.5 * CELL, 7.0 * CELL, 0);
+
+// Lighting
+const ambientLight = new THREE.AmbientLight(0x404060, 0.8);
+scene.add(ambientLight);
+const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+dirLight.position.set(10, 15, 20);
+scene.add(dirLight);
+const fillLight = new THREE.DirectionalLight(0x4060ff, 0.3);
+fillLight.position.set(-5, -5, 10);
+scene.add(fillLight);
+
+// ─── MATERIAL HELPER ────────────────────────────────────────────────────────
+function mat(color) {
+  return new THREE.MeshLambertMaterial({ color });
 }
-window.addEventListener('resize', resizeCanvas);
-
-// ─── Data Loading ────────────────────────────────────────────────
-async function loadData() {
-  try {
-    const resp = await fetch('data/transcripts.json');
-    if (!resp.ok) throw new Error('No data file');
-    const data = await resp.json();
-    if (data.agents) Object.assign(AGENTS, data.agents);
-    state.transcripts = data.transcripts || [];
-    populateSelector();
-    if (state.transcripts.length > 0) {
-      document.getElementById('drop-zone').classList.add('hidden');
-    } else {
-      document.getElementById('drop-zone').classList.remove('hidden');
-    }
-  } catch {
-    document.getElementById('drop-zone').classList.remove('hidden');
-  }
+function matT(color, opacity) {
+  return new THREE.MeshLambertMaterial({ color, transparent: true, opacity });
 }
 
-function populateSelector() {
-  const sel = document.getElementById('transcript-select');
-  sel.innerHTML = '<option value="">-- Select session (' + state.transcripts.length + ') --</option>';
-  for (const t of state.transcripts) {
-    const opt = document.createElement('option');
-    opt.value = t.id;
-    const date = t.metadata?.date || '';
-    const msgs = t.messageCount || 0;
-    const files = t.fileCount || 1;
-    const agents = (t.participants || []).filter(p => p in AGENTS && p !== 'team-lead' && p !== 'user' && p !== 'system').length;
-    opt.textContent = date + ' \u2014 ' + t.title + ' (' + msgs + ' msgs, ' + agents + ' agents)';
-    sel.appendChild(opt);
-  }
-  sel.onchange = () => {
-    const t = state.transcripts.find(x => x.id === sel.value);
-    if (t) loadTranscript(t);
-  };
-}
+// ─── GROUND CONSTRUCTION ────────────────────────────────────────────────────
+const ZONE_COLORS = {
+  start: 0x33cc33, road: 0x4d4d4d, median: 0x33cc33,
+  river: 0x1a4dcc, goalLower: 0xcc9919, goalUpper: 0x198019
+};
 
-// ─── File Drop/Upload ────────────────────────────────────────────
-const dropZone = document.getElementById('drop-zone');
-const fileInput = document.getElementById('file-input');
+function buildGround() {
+  const group = new THREE.Group();
+  for (let row = 0; row < GRID_ROWS; row++) {
+    let color;
+    if (row === 0) color = ZONE_COLORS.start;
+    else if (row <= 5) color = ZONE_COLORS.road;
+    else if (row === 6) color = ZONE_COLORS.median;
+    else if (row <= 12) color = ZONE_COLORS.river;
+    else if (row === 13) color = ZONE_COLORS.goalLower;
+    else color = ZONE_COLORS.goalUpper;
 
-document.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
-document.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
-document.addEventListener('drop', e => {
-  e.preventDefault();
-  dropZone.classList.remove('dragover');
-  handleFiles(e.dataTransfer.files);
-});
-fileInput.addEventListener('change', () => handleFiles(fileInput.files));
+    const geo = new THREE.BoxGeometry(GRID_COLS * CELL, CELL, 0.05);
+    const mesh = new THREE.Mesh(geo, mat(color));
+    mesh.position.set((GRID_COLS * CELL) / 2, row * CELL + CELL / 2, -0.025);
+    group.add(mesh);
 
-function handleFiles(files) {
-  for (const file of files) {
-    const reader = new FileReader();
-    reader.onload = e => {
-      const text = e.target.result;
-      if (file.name.endsWith('.json')) {
-        try {
-          const data = JSON.parse(text);
-          const list = data.transcripts || [data];
-          state.transcripts.push(...list);
-          populateSelector();
-          dropZone.classList.add('hidden');
-        } catch {}
-      } else {
-        const t = parseTranscriptMd(text, file.name);
-        if (t && t.messages.length > 0) {
-          state.transcripts.push(t);
-          populateSelector();
-          dropZone.classList.add('hidden');
+    // Road lane markings
+    if (row >= 1 && row <= 5) {
+      for (let c = 0; c < GRID_COLS; c++) {
+        if (c % 2 === 0) {
+          const stripe = new THREE.Mesh(
+            new THREE.BoxGeometry(0.6, 0.04, 0.01),
+            mat(0xffffff)
+          );
+          stripe.position.set(c * CELL + CELL / 2, row * CELL + CELL / 2, 0.01);
+          group.add(stripe);
         }
       }
-    };
-    reader.readAsText(file);
-  }
-}
-
-function parseTranscriptMd(text, filename) {
-  const messages = [];
-  const sections = text.split(/^(## (?:User|Assistant) \(\d{2}:\d{2} UTC\))/m);
-  let lastTeammate = null;
-
-  for (let i = 1; i < sections.length; i += 2) {
-    const header = sections[i];
-    const body = sections[i + 1] || '';
-    const hm = header.match(/## (User|Assistant) \((\d{2}:\d{2}) UTC\)/);
-    if (!hm) continue;
-    const [, role, time] = hm;
-
-    const tm = body.match(/<teammate-message\s+teammate_id="([^"]+)"(?:\s+color="[^"]*")?(?:\s+summary="([^"]*)")?\s*>/);
-
-    if (role === 'User' && tm) {
-      const sender = tm[1], summary = tm[2] || '';
-      const cm = body.match(/<teammate-message[^>]*>([\s\S]*?)<\/teammate-message>/);
-      const content = cm ? cm[1].trim() : body.trim();
-      let receiver = 'team-lead';
-      const toM = summary.match(/\[to\s+([a-z][\w-]*)\]/i);
-      if (toM) receiver = toM[1];
-      const mtype = content.includes('"type": "idle_notification"') ? 'idle' : 'teammate';
-      messages.push({ time, from: sender, to: receiver, content: content.slice(0, 800), summary, type: mtype });
-      lastTeammate = sender;
-    } else if (role === 'User') {
-      const content = body.trim();
-      if (content.length > 10) {
-        messages.push({ time, from: 'user', to: 'team-lead', content: content.slice(0, 800), summary: '', type: 'user' });
-        lastTeammate = null;
-      }
-    } else if (role === 'Assistant') {
-      const lines = body.split('\n').filter(l => l.trim() && !l.trim().startsWith('- **Used'));
-      if (lines.length > 0) {
-        const receiver = lastTeammate || 'all';
-        const mtype = body.includes('**Used SendMessage**') ? 'send' : 'response';
-        messages.push({ time, from: 'team-lead', to: receiver, content: lines.join('\n').slice(0, 800), summary: '', type: mtype });
-      }
     }
   }
 
-  const name = filename.replace('.md', '');
-  const participants = [...new Set(messages.flatMap(m => [m.from, ...(m.to !== 'all' ? [m.to] : [])]))];
-  return {
-    id: name, title: name.split('-').slice(4).join(' ') || name,
-    metadata: {}, messages, participants, messageCount: messages.length, fileCount: 1
-  };
+  // Sidewalk edges (rows 0, 6)
+  [0, 6].forEach(row => {
+    const edge = new THREE.Mesh(
+      new THREE.BoxGeometry(GRID_COLS * CELL, 0.08, 0.12),
+      mat(0xccccaa)
+    );
+    edge.position.set((GRID_COLS * CELL) / 2, row * CELL + CELL, 0.06);
+    group.add(edge);
+  });
+
+  return group;
 }
+scene.add(buildGround());
 
-// ─── Load Session ────────────────────────────────────────────────
-function loadTranscript(t) {
-  stop();
-  state.current = t;
-  state.messages = t.messages;
-  state.index = -1;
-
-  // Build participant list: include known agents + create entries for unknown ones
-  const knownAgents = new Set(Object.keys(AGENTS));
-  state.participants = [];
-  for (const p of t.participants) {
-    if (p === 'system') continue; // skip system messages
-    if (!knownAgents.has(p)) {
-      // Auto-register unknown agents with a generated color
-      AGENTS[p] = {
-        initials: p.slice(0, 2).toUpperCase(),
-        color: '#' + Math.floor(Math.random() * 0xFFFFFF).toString(16).padStart(6, '0'),
-        label: p.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
-        role: 'Agent'
-      };
-    }
-    state.participants.push(p);
-  }
-
-  // Ensure team-lead is included if any teammate messages exist
-  if (state.messages.some(m => m.type === 'teammate' || m.type === 'response') && !state.participants.includes('team-lead')) {
-    state.participants.push('team-lead');
-  }
-
-  // Update session info
-  const info = document.getElementById('session-info');
-  const agentCount = state.participants.filter(p => p !== 'user' && p !== 'system').length;
-  info.textContent = agentCount + ' agents \u00B7 ' + t.messageCount + ' messages' + (t.fileCount > 1 ? ' \u00B7 ' + t.fileCount + ' threads merged' : '');
-
-  layoutAgents();
-  renderMessageList();
-  updateUI();
-  clearCanvas();
-}
-
-// ─── Create SVG Avatar ───────────────────────────────────────────
-function createAvatarSVG(agentId) {
-  const iconSvg = AGENT_ICONS[agentId] || FALLBACK_ICON;
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('viewBox', '0 0 24 24');
-  svg.setAttribute('fill', 'none');
-  svg.innerHTML = iconSvg;
-  return svg;
-}
-
-// ─── Layout Agents in Circle ─────────────────────────────────────
-function layoutAgents() {
-  Object.values(state.agentNodes).forEach(n => n.remove());
-  state.agentNodes = {};
-  state.agentPositions = {};
-
-  const wrap = document.getElementById('arena-wrap');
-  const rect = wrap.getBoundingClientRect();
-  const cx = rect.width / 2;
-  const cy = rect.height / 2;
-  const radius = Math.min(cx, cy) * 0.62;
-
-  const display = state.participants.filter(a => a !== 'system');
-  const count = display.length;
-
-  display.forEach((id, i) => {
-    const angle = (i / count) * Math.PI * 2 - Math.PI / 2;
-    const x = cx + Math.cos(angle) * radius;
-    const y = cy + Math.sin(angle) * radius;
-    state.agentPositions[id] = { x, y };
-
-    const agent = AGENTS[id] || { initials: '?', color: '#666', label: id, role: '' };
-    const node = document.createElement('div');
-    node.className = 'agent-node';
-    node.style.left = x + 'px';
-    node.style.top = y + 'px';
-    node.style.setProperty('--agent-color', agent.color);
-    node.dataset.agentId = id;
-
-    const avatar = document.createElement('div');
-    avatar.className = 'agent-avatar';
-    avatar.style.background = agent.color + '22';
-    avatar.style.borderColor = agent.color + '66';
-    avatar.style.color = agent.color;
-    avatar.appendChild(createAvatarSVG(id));
-
-    const label = document.createElement('div');
-    label.className = 'agent-label';
-    label.textContent = agent.label;
-
-    const role = document.createElement('div');
-    role.className = 'agent-role';
-    role.textContent = agent.role;
-
-    node.appendChild(avatar);
-    node.appendChild(label);
-    node.appendChild(role);
-    wrap.appendChild(node);
-    state.agentNodes[id] = node;
+// ─── HOME SLOTS ─────────────────────────────────────────────────────────────
+const homeSlotMeshes = [];
+function buildHomeSlots() {
+  HOME_COLS.forEach((col, i) => {
+    // Lily pad - flat cylinder
+    const geo = new THREE.CylinderGeometry(0.35, 0.35, 0.06, 12);
+    const mesh = new THREE.Mesh(geo, mat(0x4dcc4d));
+    mesh.rotation.x = Math.PI / 2;
+    mesh.position.set(col * CELL + CELL / 2, HOME_ROW * CELL + CELL / 2, 0.03);
+    scene.add(mesh);
+    homeSlotMeshes.push(mesh);
   });
 }
+buildHomeSlots();
 
-// ─── Canvas Drawing ──────────────────────────────────────────────
-function clearCanvas() {
-  const rect = canvas.parentElement.getBoundingClientRect();
-  ctx.clearRect(0, 0, rect.width, rect.height);
-}
+const filledSlotMeshes = [];
 
-function getControlPoint(from, to, cx, cy) {
-  const mx = (from.x + to.x) / 2;
-  const my = (from.y + to.y) / 2;
-  const pull = 0.35;
-  return { x: mx + (cx - mx) * pull, y: my + (cy - my) * pull };
-}
-
-function drawSelfLoop(pos, progress, color) {
-  const rect = canvas.parentElement.getBoundingClientRect();
-  clearCanvas();
-
-  // Draw a loop that goes out from the agent and comes back
-  const loopRadius = 40;
-  const cx = rect.width / 2, cy = rect.height / 2;
-  // Direction away from center
-  const dx = pos.x - cx, dy = pos.y - cy;
-  const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-  const nx = dx / dist, ny = dy / dist;
-  const loopCx = pos.x + nx * loopRadius;
-  const loopCy = pos.y + ny * loopRadius;
-
-  // Full loop outline (faint)
-  ctx.beginPath();
-  ctx.arc(loopCx, loopCy, loopRadius, 0, Math.PI * 2);
-  ctx.strokeStyle = color + '18';
-  ctx.lineWidth = 2;
-  ctx.stroke();
-
-  if (progress > 0) {
-    // Animated arc
-    const startAngle = Math.atan2(pos.y - loopCy, pos.x - loopCx);
-    const endAngle = startAngle + Math.PI * 2 * progress;
-    ctx.beginPath();
-    ctx.arc(loopCx, loopCy, loopRadius, startAngle, endAngle);
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 2.5;
-    ctx.shadowColor = color;
-    ctx.shadowBlur = 8;
-    ctx.stroke();
-    ctx.shadowBlur = 0;
-
-    // Dot at leading edge
-    const dotX = loopCx + Math.cos(endAngle) * loopRadius;
-    const dotY = loopCy + Math.sin(endAngle) * loopRadius;
-    ctx.beginPath();
-    ctx.arc(dotX, dotY, 5, 0, Math.PI * 2);
-    ctx.fillStyle = '#fff';
-    ctx.shadowColor = color;
-    ctx.shadowBlur = 12;
-    ctx.fill();
-    ctx.shadowBlur = 0;
-  }
-}
-
-function drawArc(fromPos, toPos, progress, color) {
-  // Self-message: draw a loop
-  if (fromPos === toPos || (fromPos.x === toPos.x && fromPos.y === toPos.y)) {
-    drawSelfLoop(fromPos, progress, color);
-    return;
-  }
-
-  const rect = canvas.parentElement.getBoundingClientRect();
-  const cx = rect.width / 2, cy = rect.height / 2;
-  const cp = getControlPoint(fromPos, toPos, cx, cy);
-
-  clearCanvas();
-
-  // Arc trail (faint)
-  ctx.beginPath();
-  ctx.moveTo(fromPos.x, fromPos.y);
-  ctx.quadraticCurveTo(cp.x, cp.y, toPos.x, toPos.y);
-  ctx.strokeStyle = color + '18';
-  ctx.lineWidth = 2;
-  ctx.stroke();
-
-  // Animated portion
-  if (progress > 0) {
-    const steps = 60;
-    const endStep = Math.floor(progress * steps);
-    ctx.beginPath();
-    for (let s = 0; s <= endStep; s++) {
-      const t = s / steps;
-      const x = (1 - t) * (1 - t) * fromPos.x + 2 * (1 - t) * t * cp.x + t * t * toPos.x;
-      const y = (1 - t) * (1 - t) * fromPos.y + 2 * (1 - t) * t * cp.y + t * t * toPos.y;
-      if (s === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-    }
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 2.5;
-    ctx.shadowColor = color;
-    ctx.shadowBlur = 8;
-    ctx.stroke();
-    ctx.shadowBlur = 0;
-
-    // Dot at leading edge
-    const t = progress;
-    const dotX = (1 - t) * (1 - t) * fromPos.x + 2 * (1 - t) * t * cp.x + t * t * toPos.x;
-    const dotY = (1 - t) * (1 - t) * fromPos.y + 2 * (1 - t) * t * cp.y + t * t * toPos.y;
-    ctx.beginPath();
-    ctx.arc(dotX, dotY, 5, 0, Math.PI * 2);
-    ctx.fillStyle = '#fff';
-    ctx.shadowColor = color;
-    ctx.shadowBlur = 12;
-    ctx.fill();
-    ctx.shadowBlur = 0;
-  }
-}
-
-// ─── Speech Bubble ───────────────────────────────────────────────
-const bubble = document.getElementById('speech-bubble');
-
-function showBubble(msg, receiverPos) {
-  if (!receiverPos) { hideBubble(); return; }
-  const agent = AGENTS[msg.from];
-  bubble.querySelector('.bubble-from').textContent = agent?.label || msg.from;
-  bubble.querySelector('.bubble-from').style.color = agent?.color || '#fff';
-
-  const text = msg.summary || msg.content.slice(0, 160);
-  bubble.querySelector('.bubble-text').textContent = text + (msg.content.length > 160 && !msg.summary ? '...' : '');
-
-  const wrap = document.getElementById('arena-wrap').getBoundingClientRect();
-  const cx = wrap.width / 2, cy = wrap.height / 2;
-  const dx = cx - receiverPos.x, dy = cy - receiverPos.y;
-  const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-  const offsetX = (dx / dist) * 70;
-  const offsetY = (dy / dist) * 70;
-
-  bubble.style.left = (receiverPos.x + offsetX) + 'px';
-  bubble.style.top = (receiverPos.y + offsetY) + 'px';
-  bubble.style.borderColor = agent?.color || '#334155';
-  bubble.classList.add('visible');
-}
-
-function hideBubble() {
-  bubble.classList.remove('visible');
-}
-
-// ─── Animation ───────────────────────────────────────────────────
-function animateMessage(index) {
-  const msg = state.messages[index];
-  if (!msg) return;
-
-  state.index = index;
-  updateUI();
-
-  // Highlight sender/receiver
-  Object.values(state.agentNodes).forEach(n => n.classList.remove('sender', 'receiver'));
-  if (state.agentNodes[msg.from]) state.agentNodes[msg.from].classList.add('sender');
-  const toId = msg.to === 'all' ? null : msg.to;
-  if (toId && state.agentNodes[toId]) state.agentNodes[toId].classList.add('receiver');
-
-  const fromPos = state.agentPositions[msg.from];
-  const toPos = toId ? state.agentPositions[toId] : null;
-  const color = AGENTS[msg.from]?.color || '#fff';
-
-  // Self-message
-  const isSelf = msg.from === msg.to || (toId && toId === msg.from);
-  if (isSelf && fromPos) {
-    const arcDuration = (state.baseDelay / state.speed) * 0.4;
-    const startTime = performance.now();
-    // Also mark as receiver for glow
-    if (state.agentNodes[msg.from]) state.agentNodes[msg.from].classList.add('receiver');
-    function frame(now) {
-      const elapsed = now - startTime;
-      const progress = Math.min(elapsed / arcDuration, 1);
-      drawSelfLoop(fromPos, progress, color);
-      if (progress >= 0.7 && !bubble.classList.contains('visible')) {
-        showBubble(msg, fromPos);
-      }
-      if (progress < 1) {
-        state.animFrame = requestAnimationFrame(frame);
-      } else {
-        showBubble(msg, fromPos);
-        scheduleNext();
-      }
-    }
-    cancelAnimationFrame(state.animFrame);
-    clearTimeout(state.timeout);
-    state.animFrame = requestAnimationFrame(frame);
-    return;
-  }
-
-  if (!fromPos || !toPos) {
-    clearCanvas();
-    if (fromPos) showBubble(msg, fromPos);
-    scheduleNext();
-    return;
-  }
-
-  const arcDuration = (state.baseDelay / state.speed) * 0.4;
-  const startTime = performance.now();
-
-  function frame(now) {
-    const elapsed = now - startTime;
-    const progress = Math.min(elapsed / arcDuration, 1);
-    drawArc(fromPos, toPos, progress, color);
-
-    if (progress >= 0.7 && !bubble.classList.contains('visible')) {
-      showBubble(msg, toPos);
-    }
-
-    if (progress < 1) {
-      state.animFrame = requestAnimationFrame(frame);
-    } else {
-      showBubble(msg, toPos);
-      scheduleNext();
-    }
-  }
-
-  cancelAnimationFrame(state.animFrame);
-  clearTimeout(state.timeout);
-  state.animFrame = requestAnimationFrame(frame);
-}
-
-function scheduleNext() {
-  if (!state.playing) return;
-  const holdDuration = (state.baseDelay / state.speed) * 0.6;
-  state.timeout = setTimeout(() => {
-    if (state.index < state.messages.length - 1) {
-      animateMessage(state.index + 1);
-    } else {
-      stop();
-    }
-  }, holdDuration);
-}
-
-// ─── Playback Controls ──────────────────────────────────────────
-function togglePlay() {
-  if (state.playing) { pause(); } else { play(); }
-}
-
-function play() {
-  if (!state.current || state.messages.length === 0) return;
-  state.playing = true;
-  document.getElementById('btn-play').textContent = 'Pause';
-  document.getElementById('btn-play').classList.add('playing');
-  const startIdx = state.index < 0 ? 0 : (state.index >= state.messages.length - 1 ? 0 : state.index + 1);
-  animateMessage(startIdx);
-}
-
-function pause() {
-  state.playing = false;
-  cancelAnimationFrame(state.animFrame);
-  clearTimeout(state.timeout);
-  document.getElementById('btn-play').textContent = 'Play';
-  document.getElementById('btn-play').classList.remove('playing');
-}
-
-function stop() {
-  pause();
-  hideBubble();
-}
-
-function stepNext() {
-  pause();
-  if (!state.current) return;
-  const next = Math.min(state.index + 1, state.messages.length - 1);
-  showMessageStatic(next);
-}
-
-function stepPrev() {
-  pause();
-  if (!state.current) return;
-  const prev = Math.max(state.index - 1, 0);
-  showMessageStatic(prev);
-}
-
-function showMessageStatic(index) {
-  const msg = state.messages[index];
-  if (!msg) return;
-  state.index = index;
-
-  Object.values(state.agentNodes).forEach(n => n.classList.remove('sender', 'receiver'));
-  if (state.agentNodes[msg.from]) state.agentNodes[msg.from].classList.add('sender');
-  const toId = msg.to === 'all' ? null : msg.to;
-  if (toId && state.agentNodes[toId]) state.agentNodes[toId].classList.add('receiver');
-
-  const fromPos = state.agentPositions[msg.from];
-  const toPos = toId ? state.agentPositions[toId] : null;
-  const color = AGENTS[msg.from]?.color || '#fff';
-
-  const isSelf = msg.from === msg.to || (toId && toId === msg.from);
-  if (isSelf && fromPos) {
-    if (state.agentNodes[msg.from]) state.agentNodes[msg.from].classList.add('receiver');
-    drawSelfLoop(fromPos, 1, color);
-    showBubble(msg, fromPos);
-  } else if (fromPos && toPos) {
-    drawArc(fromPos, toPos, 1, color);
-    showBubble(msg, toPos);
-  } else if (fromPos) {
-    clearCanvas();
-    showBubble(msg, fromPos);
-  } else {
-    clearCanvas();
-    hideBubble();
-  }
-
-  updateUI();
-}
-
-function jumpTo(index) {
-  pause();
-  showMessageStatic(index);
-}
-
-function updateSpeed() {
-  const slider = document.getElementById('speed-slider');
-  state.speed = parseFloat(slider.value);
-  document.getElementById('speed-label').textContent = state.speed + 'x';
-}
-
-function handleTimelineClick(e) {
-  if (!state.current || state.messages.length === 0) return;
-  const rect = e.currentTarget.getBoundingClientRect();
-  const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-  const idx = Math.round(pct * (state.messages.length - 1));
-  pause();
-  showMessageStatic(idx);
-}
-
-// ─── UI Updates ──────────────────────────────────────────────────
-function updateUI() {
-  const total = state.messages.length;
-  const idx = state.index;
-
-  document.getElementById('counter-label').textContent = (idx >= 0 ? idx + 1 : 0) + ' / ' + total;
-  document.getElementById('detail-counter').textContent = 'Message ' + (idx >= 0 ? idx + 1 : '-') + ' of ' + total;
-
-  const pct = total > 0 && idx >= 0 ? ((idx / (total - 1)) * 100) : 0;
-  document.getElementById('timeline-fill').style.width = pct + '%';
-  document.getElementById('timeline-thumb').style.left = pct + '%';
-
-  if (idx >= 0 && idx < total) {
-    const msg = state.messages[idx];
-    const fromAgent = AGENTS[msg.from];
-    const toAgent = AGENTS[msg.to];
-    const isSelf = msg.from === msg.to;
-
-    document.getElementById('detail-time').textContent = msg.time + ' UTC';
-
-    const routeEl = document.getElementById('detail-route');
-    routeEl.innerHTML = '';
-    const fromSpan = document.createElement('span');
-    fromSpan.style.color = fromAgent?.color || '#fff';
-    fromSpan.textContent = fromAgent?.label || msg.from;
-
-    if (isSelf) {
-      const selfBadge = document.createElement('span');
-      selfBadge.style.cssText = 'font-size:10px;color:#a5b4fc;margin-left:8px;opacity:0.7;';
-      selfBadge.textContent = '(self)';
-      routeEl.append(fromSpan, selfBadge);
-    } else {
-      const arrow = document.createElement('span');
-      arrow.className = 'arrow';
-      arrow.textContent = ' \u2192 ';
-      const toSpan = document.createElement('span');
-      toSpan.style.color = toAgent?.color || '#fff';
-      toSpan.textContent = msg.to === 'all' ? 'All' : (toAgent?.label || msg.to);
-      routeEl.append(fromSpan, arrow, toSpan);
-    }
-
-    const typeEl = document.getElementById('detail-type');
-    const typeColors = {
-      teammate: '#10B981', response: '#6366F1', user: '#94A3B8',
-      idle: '#475569', send: '#F59E0B'
-    };
-    typeEl.style.background = (typeColors[msg.type] || '#475569') + '33';
-    typeEl.style.color = typeColors[msg.type] || '#94A3B8';
-    typeEl.textContent = msg.type;
-
-    document.getElementById('detail-content').textContent = msg.content;
-
-    document.querySelectorAll('.msg-item').forEach((el, i) => {
-      el.classList.toggle('active', i === idx);
-    });
-    const activeItem = document.querySelector('.msg-item.active');
-    if (activeItem) activeItem.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-  }
-}
-
-function renderMessageList() {
-  const wrap = document.getElementById('msg-list-wrap');
-  wrap.innerHTML = '';
-
-  state.messages.forEach((msg, i) => {
-    const item = document.createElement('div');
-    item.className = 'msg-item';
-    item.onclick = () => jumpTo(i);
-
-    const dot = document.createElement('div');
-    dot.className = 'msg-dot';
-    dot.style.background = AGENTS[msg.from]?.color || '#666';
-
-    const route = document.createElement('span');
-    route.className = 'msg-item-route';
-    const fromInit = AGENTS[msg.from]?.initials || '?';
-    const isSelf = msg.from === msg.to;
-    if (isSelf) {
-      route.textContent = fromInit + '\u21BB'; // loop arrow
-    } else {
-      const toInit = msg.to === 'all' ? 'ALL' : (AGENTS[msg.to]?.initials || '?');
-      route.textContent = fromInit + '\u2192' + toInit;
-    }
-    route.style.color = AGENTS[msg.from]?.color || '#fff';
-
-    const summary = document.createElement('span');
-    summary.className = 'msg-item-summary';
-    summary.textContent = msg.summary || msg.content.slice(0, 60).replace(/\n/g, ' ');
-
-    const time = document.createElement('span');
-    time.className = 'msg-item-time';
-    time.textContent = msg.time;
-
-    item.append(dot, route, summary, time);
-    if (isSelf) {
-      const badge = document.createElement('span');
-      badge.className = 'msg-self-badge';
-      badge.textContent = 'self';
-      item.insertBefore(badge, time);
-    }
-    wrap.appendChild(item);
+// ─── FROG ───────────────────────────────────────────────────────────────────
+function createFrog() {
+  const group = new THREE.Group();
+  // Body
+  const body = new THREE.Mesh(new THREE.SphereGeometry(0.35, 16, 12), mat(0x19cc19));
+  body.scale.set(1, 1, 0.7);
+  body.position.z = 0.25;
+  group.add(body);
+  // Eyes
+  [-0.15, 0.15].forEach(x => {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 8), mat(0xffffff));
+    eye.position.set(x, 0.2, 0.45);
+    group.add(eye);
+    const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 8), mat(0x111111));
+    pupil.position.set(x, 0.28, 0.47);
+    group.add(pupil);
   });
+  // Legs (back)
+  [-0.3, 0.3].forEach(x => {
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.3, 0.08), mat(0x15aa15));
+    leg.position.set(x, -0.25, 0.15);
+    group.add(leg);
+  });
+  return group;
+}
+const frog = createFrog();
+scene.add(frog);
+
+// ─── HAZARD & PLATFORM DEFINITIONS ─────────────────────────────────────────
+const LANE_CONFIGS = [
+  null, // row 0 - start
+  { type: 'car',        dir: -1, speed: 1.5, width: 1, gap: 3, color: 0xe61919 },
+  { type: 'truck',      dir:  1, speed: 1.0, width: 2, gap: 4, color: 0x991a1a },
+  { type: 'car',        dir: -1, speed: 2.0, width: 1, gap: 2, color: 0xe61919 },
+  { type: 'bus',        dir:  1, speed: 1.75,width: 2, gap: 3, color: 0xe68019 },
+  { type: 'motorcycle', dir: -1, speed: 2.5, width: 1, gap: 2, color: 0xe6e619 },
+  null, // row 6 - median
+  { type: 'smallLog',   dir:  1, speed: 1.0, width: 2, gap: 2, color: 0x8c4d19, platform: true },
+  { type: 'turtle',     dir: -1, speed: 0.8, width: 3, gap: 2, color: 0x198033, platform: true, submerge: true },
+  { type: 'largeLog',   dir:  1, speed: 1.2, width: 4, gap: 2, color: 0x664d1a, platform: true },
+  { type: 'smallLog',   dir: -1, speed: 1.0, width: 2, gap: 2, color: 0x8c4d19, platform: true },
+  { type: 'turtle',     dir:  1, speed: 0.8, width: 3, gap: 2, color: 0x198033, platform: true, submerge: true },
+  { type: 'largeLog',   dir: -1, speed: 1.5, width: 4, gap: 2, color: 0x664d1a, platform: true },
+];
+
+// ─── CREATE MODELS ──────────────────────────────────────────────────────────
+function createCar(color) {
+  const g = new THREE.Group();
+  // Body
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.6, 0.3), mat(color));
+  body.position.z = 0.15;
+  g.add(body);
+  // Roof
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.4, 0.2), mat(color));
+  roof.position.set(0, 0, 0.35);
+  g.add(roof);
+  // Windshield
+  const wind = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.1, 0.18), mat(0x88ccff));
+  wind.position.set(0, 0.21, 0.35);
+  g.add(wind);
+  // Wheels
+  [[-0.25, -0.3], [-0.25, 0.3], [0.25, -0.3], [0.25, 0.3]].forEach(([x, y]) => {
+    const w = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.06, 8), mat(0x222222));
+    w.rotation.x = Math.PI / 2;
+    w.position.set(x, y, 0.08);
+    g.add(w);
+  });
+  return g;
 }
 
-// ─── Keyboard Shortcuts ──────────────────────────────────────────
+function createTruck(color) {
+  const g = new THREE.Group();
+  // Cab
+  const cab = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.6, 0.4), mat(color));
+  cab.position.set(0.55, 0, 0.2);
+  g.add(cab);
+  // Cargo
+  const cargo = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.7, 0.5), mat(darken(color, 0.7)));
+  cargo.position.set(-0.15, 0, 0.25);
+  g.add(cargo);
+  // Wheels
+  [[-0.55, -0.35], [-0.55, 0.35], [0.55, -0.35], [0.55, 0.35]].forEach(([x, y]) => {
+    const w = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.06, 8), mat(0x222222));
+    w.rotation.x = Math.PI / 2;
+    w.position.set(x, y, 0.1);
+    g.add(w);
+  });
+  return g;
+}
+
+function createBus(color) {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.7, 0.45), mat(color));
+  body.position.z = 0.225;
+  g.add(body);
+  // Windows
+  for (let i = -3; i <= 3; i++) {
+    const win = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.05, 0.15), mat(0x88ccff));
+    win.position.set(i * 0.2, 0.36, 0.3);
+    g.add(win);
+  }
+  // Wheels
+  [[-0.6, -0.38], [-0.6, 0.38], [0.6, -0.38], [0.6, 0.38]].forEach(([x, y]) => {
+    const w = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.06, 8), mat(0x222222));
+    w.rotation.x = Math.PI / 2;
+    w.position.set(x, y, 0.1);
+    g.add(w);
+  });
+  return g;
+}
+
+function createMotorcycle(color) {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.3, 0.2), mat(color));
+  body.position.z = 0.2;
+  g.add(body);
+  // Rider
+  const rider = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.3), mat(0x333333));
+  rider.position.set(0, 0, 0.4);
+  g.add(rider);
+  // Wheels
+  [[-0.22, 0], [0.22, 0]].forEach(([x, y]) => {
+    const w = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.04, 8), mat(0x222222));
+    w.rotation.x = Math.PI / 2;
+    w.position.set(x, y, 0.1);
+    g.add(w);
+  });
+  return g;
+}
+
+function createLog(width, color) {
+  const g = new THREE.Group();
+  const geo = new THREE.CylinderGeometry(0.2, 0.2, width * CELL - 0.1, 8);
+  const logMesh = new THREE.Mesh(geo, mat(color));
+  logMesh.rotation.z = Math.PI / 2;
+  logMesh.position.z = 0.2;
+  g.add(logMesh);
+  // Bark rings
+  for (let i = 0; i < width; i++) {
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(0.18, 0.03, 6, 8),
+      mat(darken(color, 0.6))
+    );
+    ring.position.set((i - (width - 1) / 2) * 0.8, 0, 0.2);
+    ring.rotation.y = Math.PI / 2;
+    g.add(ring);
+  }
+  return g;
+}
+
+function createTurtleGroup(width, color) {
+  const g = new THREE.Group();
+  const count = width;
+  for (let i = 0; i < count; i++) {
+    // Shell
+    const shell = new THREE.Mesh(
+      new THREE.SphereGeometry(0.3, 10, 8),
+      mat(color)
+    );
+    shell.scale.set(1, 1, 0.5);
+    shell.position.set((i - (count - 1) / 2) * 0.85, 0, 0.15);
+    g.add(shell);
+    // Head
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.08, 6, 6), mat(0x2d8a4e));
+    head.position.set((i - (count - 1) / 2) * 0.85, 0.28, 0.15);
+    g.add(head);
+  }
+  g.userData.submerge = true;
+  return g;
+}
+
+function darken(hex, factor) {
+  const r = ((hex >> 16) & 0xff) * factor;
+  const g = ((hex >> 8) & 0xff) * factor;
+  const b = (hex & 0xff) * factor;
+  return (Math.floor(r) << 16) | (Math.floor(g) << 8) | Math.floor(b);
+}
+
+// ─── LANE ENTITIES ──────────────────────────────────────────────────────────
+let laneEntities = []; // Array of arrays per lane
+
+function createEntityForLane(config) {
+  switch (config.type) {
+    case 'car': return createCar(config.color);
+    case 'truck': return createTruck(config.color);
+    case 'bus': return createBus(config.color);
+    case 'motorcycle': return createMotorcycle(config.color);
+    case 'smallLog': return createLog(config.width, config.color);
+    case 'largeLog': return createLog(config.width, config.color);
+    case 'turtle': return createTurtleGroup(config.width, config.color);
+    default: return new THREE.Mesh(new THREE.BoxGeometry(config.width * CELL - 0.1, 0.6, 0.3), mat(config.color));
+  }
+}
+
+function getEffectiveGap(baseGap) {
+  const reduction = Math.floor((wave - 1) / 2);
+  return Math.max(1, baseGap - reduction);
+}
+
+function getSpeedMultiplier() {
+  return Math.min(MAX_SPEED_MULT, 1.0 + (wave - 1) * SPEED_INC);
+}
+
+function spawnLane(row) {
+  const config = LANE_CONFIGS[row];
+  if (!config) return [];
+  const entities = [];
+  const effectiveGap = getEffectiveGap(config.gap);
+  const spacing = (config.width + effectiveGap) * CELL;
+  const totalWidth = GRID_COLS * CELL;
+  const count = Math.ceil(totalWidth / spacing) + 2;
+
+  for (let i = 0; i < count; i++) {
+    const mesh = createEntityForLane(config);
+    const xOffset = i * spacing;
+    mesh.position.set(xOffset, row * CELL + CELL / 2, 0);
+    mesh.userData = {
+      row, speed: config.speed * config.dir * getSpeedMultiplier(),
+      width: config.width * CELL,
+      platform: !!config.platform,
+      canSubmerge: !!config.submerge,
+      submergeTimer: Math.random() * 7, // stagger submerge phases
+      submergeState: 'surface', // surface, warning, submerged
+      dir: config.dir,
+    };
+    scene.add(mesh);
+    entities.push(mesh);
+  }
+  return entities;
+}
+
+function spawnAllLanes() {
+  // Remove old
+  laneEntities.forEach(ents => ents.forEach(e => scene.remove(e)));
+  laneEntities = [];
+  for (let row = 0; row < GRID_ROWS; row++) {
+    laneEntities.push(spawnLane(row));
+  }
+}
+
+// ─── COLLISION & PLATFORM DETECTION ─────────────────────────────────────────
+function findPlatformAt(pos) {
+  for (let row = RIVER_MIN; row <= RIVER_MAX; row++) {
+    const ents = laneEntities[row];
+    if (!ents) continue;
+    for (const ent of ents) {
+      if (!ent.userData.platform) continue;
+      if (ent.userData.submergeState === 'submerged') continue;
+      const hw = ent.userData.width / 2;
+      const ex = ent.position.x;
+      if (pos.x >= ex - hw - FROG_RADIUS && pos.x <= ex + hw + FROG_RADIUS &&
+          Math.abs(pos.y - ent.position.y) < CELL * 0.6) {
+        return ent;
+      }
+    }
+  }
+  return null;
+}
+
+function checkRoadCollision(pos) {
+  for (let row = 1; row <= 5; row++) {
+    const ents = laneEntities[row];
+    if (!ents) continue;
+    if (Math.abs(pos.y - (row * CELL + CELL / 2)) > CELL * 0.45) continue;
+    for (const ent of ents) {
+      const hw = ent.userData.width / 2 * 0.8; // 80% hitbox for near-miss feel
+      const ex = ent.position.x;
+      if (pos.x >= ex - hw && pos.x <= ex + hw) return true;
+    }
+  }
+  return false;
+}
+
+// ─── GRID HELPERS ───────────────────────────────────────────────────────────
+function gridToWorld(gx, gy) {
+  return new THREE.Vector3(gx * CELL + CELL / 2, gy * CELL + CELL / 2, 0);
+}
+
+function worldToGrid(pos) {
+  return { x: Math.round(pos.x / CELL - 0.5), y: Math.round(pos.y / CELL - 0.5) };
+}
+
+function isValidGrid(gx, gy) {
+  return gx >= 0 && gx < GRID_COLS && gy >= 0 && gy < GRID_ROWS;
+}
+
+// ─── INPUT ──────────────────────────────────────────────────────────────────
+const keys = {};
+let lastInputDir = null;
+
 document.addEventListener('keydown', e => {
-  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
-  switch (e.key) {
-    case ' ': e.preventDefault(); togglePlay(); break;
-    case 'ArrowRight': case 'l': stepNext(); break;
-    case 'ArrowLeft': case 'h': stepPrev(); break;
-    case 'ArrowUp': case 'k':
-      e.preventDefault();
-      document.getElementById('speed-slider').stepUp();
-      updateSpeed();
-      break;
-    case 'ArrowDown': case 'j':
-      e.preventDefault();
-      document.getElementById('speed-slider').stepDown();
-      updateSpeed();
-      break;
+  keys[e.code] = true;
+  if (gameState === State.TITLE && !['F5', 'F11', 'F12'].includes(e.code)) {
+    startGame();
+    e.preventDefault();
+    return;
+  }
+  if (gameState === State.GAME_OVER && stateTimer > GAMEOVER_DELAY) {
+    resetToTitle();
+    e.preventDefault();
+    return;
+  }
+  if (e.code === 'KeyP' || e.code === 'Escape') {
+    if (gameState === State.PLAYING) { gameState = State.PAUSED; updateOverlay(); }
+    else if (gameState === State.PAUSED) { gameState = State.PLAYING; updateOverlay(); }
+    e.preventDefault();
+  }
+  // Directions
+  let dir = null;
+  if (e.code === 'ArrowUp' || e.code === 'KeyW') dir = { x: 0, y: 1 };
+  if (e.code === 'ArrowDown' || e.code === 'KeyS') dir = { x: 0, y: -1 };
+  if (e.code === 'ArrowLeft' || e.code === 'KeyA') dir = { x: -1, y: 0 };
+  if (e.code === 'ArrowRight' || e.code === 'KeyD') dir = { x: 1, y: 0 };
+  if (dir && gameState === State.PLAYING) {
+    if (!isHopping) tryHop(dir);
+    else bufferedDir = dir;
+    e.preventDefault();
   }
 });
 
-// ─── Init ────────────────────────────────────────────────────────
-resizeCanvas();
-loadData();
+document.addEventListener('keyup', e => { keys[e.code] = false; });
+
+// Touch controls
+function setupTouch() {
+  if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+    document.getElementById('touch-controls').style.display = 'block';
+  }
+  const dirs = { 'btn-up': {x:0,y:1}, 'btn-down': {x:0,y:-1}, 'btn-left': {x:-1,y:0}, 'btn-right': {x:1,y:0} };
+  Object.entries(dirs).forEach(([id, dir]) => {
+    const btn = document.getElementById(id);
+    btn.addEventListener('touchstart', e => {
+      e.preventDefault();
+      if (gameState === State.TITLE) { startGame(); return; }
+      if (gameState === State.GAME_OVER && stateTimer > GAMEOVER_DELAY) { resetToTitle(); return; }
+      if (gameState === State.PLAYING) {
+        if (!isHopping) tryHop(dir); else bufferedDir = dir;
+      }
+    });
+  });
+}
+setupTouch();
+
+// ─── MOVEMENT ───────────────────────────────────────────────────────────────
+function tryHop(dir) {
+  if (gameState !== State.PLAYING) return;
+  const newGX = frogGrid.x + dir.x;
+  const newGY = frogGrid.y + dir.y;
+  if (!isValidGrid(newGX, newGY)) return;
+
+  isHopping = true;
+  hopElapsed = 0;
+
+  // Use actual world position if on a platform
+  if (currentPlatform) {
+    hopStart.copy(frogWorldPos);
+  } else {
+    hopStart.copy(gridToWorld(frogGrid.x, frogGrid.y));
+  }
+  hopEnd.copy(gridToWorld(newGX, newGY));
+
+  frogGrid.x = newGX;
+  frogGrid.y = newGY;
+  lastInputDir = dir;
+
+  // Scoring
+  if (dir.y > 0) {
+    if (newGY > maxRowReached) {
+      const pts = PTS_HOP * multiplier;
+      addScore(pts);
+      maxRowReached = newGY;
+      multiplier = Math.min(multiplier + 1, MAX_MULTIPLIER);
+      spawnScorePop(pts);
+    }
+  } else if (dir.y < 0) {
+    multiplier = 1;
+  }
+
+  currentPlatform = null;
+  playSound('hop');
+}
+
+function finishHop() {
+  isHopping = false;
+  frogWorldPos.copy(gridToWorld(frogGrid.x, frogGrid.y));
+  frog.position.copy(frogWorldPos);
+
+  // Check home slot
+  if (frogGrid.y === HOME_ROW) {
+    const slotIdx = HOME_COLS.indexOf(frogGrid.x);
+    if (slotIdx >= 0 && !homeSlotsFilled[slotIdx]) {
+      fillHomeSlot(slotIdx);
+    } else {
+      die('splash');
+    }
+    return;
+  }
+
+  // Check river
+  if (frogGrid.y >= RIVER_MIN && frogGrid.y <= RIVER_MAX) {
+    const plat = findPlatformAt(frogWorldPos);
+    if (plat) {
+      currentPlatform = plat;
+    } else {
+      die('splash');
+      return;
+    }
+  }
+
+  // Check road collision at landing
+  if (frogGrid.y >= 1 && frogGrid.y <= 5) {
+    if (checkRoadCollision(frogWorldPos)) {
+      die('squish');
+      return;
+    }
+  }
+
+  // Process buffered input
+  if (bufferedDir) {
+    const bd = bufferedDir;
+    bufferedDir = null;
+    tryHop(bd);
+  }
+}
+
+// ─── SCORING ────────────────────────────────────────────────────────────────
+function addScore(pts) {
+  score += pts;
+  if (score >= nextExtraLife) {
+    lives = Math.min(lives + 1, MAX_LIVES);
+    nextExtraLife += EXTRA_LIFE_THRESHOLD;
+    playSound('extraLife');
+  }
+  if (score > hiScore) hiScore = score;
+}
+
+// ─── HOME SLOTS ─────────────────────────────────────────────────────────────
+function fillHomeSlot(idx) {
+  homeSlotsFilled[idx] = true;
+  addScore(PTS_HOME);
+  spawnScorePop(PTS_HOME);
+  playSound('homeSlot');
+
+  // Visual indicator for filled slot
+  const col = HOME_COLS[idx];
+  const filledMesh = new THREE.Mesh(
+    new THREE.SphereGeometry(0.3, 12, 8),
+    mat(0x19cc19)
+  );
+  filledMesh.scale.set(1, 1, 0.5);
+  filledMesh.position.set(col * CELL + CELL / 2, HOME_ROW * CELL + CELL / 2, 0.15);
+  scene.add(filledMesh);
+  filledSlotMeshes.push(filledMesh);
+
+  // Sparkle VFX
+  spawnSparkles(filledMesh.position);
+
+  // Check round complete
+  if (homeSlotsFilled.every(Boolean)) {
+    roundComplete();
+  } else {
+    // Reset frog
+    respawnFrog();
+  }
+}
+
+function roundComplete() {
+  const timeBonus = Math.floor(timer) * PTS_TIME;
+  addScore(PTS_ROUND + timeBonus);
+  spawnScorePop(PTS_ROUND + timeBonus);
+  gameState = State.ROUND_COMPLETE;
+  stateTimer = 0;
+  playSound('roundComplete');
+  showWaveAnnounce(wave + 1);
+  updateOverlay();
+}
+
+// ─── DEATH ──────────────────────────────────────────────────────────────────
+function die(type) {
+  if (gameState !== State.PLAYING) return;
+  lives--;
+  gameState = State.DYING;
+  stateTimer = 0;
+  currentPlatform = null;
+  deathFlashAlpha = 0.5;
+  multiplier = 1;
+  timerWarningPlayed = false;
+
+  // Death VFX
+  spawnDeathPuff(frogWorldPos.clone(), type);
+
+  if (type === 'splash') playSound('splash');
+  else if (type === 'squish') playSound('squish');
+  else playSound('squish');
+
+  updateOverlay();
+}
+
+function respawnFrog() {
+  frogGrid = { x: 6, y: 0 };
+  frogWorldPos.copy(gridToWorld(6, 0));
+  frog.position.copy(frogWorldPos);
+  isHopping = false;
+  currentPlatform = null;
+  bufferedDir = null;
+  maxRowReached = 0;
+  multiplier = 1;
+}
+
+// ─── GAME FLOW ──────────────────────────────────────────────────────────────
+function startGame() {
+  score = 0;
+  lives = START_LIVES;
+  wave = 1;
+  timer = TIME_PER_LEVEL;
+  timerWarningPlayed = false;
+  nextExtraLife = EXTRA_LIFE_THRESHOLD;
+  homeSlotsFilled = [false, false, false, false, false];
+  filledSlotMeshes.forEach(m => scene.remove(m));
+  filledSlotMeshes.length = 0;
+  multiplier = 1;
+  maxRowReached = 0;
+  spawnAllLanes();
+  respawnFrog();
+  frog.visible = true;
+  gameState = State.SPAWNING;
+  stateTimer = 0;
+  updateOverlay();
+}
+
+function nextWave() {
+  wave++;
+  timer = TIME_PER_LEVEL;
+  timerWarningPlayed = false;
+  homeSlotsFilled = [false, false, false, false, false];
+  filledSlotMeshes.forEach(m => scene.remove(m));
+  filledSlotMeshes.length = 0;
+  // Update home slot visuals
+  homeSlotMeshes.forEach(m => {
+    m.material = mat(0x4dcc4d);
+  });
+  spawnAllLanes();
+  respawnFrog();
+  gameState = State.SPAWNING;
+  stateTimer = 0;
+  updateOverlay();
+}
+
+function resetToTitle() {
+  gameState = State.TITLE;
+  frog.visible = false;
+  // Clear lane entities
+  laneEntities.forEach(ents => ents.forEach(e => scene.remove(e)));
+  laneEntities = [];
+  filledSlotMeshes.forEach(m => scene.remove(m));
+  filledSlotMeshes.length = 0;
+  updateOverlay();
+}
+
+// ─── VFX ────────────────────────────────────────────────────────────────────
+const vfxList = [];
+
+function spawnDeathPuff(pos, type) {
+  const colors = { squish: 0xff3333, splash: 0x3366ff, offscreen: 0xffff33, timeout: 0xff3333 };
+  const color = colors[type] || 0xff3333;
+  const g = new THREE.Group();
+  for (let i = 0; i < 8; i++) {
+    const angle = (i / 8) * Math.PI * 2;
+    const p = new THREE.Mesh(new THREE.SphereGeometry(0.12, 6, 6), matT(color, 0.9));
+    p.position.set(Math.cos(angle) * 0.1, Math.sin(angle) * 0.1, 0.3);
+    p.userData.vx = Math.cos(angle) * 2;
+    p.userData.vy = Math.sin(angle) * 2;
+    p.userData.vz = 1 + Math.random();
+    g.add(p);
+  }
+  g.position.copy(pos);
+  scene.add(g);
+  vfxList.push({ mesh: g, timer: 0, duration: 0.8, type: 'deathPuff' });
+}
+
+function spawnSparkles(pos) {
+  const g = new THREE.Group();
+  for (let i = 0; i < 6; i++) {
+    const angle = (i / 6) * Math.PI * 2;
+    const p = new THREE.Mesh(new THREE.SphereGeometry(0.06, 6, 6), matT(0xffd800, 0.9));
+    p.position.set(Math.cos(angle) * 0.15, Math.sin(angle) * 0.15, 0.2);
+    p.userData.vx = Math.cos(angle) * 1.5;
+    p.userData.vy = Math.sin(angle) * 1.5;
+    p.userData.vz = 2;
+    g.add(p);
+  }
+  g.position.copy(pos);
+  scene.add(g);
+  vfxList.push({ mesh: g, timer: 0, duration: 1.0, type: 'sparkle' });
+}
+
+function updateVFX(dt) {
+  for (let i = vfxList.length - 1; i >= 0; i--) {
+    const v = vfxList[i];
+    v.timer += dt;
+    const t = v.timer / v.duration;
+    if (t >= 1) {
+      scene.remove(v.mesh);
+      vfxList.splice(i, 1);
+      continue;
+    }
+    v.mesh.children.forEach(child => {
+      if (child.userData.vx !== undefined) {
+        child.position.x += child.userData.vx * dt;
+        child.position.y += child.userData.vy * dt;
+        child.position.z += child.userData.vz * dt;
+        child.userData.vz -= 5 * dt; // gravity
+      }
+      if (child.material && child.material.opacity !== undefined) {
+        child.material.opacity = Math.max(0, 1 - t);
+      }
+      child.scale.setScalar(Math.max(0.01, 1 - t * 0.5));
+    });
+  }
+}
+
+// ─── SCORE POP UI ───────────────────────────────────────────────────────────
+function spawnScorePop(pts) {
+  const el = document.createElement('div');
+  el.className = 'score-pop';
+  el.textContent = `+${pts}`;
+  el.style.color = pts > 100 ? '#ffffff' : '#ffff00';
+
+  // Project frog position to screen
+  const vec = frogWorldPos.clone();
+  vec.project(camera);
+  const x = (vec.x * 0.5 + 0.5) * window.innerWidth;
+  const y = (-vec.y * 0.5 + 0.5) * window.innerHeight;
+  el.style.left = x + 'px';
+  el.style.top = y + 'px';
+
+  document.body.appendChild(el);
+
+  let elapsed = 0;
+  const dur = 1.5;
+  function animate() {
+    elapsed += 1 / 60;
+    const t = elapsed / dur;
+    if (t >= 1) { el.remove(); return; }
+    el.style.top = (y - 60 * t) + 'px';
+    el.style.opacity = 1 - t;
+    requestAnimationFrame(animate);
+  }
+  requestAnimationFrame(animate);
+}
+
+// ─── WAVE ANNOUNCEMENT ─────────────────────────────────────────────────────
+function showWaveAnnounce(waveNum) {
+  const el = document.getElementById('wave-announce');
+  el.textContent = `WAVE ${waveNum}!`;
+  el.style.opacity = 1;
+  el.style.transform = 'translate(-50%, -50%) scale(2)';
+  let elapsed = 0;
+  function animate() {
+    elapsed += 1 / 60;
+    if (elapsed < 0.2) {
+      el.style.opacity = elapsed / 0.2;
+    } else if (elapsed < 1.5) {
+      el.style.opacity = 1;
+      const s = 2 - (elapsed - 0.2) / 1.3;
+      el.style.transform = `translate(-50%, -50%) scale(${s})`;
+    } else if (elapsed < 2.0) {
+      el.style.opacity = 1 - (elapsed - 1.5) / 0.5;
+    } else {
+      el.style.opacity = 0;
+      return;
+    }
+    requestAnimationFrame(animate);
+  }
+  requestAnimationFrame(animate);
+}
+
+// ─── OVERLAY ────────────────────────────────────────────────────────────────
+function updateOverlay() {
+  const bg = document.getElementById('overlay-bg');
+  const title = document.getElementById('title-text');
+  const sub = document.getElementById('subtitle-text');
+  const his = document.getElementById('hiscore-text');
+  const cred = document.getElementById('credits-text');
+  const state = document.getElementById('state-text');
+
+  title.textContent = '';
+  sub.textContent = '';
+  his.textContent = '';
+  cred.textContent = '';
+  state.style.display = 'none';
+  bg.style.background = 'rgba(0,0,0,0)';
+
+  switch (gameState) {
+    case State.TITLE:
+      bg.style.background = 'rgba(10,10,20,0.94)';
+      title.textContent = 'UNREAL FROG';
+      sub.textContent = 'PRESS ANY KEY TO START';
+      if (hiScore > 0) his.textContent = `HI-SCORE: ${hiScore}`;
+      cred.textContent = 'A MOB PROGRAMMING PRODUCTION';
+      break;
+    case State.SPAWNING:
+      state.style.display = 'block';
+      state.textContent = 'GET READY';
+      break;
+    case State.PAUSED:
+      bg.style.background = 'rgba(0,0,0,0.6)';
+      state.style.display = 'block';
+      state.textContent = 'PAUSED';
+      break;
+    case State.DYING:
+      state.style.display = 'block';
+      state.textContent = 'OOPS!';
+      break;
+    case State.ROUND_COMPLETE:
+      state.style.display = 'block';
+      state.textContent = 'ROUND COMPLETE!';
+      break;
+    case State.GAME_OVER:
+      bg.style.background = 'rgba(0,0,0,0.7)';
+      state.style.display = 'block';
+      state.textContent = 'GAME OVER';
+      break;
+    case State.PLAYING:
+      break;
+  }
+}
+
+// ─── AUDIO ──────────────────────────────────────────────────────────────────
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+function playTone(freq, dur, type = 'square', vol = 0.15) {
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+  gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + dur);
+}
+
+function playSound(name) {
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  switch (name) {
+    case 'hop':
+      playTone(440, 0.05, 'square', 0.1);
+      break;
+    case 'squish':
+      playTone(150, 0.3, 'sawtooth', 0.2);
+      setTimeout(() => playTone(80, 0.2, 'sawtooth', 0.15), 100);
+      break;
+    case 'splash':
+      // White noise burst
+      const buf = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.3, audioCtx.sampleRate);
+      const data = buf.getChannelData(0);
+      for (let i = 0; i < data.length; i++) {
+        data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (audioCtx.sampleRate * 0.1));
+      }
+      const src = audioCtx.createBufferSource();
+      const g = audioCtx.createGain();
+      src.buffer = buf;
+      g.gain.value = 0.2;
+      src.connect(g);
+      g.connect(audioCtx.destination);
+      src.start();
+      break;
+    case 'homeSlot':
+      playTone(523, 0.1, 'square', 0.12);
+      setTimeout(() => playTone(659, 0.1, 'square', 0.12), 80);
+      setTimeout(() => playTone(784, 0.15, 'square', 0.12), 160);
+      break;
+    case 'roundComplete':
+      [523, 659, 784, 1047].forEach((f, i) => {
+        setTimeout(() => playTone(f, 0.2, 'square', 0.15), i * 120);
+      });
+      break;
+    case 'extraLife':
+      [784, 988, 1175, 1318].forEach((f, i) => {
+        setTimeout(() => playTone(f, 0.15, 'triangle', 0.12), i * 100);
+      });
+      break;
+    case 'timerWarning':
+      playTone(880, 0.1, 'square', 0.2);
+      setTimeout(() => playTone(880, 0.1, 'square', 0.2), 200);
+      break;
+    case 'gameOver':
+      [440, 370, 330, 262].forEach((f, i) => {
+        setTimeout(() => playTone(f, 0.3, 'sawtooth', 0.15), i * 200);
+      });
+      break;
+  }
+}
+
+// ─── HUD UPDATE ─────────────────────────────────────────────────────────────
+function updateHUD() {
+  document.getElementById('score').textContent = `SCORE: ${String(score).padStart(5, '0')}`;
+  document.getElementById('hiscore').textContent = `HI: ${String(hiScore).padStart(5, '0')}`;
+  document.getElementById('lives-wave').textContent = `LIVES: ${lives}  WAVE: ${wave}`;
+
+  // Timer bar
+  const pct = Math.max(0, timer / TIME_PER_LEVEL);
+  const bar = document.getElementById('timer-bar');
+  bar.style.width = (pct * 100) + '%';
+
+  if (pct > 0.5) {
+    bar.style.backgroundColor = `rgb(${Math.floor((1 - pct) * 2 * 255)}, ${Math.floor(pct * 255)}, 0)`;
+  } else {
+    bar.style.backgroundColor = `rgb(255, ${Math.floor(pct * 2 * 255)}, 0)`;
+  }
+
+  // Pulse when low
+  const container = document.getElementById('timer-bar-container');
+  if (pct < 0.167 && gameState === State.PLAYING) {
+    const pulse = Math.sin(Date.now() * 0.006) * 0.5 + 0.5;
+    container.style.height = (8 + pulse * 6) + 'px';
+    bar.style.backgroundColor = `rgb(${180 + Math.floor(pulse * 75)}, 0, 0)`;
+  } else {
+    container.style.height = '8px';
+  }
+
+  // Death flash
+  const flash = document.getElementById('death-flash');
+  if (deathFlashAlpha > 0) {
+    flash.style.background = `rgba(255, 0, 0, ${deathFlashAlpha})`;
+  } else {
+    flash.style.background = 'rgba(255, 0, 0, 0)';
+  }
+
+  // Title pulse
+  if (gameState === State.TITLE) {
+    const t = Date.now() * 0.001;
+    const pulse = Math.sin(t * 1.5 * Math.PI * 2) * 0.5 + 0.5;
+    const r = Math.floor(pulse * 255);
+    const g = 255;
+    const b = Math.floor((1 - pulse) * 100);
+    document.getElementById('title-text').style.color = `rgb(${r},${g},${b})`;
+
+    const blink = Math.sin(t * 2 * Math.PI * 2) > 0;
+    document.getElementById('subtitle-text').style.opacity = blink ? 1 : 0;
+  }
+}
+
+// ─── TURTLE SUBMERGE ────────────────────────────────────────────────────────
+function updateTurtleSubmerge(dt) {
+  if (wave < 2) return; // No submerging in wave 1
+
+  for (let row = RIVER_MIN; row <= RIVER_MAX; row++) {
+    const ents = laneEntities[row];
+    if (!ents) continue;
+    for (const ent of ents) {
+      if (!ent.userData.canSubmerge) continue;
+      ent.userData.submergeTimer += dt;
+      const total = 4.0 + 1.0 + 2.0; // surface + warning + submerged
+      const phase = ent.userData.submergeTimer % total;
+
+      if (phase < 4.0) {
+        ent.userData.submergeState = 'surface';
+        ent.visible = true;
+        ent.children.forEach(c => {
+          if (c.material) c.material.opacity = 1;
+        });
+      } else if (phase < 5.0) {
+        ent.userData.submergeState = 'warning';
+        ent.visible = true;
+        const bobT = (phase - 4.0) / 1.0;
+        ent.children.forEach(c => {
+          if (c.material) {
+            c.material.transparent = true;
+            c.material.opacity = 0.5 + Math.sin(bobT * 10) * 0.2;
+          }
+        });
+      } else {
+        ent.userData.submergeState = 'submerged';
+        ent.visible = false;
+      }
+    }
+  }
+}
+
+// ─── MAIN UPDATE ────────────────────────────────────────────────────────────
+let lastTime = performance.now();
+
+function update() {
+  requestAnimationFrame(update);
+
+  const now = performance.now();
+  const dt = Math.min((now - lastTime) / 1000, 0.05); // Cap at 50ms
+  lastTime = now;
+
+  // State timer
+  stateTimer += dt;
+
+  // Death flash decay
+  if (deathFlashAlpha > 0) {
+    deathFlashAlpha = Math.max(0, deathFlashAlpha - 1.67 * dt);
+  }
+
+  // Update VFX
+  updateVFX(dt);
+
+  switch (gameState) {
+    case State.TITLE:
+      break;
+
+    case State.SPAWNING:
+      frog.visible = Math.sin(stateTimer * 15) > 0; // Blink
+      if (stateTimer >= RESPAWN_DELAY) {
+        frog.visible = true;
+        gameState = State.PLAYING;
+        updateOverlay();
+      }
+      break;
+
+    case State.PLAYING:
+      updateLanes(dt);
+      updateTurtleSubmerge(dt);
+      updateFrogHop(dt);
+      updateFrogRiding(dt);
+      updateTimer(dt);
+      checkContinuousCollisions();
+      break;
+
+    case State.DYING:
+      frog.visible = false;
+      if (stateTimer >= DYING_DUR) {
+        if (lives > 0) {
+          respawnFrog();
+          gameState = State.SPAWNING;
+          stateTimer = 0;
+        } else {
+          gameState = State.GAME_OVER;
+          stateTimer = 0;
+          playSound('gameOver');
+        }
+        updateOverlay();
+      }
+      break;
+
+    case State.ROUND_COMPLETE:
+      updateLanes(dt);
+      if (stateTimer >= ROUND_DUR) {
+        nextWave();
+      }
+      break;
+
+    case State.GAME_OVER:
+      break;
+
+    case State.PAUSED:
+      break;
+  }
+
+  updateHUD();
+  renderer.render(scene, camera);
+}
+
+function updateLanes(dt) {
+  for (let row = 0; row < GRID_ROWS; row++) {
+    const ents = laneEntities[row];
+    if (!ents || ents.length === 0) continue;
+    const config = LANE_CONFIGS[row];
+    if (!config) continue;
+
+    for (const ent of ents) {
+      ent.position.x += ent.userData.speed * dt;
+    }
+
+    // Wrapping
+    const totalWidth = GRID_COLS * CELL;
+    const buffer = ent => ent.userData.width;
+    for (const ent of ents) {
+      if (ent.userData.speed > 0 && ent.position.x > totalWidth + buffer(ent)) {
+        ent.position.x -= totalWidth + buffer(ent) * 2 + getEffectiveGap(config.gap) * CELL;
+      }
+      if (ent.userData.speed < 0 && ent.position.x < -buffer(ent)) {
+        ent.position.x += totalWidth + buffer(ent) * 2 + getEffectiveGap(config.gap) * CELL;
+      }
+    }
+  }
+}
+
+function updateFrogHop(dt) {
+  if (!isHopping) return;
+  hopElapsed += dt;
+  const t = Math.min(hopElapsed / HOP_DURATION, 1.0);
+
+  // Linear XY interpolation
+  frogWorldPos.x = hopStart.x + (hopEnd.x - hopStart.x) * t;
+  frogWorldPos.y = hopStart.y + (hopEnd.y - hopStart.y) * t;
+  // Parabolic arc
+  frogWorldPos.z = HOP_ARC * 4 * t * (1 - t);
+
+  frog.position.copy(frogWorldPos);
+
+  // Squash and stretch
+  const squash = 1 + Math.sin(t * Math.PI) * 0.2;
+  frog.scale.set(1, 1, squash);
+
+  if (t >= 1.0) {
+    frogWorldPos.z = 0;
+    frog.scale.set(1, 1, 1);
+    finishHop();
+  }
+}
+
+function updateFrogRiding(dt) {
+  if (isHopping || !currentPlatform) return;
+  // Move frog with platform
+  frogWorldPos.x += currentPlatform.userData.speed * dt;
+  frog.position.copy(frogWorldPos);
+  frogGrid = worldToGrid(frogWorldPos);
+
+  // Check off-screen death
+  if (frogWorldPos.x < -CELL || frogWorldPos.x > (GRID_COLS + 1) * CELL) {
+    die('offscreen');
+  }
+
+  // Check if platform submerged
+  if (currentPlatform.userData.submergeState === 'submerged') {
+    die('splash');
+  }
+}
+
+function updateTimer(dt) {
+  timer -= dt;
+  if (timer <= 5 && !timerWarningPlayed) {
+    playSound('timerWarning');
+    timerWarningPlayed = true;
+  }
+  if (timer <= 0) {
+    timer = 0;
+    die('timeout');
+  }
+}
+
+function checkContinuousCollisions() {
+  if (isHopping || gameState !== State.PLAYING) return;
+  // Road collision while stationary
+  if (frogGrid.y >= 1 && frogGrid.y <= 5) {
+    if (checkRoadCollision(frogWorldPos)) {
+      die('squish');
+    }
+  }
+}
+
+// ─── RESIZE ─────────────────────────────────────────────────────────────────
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// ─── INIT ───────────────────────────────────────────────────────────────────
+frog.visible = false;
+updateOverlay();
+update();
+
 </script>
 </body>
 </html>
