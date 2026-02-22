@@ -1,9 +1,14 @@
 #!/usr/bin/env python3
-"""Parse UnrealFrog agent transcripts into JSON for the Agent Interaction Replay app."""
+"""Parse UnrealFrog agent transcripts into JSON for the Agent Interaction Replay app.
+
+Groups individual agent transcript files by sessionId so the replay app
+shows one combined timeline per team session with all agents interleaved.
+"""
 
 import re
 import json
 import sys
+from collections import defaultdict
 from pathlib import Path
 
 TRANSCRIPT_DIR = Path(__file__).parent.parent / ".claude" / "transcripts"
@@ -125,12 +130,48 @@ def parse_transcript(filepath):
     }
 
 
+def merge_session(transcripts):
+    """Merge multiple transcript files from the same session into one combined timeline."""
+    # Use the largest transcript's title as the session title, or the first one
+    primary = max(transcripts, key=lambda t: t['messageCount'])
+    meta = primary['metadata'].copy()
+
+    # Collect all participants across all transcripts
+    all_participants = set()
+    for t in transcripts:
+        all_participants.update(t['participants'])
+
+    # Merge and interleave messages by timestamp.
+    # Within the same minute, preserve the original file order by using
+    # the transcript's file-sort position as a tiebreaker.
+    merged = []
+    for file_idx, t in enumerate(transcripts):
+        for msg_idx, msg in enumerate(t['messages']):
+            merged.append((msg['time'], file_idx, msg_idx, msg))
+
+    # Sort by (time, file_index, message_index_within_file)
+    merged.sort(key=lambda x: (x[0], x[1], x[2]))
+    messages = [m[3] for m in merged]
+
+    session_id = meta.get('sessionId', primary['id'])
+    return {
+        "id": session_id,
+        "title": primary['title'],
+        "metadata": meta,
+        "messages": messages,
+        "participants": sorted(all_participants),
+        "messageCount": len(messages),
+        "fileCount": len(transcripts),
+    }
+
+
 def main():
     if not TRANSCRIPT_DIR.exists():
         print(f"Transcript directory not found: {TRANSCRIPT_DIR}")
         sys.exit(1)
 
-    transcripts = []
+    # Parse all transcript files
+    all_transcripts = []
     files = sorted(TRANSCRIPT_DIR.glob("*.md"))
 
     for f in files:
@@ -138,19 +179,33 @@ def main():
             t = parse_transcript(f)
             has_teammate = any(m['type'] in ('teammate', 'idle') for m in t['messages'])
             if has_teammate and t['messages']:
-                transcripts.append(t)
+                all_transcripts.append(t)
         except Exception as e:
             print(f"Error parsing {f.name}: {e}", file=sys.stderr)
 
-    transcripts.sort(key=lambda t: t['id'], reverse=True)
+    # Group by sessionId
+    by_session = defaultdict(list)
+    for t in all_transcripts:
+        sid = t['metadata'].get('sessionId', t['id'])
+        by_session[sid].append(t)
+
+    # Merge each session's transcripts into one combined timeline
+    sessions = []
+    for sid, group in by_session.items():
+        sessions.append(merge_session(group))
+
+    # Sort newest first by date then session id
+    sessions.sort(key=lambda s: (s['metadata'].get('date', ''), s['id']), reverse=True)
 
     OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
     with open(OUTPUT_FILE, 'w') as f:
-        json.dump({"agents": AGENT_META, "transcripts": transcripts}, f)
+        json.dump({"agents": AGENT_META, "transcripts": sessions}, f)
 
-    total_msgs = sum(t['messageCount'] for t in transcripts)
+    total_msgs = sum(s['messageCount'] for s in sessions)
+    total_files = sum(s['fileCount'] for s in sessions)
     print(f"Processed {len(files)} transcript files")
-    print(f"Found {len(transcripts)} multi-agent transcripts with {total_msgs} messages")
+    print(f"Merged {total_files} multi-agent transcripts into {len(sessions)} sessions")
+    print(f"Total messages: {total_msgs}")
     print(f"Output: {OUTPUT_FILE} ({OUTPUT_FILE.stat().st_size / 1024:.1f} KB)")
 
 
